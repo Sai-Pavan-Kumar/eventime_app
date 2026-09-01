@@ -27,16 +27,12 @@ import {
   MapPin,
   Compass,
   Trophy,
-  ShieldCheck,
   Mail,
-  Lock,
-  Eye,
-  EyeOff,
   Building,
-  Calendar,
-  Layers,
   Star,
   Plus,
+  Eye,
+  EyeOff,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -57,17 +53,15 @@ import type { CollegeRow } from '../types';
 const { width } = Dimensions.get('window');
 
 const PROFESSIONAL_DOMAINS = [
-  'Software & Tech',
-  'AI & Data Science',
+  'Software & AI',
   'Product & Design',
   'Startups & VC',
-  'Marketing & Growth',
+  'Marketing & Media',
   'Business & Finance',
-  'Arts & Entertainment',
-  'Other',
+  'Other Domains',
 ];
 
-const GRAD_YEARS = ['2025', '2026', '2027', '2028', '2029', '2030'];
+const GRAD_YEARS = ['2025', '2026', '2027', '2028', '2029'];
 
 export default function OnboardingScreen() {
   const navigation = useNavigation<any>();
@@ -98,7 +92,7 @@ export default function OnboardingScreen() {
   const [showCollegeDropdown, setShowCollegeDropdown] = useState(false);
 
   // Professional Specific
-  const [industryFocus, setIndustryFocus] = useState<string>('Software & Tech');
+  const [industryFocus, setIndustryFocus] = useState<string>('Software & AI');
 
   // Cities
   const [citySearchQuery, setCitySearchQuery] = useState('');
@@ -116,7 +110,7 @@ export default function OnboardingScreen() {
       : ['Hackathon', 'AI Event', 'Tech Event', 'College Fest']
   );
 
-  // Auth Modal/Form States for Step 6
+  // Auth States for Step 6
   const [authMode, setAuthMode] = useState<'none' | 'email'>('none');
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -136,7 +130,7 @@ export default function OnboardingScreen() {
         .from('colleges')
         .select('*')
         .ilike('name', `%${collegeSearch}%`)
-        .limit(6);
+        .limit(5);
       setCollegesList(data || []);
       setIsSearchingColleges(false);
     }, 250);
@@ -149,7 +143,7 @@ export default function OnboardingScreen() {
       setPreferredCities(preferredCities.filter((item) => item !== c));
     } else {
       if (preferredCities.length >= 3) {
-        Alert.alert('Limit Reached', 'You can select up to 3 preferred cities.');
+        Alert.alert('Limit Reached', 'Select up to 3 cities.');
         return;
       }
       setPreferredCities([...preferredCities, c]);
@@ -162,7 +156,7 @@ export default function OnboardingScreen() {
       setSelectedCategories(selectedCategories.filter((item) => item !== cat));
     } else {
       if (selectedCategories.length >= 6) {
-        Alert.alert('Limit Reached', 'You can select up to 6 category interests.');
+        Alert.alert('Limit Reached', 'Select up to 6 categories.');
         return;
       }
       setSelectedCategories([...selectedCategories, cat]);
@@ -222,19 +216,19 @@ export default function OnboardingScreen() {
       setStep(2);
     } else if (step === 2) {
       if (userType === 'student' && !college.trim()) {
-        Alert.alert('College Required', 'Please select or enter your college name to find campus events.');
+        Alert.alert('College Required', 'Please choose your college to continue.');
         return;
       }
       setStep(3);
     } else if (step === 3) {
       if (preferredCities.length === 0) {
-        Alert.alert('Select City', 'Please select at least one city to discover events around you.');
+        Alert.alert('Select City', 'Please select at least 1 city.');
         return;
       }
       setStep(4);
     } else if (step === 4) {
       if (selectedCategories.length === 0) {
-        Alert.alert('Select Category', 'Please select at least 1 category interest.');
+        Alert.alert('Select Category', 'Please select at least 1 category.');
         return;
       }
       setStep(5);
@@ -270,25 +264,23 @@ export default function OnboardingScreen() {
       Alert.alert('Sign-In Error', error.message || 'Could not complete Google Sign-In.');
       return;
     }
-    // If successful, onAuthStateChange in AuthContext will update user,
-    // and we sync the preferences to Supabase
-    if (user) {
-      await syncPreferencesToSupabase(user.id, currentOnboardingData);
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData?.session?.user) {
+      await syncPreferencesToSupabase(sessionData.session.user.id, currentOnboardingData);
       await refreshProfile();
-    } else {
-      await saveGuestPreferences(currentOnboardingData);
       await setHasCompletedOnboarding(true);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainTabs' }],
+      });
     }
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'MainTabs' }],
-    });
   };
 
   // Email Auth
   const handleEmailAuth = async () => {
     if (!email.trim() || !password) {
-      Alert.alert('Validation Error', 'Please enter your email and password.');
+      Alert.alert('Required', 'Please enter email and password.');
       return;
     }
     setAuthLoading('email');
@@ -298,11 +290,11 @@ export default function OnboardingScreen() {
       if (error) {
         Alert.alert('Sign Up Failed', error.message);
       } else if (unconfirmed) {
-        Alert.alert('Email Already Registered', 'Please sign in with this email.');
+        Alert.alert('Email Registered', 'Please sign in with this email.');
         setIsSignUp(false);
       } else {
         await saveGuestPreferences(currentOnboardingData);
-        Alert.alert('Account Created', 'Please check your email to verify your account, then sign in.');
+        Alert.alert('Account Created', 'Check your email to verify, then sign in.');
         setIsSignUp(false);
       }
     } else {
@@ -311,8 +303,9 @@ export default function OnboardingScreen() {
       if (error) {
         Alert.alert('Sign In Failed', error.message);
       } else {
-        if (user) {
-          await syncPreferencesToSupabase(user.id, currentOnboardingData);
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session?.user) {
+          await syncPreferencesToSupabase(sessionData.session.user.id, currentOnboardingData);
           await refreshProfile();
         }
         await setHasCompletedOnboarding(true);
@@ -324,18 +317,15 @@ export default function OnboardingScreen() {
     }
   };
 
-  // Progress Bar Percentage
   const progressPercent = Math.round((step / 6) * 100);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Top Navigation Bar */}
+      {/* Minimal Top Header */}
       <View style={styles.topBar}>
         <View style={styles.topBarLeft}>
           <Image source={APP_ASSETS.logo} style={styles.logoImage} contentFit="contain" />
-          <View style={styles.stepBadge}>
-            <Text style={styles.stepBadgeText}>Step {step} of 6</Text>
-          </View>
+          <Text style={styles.stepCounterText}>Step {step} of 6</Text>
         </View>
 
         {step < 6 && (
@@ -345,7 +335,7 @@ export default function OnboardingScreen() {
         )}
       </View>
 
-      {/* Progress Line */}
+      {/* Sleek Progress Indicator */}
       <View style={styles.progressBarBg}>
         <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
       </View>
@@ -360,120 +350,104 @@ export default function OnboardingScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {/* =========================================================================
-              SCREEN 1: What is Eventime? & Persona Selection
+              SCREEN 1: All Events, One Feed & Persona Selection
              ========================================================================= */}
           {step === 1 && (
             <View style={styles.slideContainer}>
               <IllustrationPlaceholder
-                badge="⚡ All Events in One Place"
-                placeholderIcon={<Compass size={36} color="#A78BFA" />}
-                gradientColors={['#1E1B4B', '#312E81', '#0F172A']}
+                badge="All Events, One Feed"
+                placeholderIcon={<Compass size={32} color="#A78BFA" />}
+                gradientColors={['#1E1B4B', '#312E81']}
+                height={150}
               />
 
-              <Text style={styles.slideHeadline}>
-                Your Gateway to Every Event in Your City & Campus
-              </Text>
-              <Text style={styles.slideStory}>
-                Stop hunting across random WhatsApp groups, dead posters, and scattered links. Eventime brings tech fests, hackathons, conferences, workshops, concerts & meetups into one live verified feed.
+              <Text style={styles.headline}>Never Miss What's Happening</Text>
+              <Text style={styles.subtitle}>
+                Tech fests, hackathons, conferences, concerts & meetups across India.
               </Text>
 
-              <Text style={styles.sectionQuestion}>Who are you joining as?</Text>
+              <Text style={styles.questionLabel}>I am a...</Text>
 
-              {/* Persona Selector Cards */}
               <TouchableOpacity
-                style={[
-                  styles.personaCard,
-                  userType === 'student' && styles.personaCardActive,
-                ]}
+                style={[styles.personaCard, userType === 'student' && styles.personaCardActive]}
                 onPress={() => setUserType('student')}
                 activeOpacity={0.8}
               >
-                <View style={[styles.personaIconBox, userType === 'student' && styles.personaIconBoxActive]}>
-                  <GraduationCap size={22} color={userType === 'student' ? '#FFF' : '#6C47FF'} />
+                <View style={[styles.personaIcon, userType === 'student' && styles.personaIconActive]}>
+                  <GraduationCap size={20} color={userType === 'student' ? '#FFF' : '#6C47FF'} />
                 </View>
-                <View style={styles.personaTextContainer}>
+                <View style={{ flex: 1 }}>
                   <Text style={[styles.personaTitle, userType === 'student' && styles.personaTitleActive]}>
                     College Student
                   </Text>
-                  <Text style={styles.personaDesc}>
-                    Campus fests, hackathons, department symposiums & student discounts.
-                  </Text>
+                  <Text style={styles.personaSub}>Campus fests, hackathons & student perks</Text>
                 </View>
-                {userType === 'student' && <CheckCircle2 size={20} color={theme.colors.brand} />}
+                {userType === 'student' && <CheckCircle2 size={18} color={theme.colors.brand} />}
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.personaCard,
-                  userType === 'professional' && styles.personaCardActive,
-                ]}
+                style={[styles.personaCard, userType === 'professional' && styles.personaCardActive]}
                 onPress={() => setUserType('professional')}
                 activeOpacity={0.8}
               >
-                <View style={[styles.personaIconBox, userType === 'professional' && styles.personaIconBoxActive]}>
-                  <Briefcase size={22} color={userType === 'professional' ? '#FFF' : '#6C47FF'} />
+                <View style={[styles.personaIcon, userType === 'professional' && styles.personaIconActive]}>
+                  <Briefcase size={20} color={userType === 'professional' ? '#FFF' : '#6C47FF'} />
                 </View>
-                <View style={styles.personaTextContainer}>
+                <View style={{ flex: 1 }}>
                   <Text style={[styles.personaTitle, userType === 'professional' && styles.personaTitleActive]}>
                     Working Professional
                   </Text>
-                  <Text style={styles.personaDesc}>
-                    Tech summits, developer conferences, workshops & networking meetups.
-                  </Text>
+                  <Text style={styles.personaSub}>Tech summits, conferences & networking</Text>
                 </View>
-                {userType === 'professional' && <CheckCircle2 size={20} color={theme.colors.brand} />}
+                {userType === 'professional' && <CheckCircle2 size={18} color={theme.colors.brand} />}
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.personaCard,
-                  userType === 'creator' && styles.personaCardActive,
-                ]}
+                style={[styles.personaCard, userType === 'creator' && styles.personaCardActive]}
                 onPress={() => setUserType('creator')}
                 activeOpacity={0.8}
               >
-                <View style={[styles.personaIconBox, userType === 'creator' && styles.personaIconBoxActive]}>
-                  <Palette size={22} color={userType === 'creator' ? '#FFF' : '#6C47FF'} />
+                <View style={[styles.personaIcon, userType === 'creator' && styles.personaIconActive]}>
+                  <Palette size={20} color={userType === 'creator' ? '#FFF' : '#6C47FF'} />
                 </View>
-                <View style={styles.personaTextContainer}>
+                <View style={{ flex: 1 }}>
                   <Text style={[styles.personaTitle, userType === 'creator' && styles.personaTitleActive]}>
-                    Creator & Founder
+                    Creator / Founder
                   </Text>
-                  <Text style={styles.personaDesc}>
-                    Pitch days, creative showcases, open mics, design circles & expos.
-                  </Text>
+                  <Text style={styles.personaSub}>Showcases, pitch events & cultural fests</Text>
                 </View>
-                {userType === 'creator' && <CheckCircle2 size={20} color={theme.colors.brand} />}
+                {userType === 'creator' && <CheckCircle2 size={18} color={theme.colors.brand} />}
               </TouchableOpacity>
             </View>
           )}
 
           {/* =========================================================================
-              SCREEN 2: Campus Hub (Student) OR Career Sphere (Professional/Creator)
+              SCREEN 2: Campus / Career Setup
              ========================================================================= */}
           {step === 2 && (
             <View style={styles.slideContainer}>
               {userType === 'student' ? (
                 <>
                   <IllustrationPlaceholder
-                    badge="🏫 Campus Circle"
-                    placeholderIcon={<GraduationCap size={36} color="#A78BFA" />}
-                    gradientColors={['#172554', '#1E3A8A', '#0F172A']}
+                    badge="Campus Sphere"
+                    placeholderIcon={<GraduationCap size={32} color="#A78BFA" />}
+                    gradientColors={['#172554', '#1E3A8A']}
+                    height={140}
                   />
 
-                  <Text style={styles.slideHeadline}>Never Miss an Event on Your Campus</Text>
-                  <Text style={styles.slideStory}>
-                    Get a dedicated Campus feed for your college. Inter-college fests, department symposiums, and private campus events appear directly in your Campus tab.
+                  <Text style={styles.headline}>Your Campus Hub</Text>
+                  <Text style={styles.subtitle}>
+                    Get private feeds for your college fests and symposiums.
                   </Text>
 
-                  {/* College Search Autocomplete */}
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.inputLabel}>Search College / University *</Text>
-                    <View style={styles.searchBarWrapper}>
-                      <Search size={18} color="#94A3B8" style={{ marginRight: 8 }} />
+                  {/* College Search */}
+                  <View style={styles.inputSection}>
+                    <Text style={styles.label}>College / University *</Text>
+                    <View style={styles.searchBar}>
+                      <Search size={16} color="#94A3B8" style={{ marginRight: 6 }} />
                       <TextInput
-                        style={styles.searchInput}
-                        placeholder="e.g. IIT Hyderabad, CBIT, OU, VIT..."
+                        style={styles.input}
+                        placeholder="Search IIT, CBIT, OU, VIT..."
                         placeholderTextColor="#94A3B8"
                         value={collegeSearch}
                         onChangeText={(t) => {
@@ -487,13 +461,12 @@ export default function OnboardingScreen() {
                       {isSearchingColleges && <ActivityIndicator size="small" color={theme.colors.brand} />}
                     </View>
 
-                    {/* Autocomplete Dropdown */}
                     {showCollegeDropdown && collegesList.length > 0 && (
-                      <View style={styles.dropdownCard}>
+                      <View style={styles.dropdown}>
                         {collegesList.map((col) => (
                           <TouchableOpacity
                             key={col.id}
-                            style={styles.dropdownItem}
+                            style={styles.dropdownRow}
                             onPress={() => {
                               setCollege(col.name);
                               setCollegeId(col.id);
@@ -501,62 +474,51 @@ export default function OnboardingScreen() {
                               setShowCollegeDropdown(false);
                             }}
                           >
-                            <Building size={14} color="#6C47FF" style={{ marginRight: 8 }} />
-                            <Text style={styles.dropdownItemText} numberOfLines={1}>
-                              {col.name}
-                            </Text>
+                            <Building size={14} color="#6C47FF" style={{ marginRight: 6 }} />
+                            <Text style={styles.dropdownText} numberOfLines={1}>{col.name}</Text>
                           </TouchableOpacity>
                         ))}
                       </View>
                     )}
 
-                    {showCollegeDropdown &&
-                      collegeSearch.length >= 2 &&
-                      !isSearchingColleges &&
-                      collegesList.length === 0 && (
-                        <TouchableOpacity
-                          style={styles.createCollegeBtn}
-                          onPress={() => handleCreateCollege(collegeSearch)}
-                        >
-                          <Plus size={14} color={theme.colors.brand} />
-                          <Text style={styles.createCollegeBtnText}>
-                            Add "{collegeSearch.trim()}" to Colleges
-                          </Text>
-                        </TouchableOpacity>
-                      )}
+                    {showCollegeDropdown && collegeSearch.length >= 2 && !isSearchingColleges && collegesList.length === 0 && (
+                      <TouchableOpacity
+                        style={styles.addBtn}
+                        onPress={() => handleCreateCollege(collegeSearch)}
+                      >
+                        <Plus size={14} color={theme.colors.brand} />
+                        <Text style={styles.addBtnText}>Add "{collegeSearch.trim()}"</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
 
-                  {/* Branch Selection */}
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.inputLabel}>Engineering / Major Branch</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalChips}>
-                      {INDIAN_COLLEGE_BRANCHES.slice(0, 12).map((b) => (
+                  {/* Branch */}
+                  <View style={styles.inputSection}>
+                    <Text style={styles.label}>Branch</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {INDIAN_COLLEGE_BRANCHES.slice(0, 10).map((b) => (
                         <TouchableOpacity
                           key={b}
-                          style={[styles.smallChip, branch === b && styles.smallChipActive]}
+                          style={[styles.miniChip, branch === b && styles.miniChipActive]}
                           onPress={() => setBranch(b)}
                         >
-                          <Text style={[styles.smallChipText, branch === b && styles.smallChipTextActive]}>
-                            {b}
-                          </Text>
+                          <Text style={[styles.miniChipText, branch === b && styles.miniChipTextActive]}>{b}</Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
                   </View>
 
-                  {/* Graduation Year */}
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.inputLabel}>Graduation Year</Text>
-                    <View style={styles.rowWrap}>
+                  {/* Year */}
+                  <View style={styles.inputSection}>
+                    <Text style={styles.label}>Graduation Year</Text>
+                    <View style={styles.chipRow}>
                       {GRAD_YEARS.map((y) => (
                         <TouchableOpacity
                           key={y}
                           style={[styles.yearChip, graduationYear === y && styles.yearChipActive]}
                           onPress={() => setGraduationYear(y)}
                         >
-                          <Text style={[styles.yearChipText, graduationYear === y && styles.yearChipTextActive]}>
-                            {y}
-                          </Text>
+                          <Text style={[styles.yearChipText, graduationYear === y && styles.yearChipTextActive]}>{y}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -565,29 +527,27 @@ export default function OnboardingScreen() {
               ) : (
                 <>
                   <IllustrationPlaceholder
-                    badge="💼 Career Sphere"
-                    placeholderIcon={<Briefcase size={36} color="#A78BFA" />}
-                    gradientColors={['#064E3B', '#065F46', '#0F172A']}
+                    badge="Career Domain"
+                    placeholderIcon={<Briefcase size={32} color="#A78BFA" />}
+                    gradientColors={['#064E3B', '#065F46']}
+                    height={140}
                   />
 
-                  <Text style={styles.slideHeadline}>Curated for Your Professional Journey</Text>
-                  <Text style={styles.slideStory}>
-                    Discover conferences, founder meetups, AI symposiums, and networking circles tailored to your domain and ambition.
+                  <Text style={styles.headline}>Your Domain Focus</Text>
+                  <Text style={styles.subtitle}>
+                    Discover conferences, summits, and meetups tailored for your career.
                   </Text>
 
-                  <Text style={styles.inputLabel}>Select Your Industry / Primary Focus</Text>
-                  <View style={styles.domainGrid}>
+                  <View style={{ gap: 8, marginTop: 12 }}>
                     {PROFESSIONAL_DOMAINS.map((domain) => {
                       const isSelected = industryFocus === domain;
                       return (
                         <TouchableOpacity
                           key={domain}
-                          style={[styles.domainCard, isSelected && styles.domainCardActive]}
+                          style={[styles.domainItem, isSelected && styles.domainItemActive]}
                           onPress={() => setIndustryFocus(domain)}
                         >
-                          <Text style={[styles.domainCardText, isSelected && styles.domainCardTextActive]}>
-                            {domain}
-                          </Text>
+                          <Text style={[styles.domainText, isSelected && styles.domainTextActive]}>{domain}</Text>
                           {isSelected && <CheckCircle2 size={16} color="#FFF" />}
                         </TouchableOpacity>
                       );
@@ -599,34 +559,31 @@ export default function OnboardingScreen() {
           )}
 
           {/* =========================================================================
-              SCREEN 3: Preferred Cities (Search & Select)
+              SCREEN 3: Preferred Cities
              ========================================================================= */}
           {step === 3 && (
             <View style={styles.slideContainer}>
               <IllustrationPlaceholder
-                badge="📍 Location Hub"
-                placeholderIcon={<MapPin size={36} color="#A78BFA" />}
-                gradientColors={['#3B0764', '#581C87', '#0F172A']}
+                badge="Location Hub"
+                placeholderIcon={<MapPin size={32} color="#A78BFA" />}
+                gradientColors={['#3B0764', '#581C87']}
+                height={140}
               />
 
-              <Text style={styles.slideHeadline}>Where Do You Want to Explore?</Text>
-              <Text style={styles.slideStory}>
-                Track events in your home city, college hub, or online. Your "Around You" feed filters live events based on these choices.
-              </Text>
-
-              {/* City Selection Header with Counter */}
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Pick Your Cities</Text>
-                <View style={styles.counterBadge}>
-                  <Text style={styles.counterBadgeText}>{preferredCities.length} / 3 Selected</Text>
+              <View style={styles.headerRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.headline}>Pick Your Cities</Text>
+                  <Text style={styles.subtitle}>Select up to 3 cities for your Around You feed.</Text>
+                </View>
+                <View style={styles.counter}>
+                  <Text style={styles.counterText}>{preferredCities.length}/3</Text>
                 </View>
               </View>
 
-              {/* Search Bar */}
-              <View style={styles.searchBarWrapper}>
-                <Search size={18} color="#94A3B8" style={{ marginRight: 8 }} />
+              <View style={styles.searchBar}>
+                <Search size={16} color="#94A3B8" style={{ marginRight: 6 }} />
                 <TextInput
-                  style={styles.searchInput}
+                  style={styles.input}
                   placeholder="Search Indian cities..."
                   placeholderTextColor="#94A3B8"
                   value={citySearchQuery}
@@ -634,7 +591,6 @@ export default function OnboardingScreen() {
                 />
               </View>
 
-              {/* Cities Grid */}
               <View style={styles.chipGrid}>
                 {filteredCities.map((cityName) => {
                   const isSelected = preferredCities.includes(cityName);
@@ -645,11 +601,10 @@ export default function OnboardingScreen() {
                       onPress={() => toggleCity(cityName)}
                       activeOpacity={0.7}
                     >
-                      <MapPin size={13} color={isSelected ? '#FFF' : '#64748B'} style={{ marginRight: 4 }} />
+                      <MapPin size={12} color={isSelected ? '#FFF' : '#64748B'} style={{ marginRight: 4 }} />
                       <Text style={[styles.cityChipText, isSelected && styles.cityChipTextActive]}>
                         {cityName}
                       </Text>
-                      {isSelected && <CheckCircle2 size={13} color="#FFF" style={{ marginLeft: 4 }} />}
                     </TouchableOpacity>
                   );
                 })}
@@ -658,42 +613,38 @@ export default function OnboardingScreen() {
           )}
 
           {/* =========================================================================
-              SCREEN 4: Your Event Passions (36 Categories)
+              SCREEN 4: Interest Categories
              ========================================================================= */}
           {step === 4 && (
             <View style={styles.slideContainer}>
               <IllustrationPlaceholder
-                badge="🎯 Custom Interests"
-                placeholderIcon={<Layers size={36} color="#A78BFA" />}
-                gradientColors={['#701A75', '#4A044E', '#0F172A']}
+                badge="Event Categories"
+                placeholderIcon={<Sparkles size={32} color="#A78BFA" />}
+                gradientColors={['#701A75', '#4A044E']}
+                height={140}
               />
 
-              <Text style={styles.slideHeadline}>What Inspires You Most?</Text>
-              <Text style={styles.slideStory}>
-                From 48-hour AI Hackathons to high-energy College Fests and Creator Meetups — your "For You" feed is built entirely around these choices.
-              </Text>
-
-              {/* Category Counter */}
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Select Categories</Text>
-                <View style={styles.counterBadge}>
-                  <Text style={styles.counterBadgeText}>{selectedCategories.length} / 6 Selected</Text>
+              <View style={styles.headerRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.headline}>Choose Your Interests</Text>
+                  <Text style={styles.subtitle}>Pick up to 6 categories for your For You feed.</Text>
+                </View>
+                <View style={styles.counter}>
+                  <Text style={styles.counterText}>{selectedCategories.length}/6</Text>
                 </View>
               </View>
 
-              {/* Search Bar */}
-              <View style={styles.searchBarWrapper}>
-                <Search size={18} color="#94A3B8" style={{ marginRight: 8 }} />
+              <View style={styles.searchBar}>
+                <Search size={16} color="#94A3B8" style={{ marginRight: 6 }} />
                 <TextInput
-                  style={styles.searchInput}
-                  placeholder="Filter categories (e.g. Hackathon, Concert)..."
+                  style={styles.input}
+                  placeholder="Filter categories (Hackathon, Fest)..."
                   placeholderTextColor="#94A3B8"
                   value={categorySearchQuery}
                   onChangeText={setCategorySearchQuery}
                 />
               </View>
 
-              {/* Categories Grid */}
               <View style={styles.chipGrid}>
                 {filteredCategories.map((cat) => {
                   const isSelected = selectedCategories.includes(cat);
@@ -702,7 +653,7 @@ export default function OnboardingScreen() {
                     <TouchableOpacity
                       key={cat}
                       style={[
-                        styles.categoryChip,
+                        styles.catChip,
                         isSelected && {
                           backgroundColor: meta.accentColor,
                           borderColor: meta.accentColor,
@@ -711,15 +662,9 @@ export default function OnboardingScreen() {
                       onPress={() => toggleCategory(cat)}
                       activeOpacity={0.7}
                     >
-                      <Text
-                        style={[
-                          styles.categoryChipText,
-                          isSelected && styles.categoryChipTextActive,
-                        ]}
-                      >
+                      <Text style={[styles.catChipText, isSelected && styles.catChipTextActive]}>
                         {cat}
                       </Text>
-                      {isSelected && <CheckCircle2 size={13} color="#FFF" style={{ marginLeft: 4 }} />}
                     </TouchableOpacity>
                   );
                 })}
@@ -728,80 +673,62 @@ export default function OnboardingScreen() {
           )}
 
           {/* =========================================================================
-              SCREEN 5: The Leaderboard & ET Score Economy
+              SCREEN 5: Leaderboard & ET Score
              ========================================================================= */}
           {step === 5 && (
             <View style={styles.slideContainer}>
               <IllustrationPlaceholder
-                badge="🏆 Leaderboard & Rewards"
-                placeholderIcon={<Trophy size={36} color="#FBBF24" />}
-                gradientColors={['#78350F', '#92400E', '#0F172A']}
+                badge="Leaderboard & ET Score"
+                placeholderIcon={<Trophy size={32} color="#FBBF24" />}
+                gradientColors={['#78350F', '#92400E']}
+                height={140}
               />
 
-              <Text style={styles.slideHeadline}>Compete, Earn ET Score & Rule the Leaderboard</Text>
-              <Text style={styles.slideStory}>
-                Eventime is driven by community curators. Post events, earn ET Points, unlock Silver & Gold Curator tiers, and rank on your City and Campus leaderboards.
+              <Text style={styles.headline}>Compete & Climb Ranks</Text>
+              <Text style={styles.subtitle}>
+                Post events in 30 seconds, earn ET Points, and top your city leaderboard.
               </Text>
 
-              {/* Starting Bonus Card */}
-              <View style={styles.bonusCard}>
-                <View style={styles.bonusIconCircle}>
-                  <Star size={24} color="#F59E0B" />
-                </View>
+              <View style={styles.bonusBox}>
+                <Star size={22} color="#F59E0B" />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.bonusTitle}>Starting Curator Bonus</Text>
-                  <Text style={styles.bonusSubtitle}>+100 ET Score automatically credited on account creation!</Text>
+                  <Text style={styles.bonusHead}>+100 Starting ET Score</Text>
+                  <Text style={styles.bonusDesc}>Instant bonus unlocked upon profile creation!</Text>
                 </View>
               </View>
 
-              {/* Summary Passport Card */}
-              <View style={styles.passportCard}>
-                <Text style={styles.passportHeader}>YOUR EVENTIME PROFILE SETUP</Text>
-
-                <View style={styles.passportRow}>
-                  <Text style={styles.passportLabel}>Persona:</Text>
-                  <Text style={styles.passportValue}>
-                    {userType === 'student' ? '🎓 College Student' : userType === 'professional' ? '💼 Professional' : '🎨 Creator'}
-                  </Text>
-                </View>
-
+              <View style={styles.miniCard}>
+                <Text style={styles.miniCardTag}>PREFERENCES SUMMARY</Text>
+                <Text style={styles.miniCardText}>
+                  👤 {userType === 'student' ? 'College Student' : userType === 'professional' ? 'Professional' : 'Creator'}
+                </Text>
                 {userType === 'student' && college ? (
-                  <View style={styles.passportRow}>
-                    <Text style={styles.passportLabel}>College:</Text>
-                    <Text style={styles.passportValue} numberOfLines={1}>{college} ({branch} '{graduationYear})</Text>
-                  </View>
+                  <Text style={styles.miniCardText}>🏫 {college}</Text>
                 ) : null}
-
-                <View style={styles.passportRow}>
-                  <Text style={styles.passportLabel}>Hubs ({preferredCities.length}):</Text>
-                  <Text style={styles.passportValue}>{preferredCities.join(', ')}</Text>
-                </View>
-
-                <View style={styles.passportRow}>
-                  <Text style={styles.passportLabel}>Interests ({selectedCategories.length}):</Text>
-                  <Text style={styles.passportValue} numberOfLines={2}>{selectedCategories.join(', ')}</Text>
-                </View>
+                <Text style={styles.miniCardText}>📍 {preferredCities.join(', ')}</Text>
+                <Text style={styles.miniCardText} numberOfLines={1}>🎯 {selectedCategories.join(', ')}</Text>
               </View>
             </View>
           )}
 
           {/* =========================================================================
-              SCREEN 6: Lock in Your Setup & Sign In
+              SCREEN 6: Save & Launch
              ========================================================================= */}
           {step === 6 && (
             <View style={styles.slideContainer}>
               <IllustrationPlaceholder
-                badge="🚀 Ready to Launch"
-                placeholderIcon={<Sparkles size={36} color="#A78BFA" />}
-                gradientColors={['#1E1B4B', '#4C1D95', '#0F172A']}
+                badge="Save & Sync"
+                placeholderIcon={<Sparkles size={32} color="#A78BFA" />}
+                gradientColors={['#1E1B4B', '#4C1D95']}
+                height={140}
               />
 
-              <Text style={styles.slideHeadline}>Lock In Your Preferences</Text>
-              <Text style={styles.slideStory}>
-                Sign in to save your customized feeds, sync bookmarks, track your ET Score rank, and post events in 30 seconds.
+              <Text style={styles.headline}>Lock In Your Profile</Text>
+              <Text style={styles.subtitle}>
+                Sign in to save your custom feeds, sync bookmarks, and track your ET score.
               </Text>
 
-              {/* Option A: Google 1-Tap Sign-In */}
+              {/* Google Sign In */}
               <TouchableOpacity
                 style={styles.googleBtn}
                 onPress={handleGoogleSignIn}
@@ -818,113 +745,95 @@ export default function OnboardingScreen() {
                 )}
               </TouchableOpacity>
 
-              {/* Option B: Email Auth Toggle / Form */}
+              {/* Email Form Toggle */}
               {authMode === 'none' ? (
                 <TouchableOpacity
-                  style={styles.emailOptionBtn}
+                  style={styles.emailToggle}
                   onPress={() => setAuthMode('email')}
                 >
-                  <Mail size={18} color="#6C47FF" />
-                  <Text style={styles.emailOptionBtnText}>Sign in / Sign up with Email</Text>
+                  <Mail size={16} color="#6C47FF" />
+                  <Text style={styles.emailToggleText}>Sign in with Email</Text>
                 </TouchableOpacity>
               ) : (
-                <View style={styles.emailFormCard}>
-                  <Text style={styles.emailFormTitle}>{isSignUp ? 'Create an Account' : 'Welcome Back'}</Text>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabelSmall}>Email Address</Text>
+                <View style={styles.emailBox}>
+                  <TextInput
+                    style={styles.authField}
+                    placeholder="Email address"
+                    placeholderTextColor="#94A3B8"
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                  <View style={styles.passRow}>
                     <TextInput
-                      style={styles.authInput}
-                      placeholder="curator@college.edu"
+                      style={{ flex: 1, fontSize: 14, color: theme.colors.textPrimary }}
+                      placeholder="Password"
                       placeholderTextColor="#94A3B8"
-                      value={email}
-                      onChangeText={setEmail}
-                      autoCapitalize="none"
-                      keyboardType="email-address"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry={!showPassword}
                     />
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabelSmall}>Password</Text>
-                    <View style={styles.passwordWrapper}>
-                      <TextInput
-                        style={styles.passwordInput}
-                        placeholder="••••••••"
-                        placeholderTextColor="#94A3B8"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry={!showPassword}
-                      />
-                      <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                        {showPassword ? <EyeOff size={16} color="#94A3B8" /> : <Eye size={16} color="#94A3B8" />}
-                      </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                      {showPassword ? <EyeOff size={16} color="#94A3B8" /> : <Eye size={16} color="#94A3B8" />}
+                    </TouchableOpacity>
                   </View>
 
                   <TouchableOpacity
-                    style={styles.authSubmitBtn}
+                    style={styles.authBtn}
                     onPress={handleEmailAuth}
                     disabled={Boolean(authLoading)}
                   >
                     {authLoading === 'email' ? (
                       <ActivityIndicator size="small" color="#FFF" />
                     ) : (
-                      <Text style={styles.authSubmitBtnText}>{isSignUp ? 'Sign Up & Save Setup' : 'Sign In & Save Setup'}</Text>
+                      <Text style={styles.authBtnText}>{isSignUp ? 'Sign Up' : 'Sign In'}</Text>
                     )}
                   </TouchableOpacity>
 
-                  <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)} style={styles.toggleAuthBtn}>
-                    <Text style={styles.toggleAuthText}>
-                      {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                  <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)} style={{ marginTop: 8, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: theme.colors.brand, fontWeight: '600' }}>
+                      {isSignUp ? 'Have an account? Sign In' : "New user? Create Account"}
                     </Text>
                   </TouchableOpacity>
                 </View>
               )}
 
-              {/* Option C: Explore as Guest */}
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>OR</Text>
-                <View style={styles.dividerLine} />
+              <View style={styles.orDivider}>
+                <View style={styles.orLine} />
+                <Text style={styles.orText}>OR</Text>
+                <View style={styles.orLine} />
               </View>
 
+              {/* Guest Option */}
               <TouchableOpacity
-                style={styles.guestBtn}
+                style={styles.guestActionBtn}
                 onPress={handleContinueAsGuest}
                 disabled={isSaving}
                 activeOpacity={0.8}
               >
-                {isSaving ? (
-                  <ActivityIndicator size="small" color="#64748B" />
-                ) : (
-                  <>
-                    <Text style={styles.guestBtnText}>Explore as Guest</Text>
-                    <ArrowRight size={16} color="#64748B" />
-                  </>
-                )}
+                <Text style={styles.guestActionText}>Explore as Guest</Text>
+                <ArrowRight size={14} color="#64748B" />
               </TouchableOpacity>
-              <Text style={styles.guestNote}>
-                Guest mode lets you browse all public events without account sync.
-              </Text>
             </View>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Bottom Bar Controls (Steps 1 to 5) */}
+      {/* Bottom Nav Bar */}
       {step < 6 && (
         <View style={styles.bottomBar}>
           {step > 1 ? (
             <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
-              <ArrowLeft size={20} color="#64748B" />
+              <ArrowLeft size={18} color="#64748B" />
             </TouchableOpacity>
           ) : (
-            <View style={{ width: 44 }} />
+            <View style={{ width: 40 }} />
           )}
 
           <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
-            <Text style={styles.nextBtnText}>{step === 5 ? 'Finish Setup' : 'Continue'}</Text>
-            <ArrowRight size={18} color="#FFF" />
+            <Text style={styles.nextBtnText}>{step === 5 ? 'Done' : 'Next'}</Text>
+            <ArrowRight size={16} color="#FFF" />
           </TouchableOpacity>
         </View>
       )}
@@ -941,42 +850,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   topBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   logoImage: {
-    width: 28,
-    height: 28,
+    width: 24,
+    height: 24,
   },
-  stepBadge: {
-    backgroundColor: 'rgba(108, 71, 255, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(108, 71, 255, 0.25)',
-  },
-  stepBadgeText: {
+  stepCounterText: {
     fontSize: 12,
     fontWeight: '700',
-    color: theme.colors.brand,
+    color: theme.colors.textSecondary,
   },
   skipBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   skipBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: theme.colors.textSecondary,
   },
   progressBarBg: {
-    height: 3,
+    height: 2,
     backgroundColor: theme.colors.borderLight,
     width: '100%',
   },
@@ -985,177 +886,159 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.brand,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 40,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
   },
   slideContainer: {
     flex: 1,
   },
-  slideHeadline: {
-    fontSize: 22,
+  headline: {
+    fontSize: 20,
     fontWeight: '800',
     color: theme.colors.textPrimary,
-    lineHeight: 28,
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  slideStory: {
-    fontSize: 14,
+  subtitle: {
+    fontSize: 13,
     color: theme.colors.textSecondary,
-    lineHeight: 20,
-    marginBottom: 20,
+    marginBottom: 16,
+    lineHeight: 18,
   },
-  sectionQuestion: {
-    fontSize: 15,
+  questionLabel: {
+    fontSize: 13,
     fontWeight: '700',
     color: theme.colors.textPrimary,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   personaCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.surface,
-    padding: 16,
-    borderRadius: theme.borderRadius.xl,
+    padding: 12,
+    borderRadius: theme.borderRadius.lg,
     borderWidth: 1.5,
     borderColor: theme.colors.border,
-    marginBottom: 12,
-    gap: 14,
-    ...theme.shadows.sm,
+    marginBottom: 10,
+    gap: 12,
   },
   personaCardActive: {
     borderColor: theme.colors.brand,
     backgroundColor: 'rgba(108, 71, 255, 0.04)',
   },
-  personaIconBox: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+  personaIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: 'rgba(108, 71, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  personaIconBoxActive: {
+  personaIconActive: {
     backgroundColor: theme.colors.brand,
   },
-  personaTextContainer: {
-    flex: 1,
-  },
   personaTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: theme.colors.textPrimary,
-    marginBottom: 2,
   },
   personaTitleActive: {
     color: theme.colors.brand,
   },
-  personaDesc: {
-    fontSize: 12,
+  personaSub: {
+    fontSize: 11,
     color: theme.colors.textSecondary,
-    lineHeight: 16,
+    marginTop: 2,
   },
-  fieldGroup: {
-    marginBottom: 16,
+  inputSection: {
+    marginBottom: 14,
   },
-  inputLabel: {
-    fontSize: 13,
+  label: {
+    fontSize: 12,
     fontWeight: '700',
     color: theme.colors.textPrimary,
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  inputLabelSmall: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
-    marginBottom: 4,
-  },
-  searchBarWrapper: {
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.surfaceSecondary,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.lg,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 10,
   },
-  searchInput: {
+  input: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     color: theme.colors.textPrimary,
   },
-  dropdownCard: {
+  dropdown: {
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.md,
-    overflow: 'hidden',
-    marginBottom: 10,
-    ...theme.shadows.md,
+    marginBottom: 8,
   },
-  dropdownItem: {
+  dropdownRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.borderLight,
   },
-  dropdownItemText: {
-    fontSize: 13,
-    color: theme.colors.textPrimary,
+  dropdownText: {
+    fontSize: 12,
     fontWeight: '600',
+    color: theme.colors.textPrimary,
     flex: 1,
   },
-  createCollegeBtn: {
+  addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     backgroundColor: 'rgba(108, 71, 255, 0.08)',
     borderRadius: theme.borderRadius.md,
     alignSelf: 'flex-start',
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  createCollegeBtnText: {
-    fontSize: 12,
+  addBtnText: {
+    fontSize: 11,
     fontWeight: '700',
     color: theme.colors.brand,
   },
-  horizontalChips: {
-    flexDirection: 'row',
-  },
-  smallChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+  miniChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.surfaceSecondary,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    marginRight: 8,
+    marginRight: 6,
   },
-  smallChipActive: {
+  miniChipActive: {
     backgroundColor: theme.colors.brand,
     borderColor: theme.colors.brand,
   },
-  smallChipText: {
-    fontSize: 12,
+  miniChipText: {
+    fontSize: 11,
     fontWeight: '600',
     color: theme.colors.textSecondary,
   },
-  smallChipTextActive: {
+  miniChipTextActive: {
     color: '#FFF',
   },
-  rowWrap: {
+  chipRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   yearChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: theme.borderRadius.md,
     backgroundColor: theme.colors.surfaceSecondary,
     borderWidth: 1,
@@ -1166,57 +1049,47 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.brand,
   },
   yearChipText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: theme.colors.textSecondary,
   },
   yearChipTextActive: {
     color: '#FFF',
   },
-  domainGrid: {
-    gap: 8,
-    marginTop: 8,
-  },
-  domainCard: {
+  domainItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 14,
-    borderRadius: theme.borderRadius.lg,
+    padding: 12,
+    borderRadius: theme.borderRadius.md,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  domainCardActive: {
+  domainItemActive: {
     backgroundColor: theme.colors.brand,
     borderColor: theme.colors.brand,
   },
-  domainCardText: {
-    fontSize: 14,
+  domainText: {
+    fontSize: 13,
     fontWeight: '700',
     color: theme.colors.textPrimary,
   },
-  domainCardTextActive: {
+  domainTextActive: {
     color: '#FFF',
   },
-  sectionHeaderRow: {
+  headerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    justifyContent: 'space-between',
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: theme.colors.textPrimary,
-  },
-  counterBadge: {
+  counter: {
     backgroundColor: 'rgba(108, 71, 255, 0.1)',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: theme.borderRadius.sm,
   },
-  counterBadgeText: {
+  counterText: {
     fontSize: 11,
     fontWeight: '700',
     color: theme.colors.brand,
@@ -1224,14 +1097,13 @@ const styles = StyleSheet.create({
   chipGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
+    gap: 6,
   },
   cityChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.surfaceSecondary,
     borderWidth: 1,
@@ -1242,7 +1114,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.brand,
   },
   cityChipText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: theme.colors.textPrimary,
   },
@@ -1250,261 +1122,195 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: '700',
   },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  catChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.surfaceSecondary,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  categoryChipText: {
-    fontSize: 12,
+  catChipText: {
+    fontSize: 11,
     fontWeight: '600',
     color: theme.colors.textPrimary,
   },
-  categoryChipTextActive: {
+  catChipTextActive: {
     color: '#FFF',
     fontWeight: '700',
   },
-  bonusCard: {
+  bonusBox: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    borderRadius: theme.borderRadius.xl,
-    padding: 16,
-    gap: 14,
-    marginBottom: 16,
+    borderRadius: theme.borderRadius.lg,
+    padding: 12,
+    gap: 10,
+    marginBottom: 12,
   },
-  bonusIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FDE68A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bonusTitle: {
-    fontSize: 14,
+  bonusHead: {
+    fontSize: 13,
     fontWeight: '800',
     color: '#92400E',
-    marginBottom: 2,
   },
-  bonusSubtitle: {
-    fontSize: 12,
+  bonusDesc: {
+    fontSize: 11,
     color: '#B45309',
-    lineHeight: 16,
-    fontWeight: '600',
   },
-  passportCard: {
+  miniCard: {
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.xl,
-    padding: 16,
+    padding: 12,
+    borderRadius: theme.borderRadius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    ...theme.shadows.sm,
+    gap: 4,
   },
-  passportHeader: {
-    fontSize: 11,
+  miniCardTag: {
+    fontSize: 10,
     fontWeight: '800',
-    color: theme.colors.textSecondary,
-    letterSpacing: 0.8,
-    marginBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.borderLight,
-    paddingBottom: 8,
-  },
-  passportRow: {
-    marginBottom: 10,
-  },
-  passportLabel: {
-    fontSize: 11,
-    fontWeight: '700',
     color: theme.colors.textSecondary,
     marginBottom: 2,
   },
-  passportValue: {
-    fontSize: 13,
-    fontWeight: '700',
+  miniCardText: {
+    fontSize: 12,
+    fontWeight: '600',
     color: theme.colors.textPrimary,
   },
   googleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFF',
     borderWidth: 1,
     borderColor: '#CBD5E1',
-    borderRadius: theme.borderRadius.lg,
-    paddingVertical: 14,
-    gap: 10,
-    marginBottom: 12,
-    ...theme.shadows.sm,
+    borderRadius: theme.borderRadius.md,
+    paddingVertical: 12,
+    gap: 8,
+    marginBottom: 10,
   },
   googleIcon: {
-    width: 20,
-    height: 20,
+    width: 18,
+    height: 18,
   },
   googleBtnText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1E293B',
   },
-  emailOptionBtn: {
+  emailToggle: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     backgroundColor: 'rgba(108, 71, 255, 0.06)',
-    borderRadius: theme.borderRadius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(108, 71, 255, 0.2)',
-    gap: 8,
-    marginBottom: 16,
+    borderRadius: theme.borderRadius.md,
+    gap: 6,
   },
-  emailOptionBtnText: {
-    fontSize: 14,
+  emailToggleText: {
+    fontSize: 13,
     fontWeight: '700',
     color: theme.colors.brand,
   },
-  emailFormCard: {
+  emailBox: {
     backgroundColor: theme.colors.surface,
-    padding: 16,
-    borderRadius: theme.borderRadius.xl,
+    padding: 12,
+    borderRadius: theme.borderRadius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    marginBottom: 16,
+    gap: 8,
   },
-  emailFormTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: theme.colors.textPrimary,
-    marginBottom: 12,
-  },
-  inputGroup: {
-    marginBottom: 12,
-  },
-  authInput: {
+  authField: {
     backgroundColor: theme.colors.surfaceSecondary,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 14,
-    color: theme.colors.textPrimary,
+    borderRadius: theme.borderRadius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
   },
-  passwordWrapper: {
+  passRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.surfaceSecondary,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: 12,
+    borderRadius: theme.borderRadius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  passwordInput: {
-    flex: 1,
-    paddingVertical: 9,
-    fontSize: 14,
-    color: theme.colors.textPrimary,
-  },
-  authSubmitBtn: {
+  authBtn: {
     backgroundColor: theme.colors.brand,
-    paddingVertical: 12,
-    borderRadius: theme.borderRadius.md,
+    paddingVertical: 10,
+    borderRadius: theme.borderRadius.sm,
     alignItems: 'center',
-    marginTop: 4,
   },
-  authSubmitBtnText: {
+  authBtnText: {
     color: '#FFF',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
-  toggleAuthBtn: {
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  toggleAuthText: {
-    fontSize: 12,
-    color: theme.colors.brand,
-    fontWeight: '600',
-  },
-  dividerRow: {
+  orDivider: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 12,
   },
-  dividerLine: {
+  orLine: {
     flex: 1,
     height: 1,
     backgroundColor: theme.colors.borderLight,
   },
-  dividerText: {
-    paddingHorizontal: 12,
-    fontSize: 11,
+  orText: {
+    paddingHorizontal: 10,
+    fontSize: 10,
     fontWeight: '700',
     color: theme.colors.textMuted,
   },
-  guestBtn: {
+  guestActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: theme.borderRadius.lg,
+    paddingVertical: 12,
+    borderRadius: theme.borderRadius.md,
     backgroundColor: theme.colors.surfaceSecondary,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    gap: 8,
+    gap: 6,
   },
-  guestBtnText: {
-    fontSize: 14,
+  guestActionText: {
+    fontSize: 13,
     fontWeight: '700',
     color: theme.colors.textSecondary,
-  },
-  guestNote: {
-    fontSize: 11,
-    color: theme.colors.textMuted,
-    textAlign: 'center',
-    marginTop: 8,
   },
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: theme.colors.borderLight,
     backgroundColor: theme.colors.surface,
   },
   backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: theme.colors.surfaceSecondary,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
   },
   nextBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.brand,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: theme.borderRadius.full,
-    gap: 8,
-    ...theme.shadows.brand,
+    gap: 6,
   },
   nextBtnText: {
     color: '#FFF',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
   },
 });

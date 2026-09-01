@@ -46,6 +46,12 @@ export default function LoginScreen() {
     setIsLoading(null);
     if (error) {
       Alert.alert('Sign-In Error', error.message || 'Could not complete Google Sign-In.');
+    } else {
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('MainTabs');
+      }
     }
   };
 

@@ -170,22 +170,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (result.type === 'success' && result.url) {
           const resUrl = result.url;
-          const fragment = resUrl.includes('#') ? resUrl.split('#')[1] : resUrl.split('?')[1];
-          if (fragment) {
-            const params = new URLSearchParams(fragment);
-            const accessToken = params.get('access_token');
-            const refreshToken = params.get('refresh_token');
-            const code = params.get('code');
+          
+          // Parse both query parameters and hash fragment
+          const parsed = Linking.parse(resUrl);
+          const params: Record<string, string> = {};
 
-            if (accessToken && refreshToken) {
-              const { error: sessionError } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
-              if (sessionError) throw sessionError;
-            } else if (code) {
-              const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-              if (exchangeError) throw exchangeError;
+          if (parsed.queryParams) {
+            Object.entries(parsed.queryParams).forEach(([k, v]) => {
+              if (v) params[k] = Array.isArray(v) ? v[0] : String(v);
+            });
+          }
+
+          if (resUrl.includes('#')) {
+            const hashPart = resUrl.split('#')[1];
+            const hashParams = new URLSearchParams(hashPart);
+            hashParams.forEach((v, k) => {
+              params[k] = v;
+            });
+          }
+
+          const accessToken = params.access_token;
+          const refreshToken = params.refresh_token;
+          const code = params.code;
+
+          if (accessToken && refreshToken) {
+            const { data: sData, error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            if (sessionError) throw sessionError;
+            if (sData?.session?.user) {
+              setUser(sData.session.user);
+              setSession(sData.session);
+              await fetchProfile(sData.session.user.id, sData.session.user);
+            }
+          } else if (code) {
+            const { data: exData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+            if (exchangeError) throw exchangeError;
+            if (exData?.session?.user) {
+              setUser(exData.session.user);
+              setSession(exData.session);
+              await fetchProfile(exData.session.user.id, exData.session.user);
             }
           }
         }
