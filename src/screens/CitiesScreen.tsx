@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,8 @@ import { Search, CalendarDays } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { CITIES } from '../lib/constants/cities';
-import { getCityImage } from '../lib/asset-registry';
+import { getCityImage, APP_ASSETS } from '../lib/asset-registry';
+import { parseEventDateString } from '../lib/utils/date';
 import type { RootStackParamList } from '../types';
 
 const { width } = Dimensions.get('window');
@@ -34,12 +35,25 @@ export default function CitiesScreen() {
       try {
         const { data, error } = await supabase
           .from('events')
-          .select('city')
+          .select('city, date_string')
           .eq('status', 'approved');
 
         if (!error && data) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
           const counts: Record<string, number> = {};
           data.forEach((ev) => {
+            // Strictly exclude past events from upcoming city counts
+            const parsed = parseEventDateString(ev.date_string || '');
+            if (parsed) {
+              const evDate = new Date(parsed);
+              evDate.setHours(0, 0, 0, 0);
+              if (evDate.getTime() < today.getTime()) {
+                return;
+              }
+            }
+
             if (ev.city) {
               const name = ev.city.trim();
               counts[name] = (counts[name] || 0) + 1;
@@ -55,25 +69,34 @@ export default function CitiesScreen() {
     })();
   }, []);
 
-  const cityList = CITIES.map((c) => ({
-    name: c,
-    count: cityCounts[c] || 0,
-  }));
+  // Filter out cities with 0 upcoming events
+  const activeCityList = useMemo(() => {
+    // Collect all cities that have active counts
+    const withEvents = Object.keys(cityCounts)
+      .filter((cityName) => cityCounts[cityName] > 0)
+      .map((name) => ({
+        name,
+        count: cityCounts[name],
+      }));
 
-  // Pinned "Online" first, followed by cities with most events, then alphabetically
-  const onlineItem = cityList.find((c) => c.name.toLowerCase() === 'online');
-  const otherCities = cityList
-    .filter((c) => c.name.toLowerCase() !== 'online')
-    .sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.name.localeCompare(b.name);
-    });
+    // If Online has events or exists, put it first
+    const onlineItem = withEvents.find((c) => c.name.toLowerCase() === 'online');
+    const otherCities = withEvents
+      .filter((c) => c.name.toLowerCase() !== 'online')
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return a.name.localeCompare(b.name);
+      });
 
-  const sortedCities = onlineItem ? [onlineItem, ...otherCities] : otherCities;
+    return onlineItem ? [onlineItem, ...otherCities] : otherCities;
+  }, [cityCounts]);
 
-  const filteredCities = sortedCities.filter((c) =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
-  );
+  const filteredCities = useMemo(() => {
+    if (!searchQuery.trim()) return activeCityList;
+    return activeCityList.filter((c) =>
+      c.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
+    );
+  }, [activeCityList, searchQuery]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -81,7 +104,7 @@ export default function CitiesScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Explore by City</Text>
         <Text style={styles.subtitle}>
-          Discover conferences, hackathons & meetups happening across India
+          Discover upcoming conferences, hackathons & meetups happening in active cities
         </Text>
 
         {/* Search Input */}
@@ -89,53 +112,77 @@ export default function CitiesScreen() {
           <Search size={18} color="#94A3B8" style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search 30+ Indian cities..."
+            placeholder="Search active city..."
             placeholderTextColor="#94A3B8"
             value={searchQuery}
             onChangeText={setSearchQuery}
+            autoCapitalize="none"
           />
         </View>
       </View>
 
+      {/* Grid of Cities */}
       {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#6C47FF" />
-          <Text style={styles.loadingText}>Loading cities...</Text>
+          <Text style={styles.loadingText}>Finding active cities...</Text>
         </View>
       ) : (
         <FlatList
           data={filteredCities}
           keyExtractor={(item) => item.name}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          numColumns={2}
-          columnWrapperStyle={styles.columnWrapper}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Image
+                source={APP_ASSETS.illustrations.search}
+                style={styles.emptyImage}
+                contentFit="contain"
+              />
+              <Text style={styles.emptyTitle}>No active events in this city</Text>
+              <Text style={styles.emptySubtitle}>
+                {searchQuery
+                  ? `No upcoming events found for "${searchQuery}". Check upcoming events on the home page.`
+                  : 'No cities currently have upcoming events scheduled. Be the first to host one!'}
+              </Text>
+              <TouchableOpacity
+                style={styles.hostBtn}
+                onPress={() => (navigation as any).navigate('CreateTab')}
+              >
+                <Text style={styles.hostBtnText}>Host An Event in Your City</Text>
+              </TouchableOpacity>
+            </View>
+          }
           renderItem={({ item }) => {
             const cityImage = getCityImage(item.name);
             return (
               <TouchableOpacity
-                style={styles.cityCard}
+                style={styles.card}
                 activeOpacity={0.88}
-                onPress={() => navigation.navigate('CityEvents', { city: item.name })}
+                onPress={() =>
+                  navigation.navigate('CityEvents', {
+                    city: item.name,
+                  })
+                }
               >
-                {/* 16:9 Genuine .webp City Banner */}
-                <View style={styles.imageContainer}>
-                  <Image
-                    source={cityImage}
-                    style={styles.cityBanner}
-                    contentFit="cover"
-                    transition={200}
-                  />
-                </View>
+                <Image
+                  source={cityImage}
+                  style={styles.cardImage}
+                  contentFit="cover"
+                  transition={200}
+                />
+                <View style={styles.cardGradient} />
 
-                {/* City Name & Real Event Counts */}
-                <View style={styles.cityInfo}>
+                <View style={styles.cardContent}>
                   <Text style={styles.cityName} numberOfLines={1}>
                     {item.name}
                   </Text>
-                  <View style={styles.countRow}>
-                    <CalendarDays size={13} color="#6C47FF" />
-                    <Text style={styles.cityCount}>
+                  <View style={styles.countBadge}>
+                    <CalendarDays size={11} color="#6C47FF" />
+                    <Text style={styles.countText}>
                       {item.count} {item.count === 1 ? 'Event' : 'Events'}
                     </Text>
                   </View>
@@ -156,8 +203,8 @@ const styles = StyleSheet.create({
   },
   center: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingText: {
     marginTop: 12,
@@ -166,15 +213,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   header: {
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 16,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.5,
@@ -183,70 +230,116 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748B',
     marginTop: 4,
-    marginBottom: 14,
     lineHeight: 18,
   },
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F1F5F9',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 42,
+    marginTop: 14,
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
     color: '#0F172A',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   listContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
-  columnWrapper: {
+  row: {
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  cityCard: {
+  card: {
     width: CARD_WIDTH,
-    backgroundColor: '#FFFFFF',
+    height: 140,
     borderRadius: 20,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    backgroundColor: '#0F172A',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
+    position: 'relative',
   },
-  imageContainer: {
-    width: '100%',
-    aspectRatio: 16 / 10,
-    backgroundColor: '#F1F5F9',
-  },
-  cityBanner: {
+  cardImage: {
     width: '100%',
     height: '100%',
+    position: 'absolute',
   },
-  cityInfo: {
-    padding: 12,
+  cardGradient: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+  },
+  cardContent: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    right: 12,
   },
   cityName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#FFFFFF',
     marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  countRow: {
+  countBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
+    alignSelf: 'flex-start',
   },
-  cityCount: {
-    fontSize: 12,
-    fontWeight: '600',
+  countText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#6C47FF',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 24,
+  },
+  emptyImage: {
+    width: 200,
+    height: 140,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 13,
     color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 20,
+  },
+  hostBtn: {
+    backgroundColor: '#6C47FF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 100,
+  },
+  hostBtnText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });
