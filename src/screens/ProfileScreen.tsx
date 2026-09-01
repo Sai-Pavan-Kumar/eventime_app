@@ -317,6 +317,32 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
+            onPress={() => navigation.navigate('PrivacyPolicy')}
+          >
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuIconBg, { backgroundColor: '#ECFDF5' }]}>
+                <CheckCircle size={18} color="#059669" />
+              </View>
+              <Text style={styles.menuItemText}>Privacy Policy (DPDP)</Text>
+            </View>
+            <ChevronRight size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('Terms')}
+          >
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuIconBg, { backgroundColor: '#EDE9FE' }]}>
+                <Shield size={18} color={theme.colors.brand} />
+              </View>
+              <Text style={styles.menuItemText}>Terms of Service</Text>
+            </View>
+            <ChevronRight size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
             onPress={handleSignOut}
           >
             <View style={styles.menuItemLeft}>

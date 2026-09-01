@@ -13,12 +13,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { useNavigation } from '@react-navigation/native';
 import { Mail, Lock, Eye, EyeOff, CheckCircle2, ShieldCheck } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../config/theme';
 import { APP_ASSETS } from '../lib/asset-registry';
 
 export default function LoginScreen() {
+  const navigation = useNavigation<any>();
   const { signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset } = useAuth();
 
   const [isSignUp, setIsSignUp] = useState(false);
@@ -292,19 +294,31 @@ export default function LoginScreen() {
             )}
 
             {/* Consent Policy Toggle */}
-            <TouchableOpacity
-              style={styles.consentRow}
-              activeOpacity={0.8}
-              onPress={() => setHasConsented(!hasConsented)}
-            >
-              <View style={[styles.checkbox, hasConsented && styles.checkboxChecked]}>
+            <View style={styles.consentRow}>
+              <TouchableOpacity
+                style={[styles.checkbox, hasConsented && styles.checkboxChecked]}
+                onPress={() => setHasConsented(!hasConsented)}
+                activeOpacity={0.8}
+              >
                 {hasConsented && <CheckCircle2 size={16} color="#FFF" />}
-              </View>
+              </TouchableOpacity>
               <Text style={styles.consentText}>
-                I agree to the <Text style={styles.consentLink}>Data Collection Policy</Text> and{' '}
-                <Text style={styles.consentLink}>Terms of Service</Text>.
+                I agree to the{' '}
+                <Text
+                  style={styles.consentLink}
+                  onPress={() => navigation.navigate('PrivacyPolicy')}
+                >
+                  Data Collection Policy
+                </Text>{' '}
+                and{' '}
+                <Text
+                  style={styles.consentLink}
+                  onPress={() => navigation.navigate('Terms')}
+                >
+                  Terms of Service
+                </Text>.
               </Text>
-            </TouchableOpacity>
+            </View>
           </View>
 
           {/* Trust Footer */}

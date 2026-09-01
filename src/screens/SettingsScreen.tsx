@@ -110,6 +110,37 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account & Wipe Data?',
+      'Under the DPDP Act 2023, your account and all associated profile preferences, saves, and event interests will be permanently deleted. This action is irreversible.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Permanently Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (!user) return;
+            try {
+              // Delete personal relational data
+              await Promise.all([
+                supabase.from('saved_events').delete().eq('user_id', user.id),
+                supabase.from('interested_events').delete().eq('user_id', user.id),
+                supabase.from('profiles').delete().eq('id', user.id),
+              ]);
+
+              await supabase.auth.signOut();
+              Alert.alert('Account Deleted', 'Your account data has been completely erased.');
+              (navigation as any).navigate('MainTabs');
+            } catch (delErr: any) {
+              Alert.alert('Error', delErr?.message || 'Could not complete account deletion.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
@@ -282,6 +313,35 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Legal & Privacy Section (DPDP Act) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Privacy & Legal</Text>
+
+          <TouchableOpacity
+            style={styles.legalRow}
+            onPress={() => (navigation as any).navigate('PrivacyPolicy')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.legalLeft}>
+              <CheckCircle2 size={16} color="#059669" />
+              <Text style={styles.legalText}>Privacy Policy (DPDP Compliant)</Text>
+            </View>
+            <Text style={styles.legalArrow}>›</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.legalRow}
+            onPress={() => (navigation as any).navigate('Terms')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.legalLeft}>
+              <Building size={16} color={theme.colors.brand} />
+              <Text style={styles.legalText}>Terms of Service & Guidelines</Text>
+            </View>
+            <Text style={styles.legalArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Save Button */}
         <TouchableOpacity
           style={[styles.bottomSaveBtn, isSaving && styles.bottomSaveBtnDisabled]}
@@ -293,6 +353,15 @@ export default function SettingsScreen() {
           ) : (
             <Text style={styles.bottomSaveBtnText}>Save Profile Preferences</Text>
           )}
+        </TouchableOpacity>
+
+        {/* Delete Account (DPDP Act Section 12 Right to Erasure) */}
+        <TouchableOpacity
+          style={styles.deleteAccountBtn}
+          onPress={handleDeleteAccount}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.deleteAccountText}>Delete Account & Wipe Data</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -485,5 +554,37 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 15,
     fontWeight: '800',
+  },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.borderLight,
+  },
+  legalLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  legalText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+  },
+  legalArrow: {
+    fontSize: 20,
+    color: theme.colors.textMuted,
+  },
+  deleteAccountBtn: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginTop: 16,
+  },
+  deleteAccountText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.danger,
   },
 });

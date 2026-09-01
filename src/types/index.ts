@@ -37,6 +37,8 @@ export type RootStackParamList = {
   CityEvents: { city: string };
   CategoryEvents: { category: string };
   CuratorProfile: { username?: string; userId?: string; name?: string };
+  PrivacyPolicy: undefined;
+  Terms: undefined;
 };
 
 export type MainTabParamList = {
