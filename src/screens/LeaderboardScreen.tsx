@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -17,6 +18,9 @@ import { theme } from '../config/theme';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { useAuth } from '../context/AuthContext';
 import type { LeaderboardViewRow } from '../types';
+
+const DEFAULT_EXCLUDED_EMAILS = ['p.pavansiri@gmail.com', 'eventime.admin@gmail.com'];
+const DEFAULT_EXCLUDED_USERNAMES = ['eventime.admin', 'eventimeadmin', 'admin'];
 
 export default function LeaderboardScreen() {
   const navigation = useNavigation<any>();
@@ -44,25 +48,47 @@ export default function LeaderboardScreen() {
       }
       setIsLeaderboardEnabled(true);
 
-      // 2. Fetch from leaderboard_view or fallback to profiles
+      // 2. Resolve excluded user IDs
+      const rawEnvEmails = process.env.EXPO_PUBLIC_LEADERBOARD_EXCLUDED_EMAILS || '';
+      const envEmailList = rawEnvEmails
+        .split(',')
+        .map((e: string) => e.trim().toLowerCase())
+        .filter(Boolean);
+
+      const allExcludedEmails = Array.from(new Set([...DEFAULT_EXCLUDED_EMAILS, ...envEmailList]));
+
+      const { data: excludedProfiles } = await supabase
+        .from('profiles')
+        .select('id, username, email')
+        .in('email', allExcludedEmails);
+
+      const excludedIds = new Set<string>((excludedProfiles || []).map((p) => p.id));
+
+      // Also add profiles matching default excluded usernames
+      const { data: excludedByUsername } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('username', DEFAULT_EXCLUDED_USERNAMES);
+
+      (excludedByUsername || []).forEach((p) => excludedIds.add(p.id));
+
+      // 3. Fetch from leaderboard_view
       const { data, error } = await supabase
         .from('leaderboard_view')
         .select('*')
         .order('et_score', { ascending: false })
         .limit(100);
 
-      if (!error && data && data.length > 0) {
-        const sanitized = data.map((r, idx) => ({
-          ...r,
-          et_score: r.et_score ?? 100,
-          rank: r.rank ?? idx + 1,
-        }));
-        setLeaderboard(sanitized);
+      let cleanRows: LeaderboardViewRow[] = [];
 
-        if (user) {
-          const foundIndex = sanitized.findIndex((r) => r.user_id === user.id);
-          setMyRank(foundIndex !== -1 ? (sanitized[foundIndex].rank ?? foundIndex + 1) : null);
-        }
+      if (!error && data && data.length > 0) {
+        cleanRows = data
+          .filter((r) => r.user_id && !excludedIds.has(r.user_id))
+          .map((r, idx) => ({
+            ...r,
+            et_score: r.et_score ?? 100,
+            rank: idx + 1,
+          }));
       } else {
         // Fallback to profiles table
         const { data: profs, error: profError } = await supabase
@@ -72,21 +98,25 @@ export default function LeaderboardScreen() {
           .limit(100);
 
         if (!profError && profs) {
-          const mapped: LeaderboardViewRow[] = profs.map((p, idx) => ({
-            user_id: p.id,
-            full_name: p.full_name,
-            username: p.username,
-            avatar_url: p.avatar_url,
-            college: p.college,
-            et_score: p.et_score ?? 100,
-            rank: idx + 1,
-          }));
-          setLeaderboard(mapped);
-          if (user) {
-            const found = mapped.findIndex((m) => m.user_id === user.id);
-            setMyRank(found !== -1 ? found + 1 : null);
-          }
+          cleanRows = profs
+            .filter((p) => !excludedIds.has(p.id))
+            .map((p, idx) => ({
+              user_id: p.id,
+              full_name: p.full_name,
+              username: p.username,
+              avatar_url: p.avatar_url,
+              college: p.college,
+              et_score: p.et_score ?? 100,
+              rank: idx + 1,
+            }));
         }
+      }
+
+      setLeaderboard(cleanRows);
+
+      if (user) {
+        const foundIndex = cleanRows.findIndex((r) => r.user_id === user.id);
+        setMyRank(foundIndex !== -1 ? foundIndex + 1 : null);
       }
     } catch (err) {
       console.error('Fetch leaderboard error:', err);
@@ -142,7 +172,31 @@ export default function LeaderboardScreen() {
             The curator leaderboard is currently undergoing scheduled updates. Please check back later.
           </Text>
         </View>
+      ) : leaderboard.length === 0 ? (
+        /* Empty State: Only shown when absolutely no curators exist */
+        <ScrollView
+          contentContainerStyle={styles.emptyContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.colors.brand}
+              colors={[theme.colors.brand]}
+            />
+          }
+        >
+          <Image
+            source={APP_ASSETS.illustrations.throneEmpty}
+            style={styles.emptyIllustration}
+            contentFit="contain"
+          />
+          <Text style={styles.emptyTitle}>The Throne is Empty!</Text>
+          <Text style={styles.emptySubtitle}>
+            There are currently no curators ranked on the leaderboard. Be the first to post approved events and claim the #1 spot!
+          </Text>
+        </ScrollView>
       ) : (
+        /* Leaderboard View with Podium + Ranks 4+ */
         <FlatList
           data={restList}
           keyExtractor={(item, idx) => item.user_id || String(idx)}
@@ -161,7 +215,7 @@ export default function LeaderboardScreen() {
               {/* Podium for Top 3 */}
               <View style={styles.podiumContainer}>
                 {/* 2nd Place */}
-                {topThree[1] && (
+                {topThree[1] ? (
                   <TouchableOpacity
                     style={[styles.podiumColumn, styles.silverColumn]}
                     onPress={() => handleCuratorPress(topThree[1])}
@@ -187,10 +241,23 @@ export default function LeaderboardScreen() {
                       <Medal size={22} color="#64748B" />
                     </View>
                   </TouchableOpacity>
+                ) : (
+                  <View style={[styles.podiumColumn, styles.silverColumn, { opacity: 0.35 }]}>
+                    <View style={[styles.podiumAvatarWrap]}>
+                      <View style={[styles.podiumAvatar, styles.avatarFallback]}>
+                        <Text style={styles.avatarLetter}>2</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.podiumName}>Open</Text>
+                    <Text style={styles.podiumScore}>-</Text>
+                    <View style={[styles.podiumPedestal, { height: 75, backgroundColor: '#E2E8F0' }]}>
+                      <Medal size={22} color="#64748B" />
+                    </View>
+                  </View>
                 )}
 
                 {/* 1st Place (Center / Tallest) */}
-                {topThree[0] && (
+                {topThree[0] ? (
                   <TouchableOpacity
                     style={[styles.podiumColumn, styles.goldColumn]}
                     onPress={() => handleCuratorPress(topThree[0])}
@@ -219,10 +286,24 @@ export default function LeaderboardScreen() {
                       <Trophy size={28} color="#F59E0B" />
                     </View>
                   </TouchableOpacity>
+                ) : (
+                  <View style={[styles.podiumColumn, styles.goldColumn, { opacity: 0.35 }]}>
+                    <Crown size={24} color="#F59E0B" style={{ marginBottom: -6 }} />
+                    <View style={styles.podiumAvatarWrap}>
+                      <View style={[styles.podiumAvatar, styles.goldAvatar, styles.avatarFallback]}>
+                        <Text style={styles.avatarLetter}>1</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.podiumName, { fontWeight: '900' }]}>Open</Text>
+                    <Text style={[styles.podiumScore, { color: '#B45309' }]}>-</Text>
+                    <View style={[styles.podiumPedestal, { height: 100, backgroundColor: '#FEF3C7' }]}>
+                      <Trophy size={28} color="#F59E0B" />
+                    </View>
+                  </View>
                 )}
 
                 {/* 3rd Place */}
-                {topThree[2] && (
+                {topThree[2] ? (
                   <TouchableOpacity
                     style={[styles.podiumColumn, styles.bronzeColumn]}
                     onPress={() => handleCuratorPress(topThree[2])}
@@ -248,6 +329,19 @@ export default function LeaderboardScreen() {
                       <Award size={20} color="#D97706" />
                     </View>
                   </TouchableOpacity>
+                ) : (
+                  <View style={[styles.podiumColumn, styles.bronzeColumn, { opacity: 0.35 }]}>
+                    <View style={[styles.podiumAvatarWrap]}>
+                      <View style={[styles.podiumAvatar, styles.avatarFallback]}>
+                        <Text style={styles.avatarLetter}>3</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.podiumName}>Open</Text>
+                    <Text style={styles.podiumScore}>-</Text>
+                    <View style={[styles.podiumPedestal, { height: 55, backgroundColor: '#FFEDD5' }]}>
+                      <Award size={20} color="#D97706" />
+                    </View>
+                  </View>
                 )}
               </View>
 
@@ -255,19 +349,6 @@ export default function LeaderboardScreen() {
               {restList.length > 0 && (
                 <Text style={styles.listSectionTitle}>All Top Curators</Text>
               )}
-            </View>
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Image
-                source={APP_ASSETS.illustrations.throneEmpty}
-                style={styles.emptyIllustration}
-                contentFit="contain"
-              />
-              <Text style={styles.emptyTitle}>The Throne is Empty!</Text>
-              <Text style={styles.emptySubtitle}>
-                Be the first curator to post approved events and claim the #1 spot on the leaderboard.
-              </Text>
             </View>
           }
           renderItem={({ item, index }) => {
@@ -551,26 +632,28 @@ const styles = StyleSheet.create({
     color: '#D97706',
   },
   emptyContainer: {
+    flex: 1,
     padding: 32,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 400,
   },
   emptyIllustration: {
-    width: 140,
-    height: 140,
+    width: 160,
+    height: 160,
     marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '800',
     color: '#0F172A',
     marginBottom: 6,
   },
   emptySubtitle: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#64748B',
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
   },
   myRankBar: {
     position: 'absolute',
