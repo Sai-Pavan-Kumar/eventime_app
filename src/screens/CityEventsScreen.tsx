@@ -12,7 +12,7 @@ import { Image } from 'expo-image';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft, MapPin } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
@@ -81,10 +81,6 @@ export default function CityEventsScreen() {
       </TouchableOpacity>
 
       <View style={styles.coverTextContainer}>
-        <View style={styles.badgeRow}>
-          <MapPin size={14} color="#FFF" />
-          <Text style={styles.cityBadgeText}>{city}</Text>
-        </View>
         <Text style={styles.coverTitle}>Events in {city}</Text>
         <Text style={styles.coverSubtitle}>
           {events.length} {events.length === 1 ? 'upcoming event' : 'upcoming events'}
