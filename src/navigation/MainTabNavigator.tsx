@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Home, Search, Plus, MapPin, User, Compass } from 'lucide-react-native';
+import { Home, Search, Plus, MapPin, User } from 'lucide-react-native';
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
 import CitiesScreen from '../screens/CitiesScreen';
@@ -13,33 +14,41 @@ import type { MainTabParamList, RootStackParamList } from '../types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-// Dummy screen for CreateTab since clicking it navigates to stack CreateEvent modal
+// Dummy screen for CreateTab since clicking it opens stack CreateEvent modal
 function DummyCreateScreen() {
   return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
 }
 
 export function MainTabNavigator() {
   const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
+
+  const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 8);
 
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarActiveTintColor: theme.colors.brand,
-        tabBarInactiveTintColor: theme.colors.textSecondary,
+        tabBarActiveTintColor: '#6C47FF',
+        tabBarInactiveTintColor: '#94A3B8',
         tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.border,
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#F1F5F9',
           borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 88 : 64,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+          height: 60 + safeBottom,
+          paddingBottom: safeBottom,
           paddingTop: 8,
-          ...theme.shadows.md,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          elevation: 10,
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '700',
+          marginTop: 2,
         },
       }}
     >
@@ -48,7 +57,9 @@ export function MainTabNavigator() {
         component={HomeScreen}
         options={{
           tabBarLabel: 'Home',
-          tabBarIcon: ({ color, focused }) => <Home size={22} color={color} strokeWidth={focused ? 2.5 : 2} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Home size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
+          ),
         }}
       />
 
@@ -57,19 +68,29 @@ export function MainTabNavigator() {
         component={SearchScreen}
         options={{
           tabBarLabel: 'Search',
-          tabBarIcon: ({ color, focused }) => <Search size={22} color={color} strokeWidth={focused ? 2.5 : 2} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Search size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
+          ),
         }}
       />
 
-      {/* Center Elevated Create (+) Button */}
+      {/* Center Elevated Floating Post (+) Button */}
       <Tab.Screen
         name="CreateTab"
         component={DummyCreateScreen}
         options={{
           tabBarLabel: 'Post',
+          tabBarLabelStyle: {
+            fontSize: 11,
+            fontWeight: '700',
+            marginTop: 4,
+            color: '#6C47FF',
+          },
           tabBarIcon: () => (
-            <View style={styles.createButtonWrapper}>
-              <Plus size={22} color="#FFF" strokeWidth={3} />
+            <View style={styles.elevatedButtonContainer}>
+              <View style={styles.createButtonWrapper}>
+                <Plus size={24} color="#FFFFFF" strokeWidth={3} />
+              </View>
             </View>
           ),
         }}
@@ -86,7 +107,9 @@ export function MainTabNavigator() {
         component={CitiesScreen}
         options={{
           tabBarLabel: 'Cities',
-          tabBarIcon: ({ color, focused }) => <MapPin size={22} color={color} strokeWidth={focused ? 2.5 : 2} />,
+          tabBarIcon: ({ color, focused }) => (
+            <MapPin size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
+          ),
         }}
       />
 
@@ -95,7 +118,9 @@ export function MainTabNavigator() {
         component={ProfileScreen}
         options={{
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ color, focused }) => <User size={22} color={color} strokeWidth={focused ? 2.5 : 2} />,
+          tabBarIcon: ({ color, focused }) => (
+            <User size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
+          ),
         }}
       />
     </Tab.Navigator>
@@ -103,14 +128,24 @@ export function MainTabNavigator() {
 }
 
 const styles = StyleSheet.create({
+  elevatedButtonContainer: {
+    top: -14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   createButtonWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.colors.brand,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#6C47FF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
-    ...theme.shadows.brand,
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+    shadowColor: '#6C47FF',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
   },
 });
