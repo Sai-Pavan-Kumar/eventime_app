@@ -14,6 +14,7 @@ import LeaderboardScreen from '../screens/LeaderboardScreen';
 import AdminScreen from '../screens/AdminScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import CityEventsScreen from '../screens/CityEventsScreen';
+import CuratorProfileScreen from '../screens/CuratorProfileScreen';
 import { theme } from '../config/theme';
 import type { RootStackParamList } from '../types';
 
@@ -64,6 +65,7 @@ export function RootNavigator() {
             <Stack.Screen name="Admin" component={AdminScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="CityEvents" component={CityEventsScreen} />
+            <Stack.Screen name="CuratorProfile" component={CuratorProfileScreen} />
           </>
         )}
       </Stack.Navigator>

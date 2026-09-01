@@ -32,6 +32,7 @@ export default function LoginScreen() {
   // Rate limiting attempts
   const [attempts, setAttempts] = useState(0);
   const [isLockedOut, setIsLockedOut] = useState(false);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
 
   const handleGoogleLogin = async () => {
     if (!hasConsented) {
@@ -52,7 +53,7 @@ export default function LoginScreen() {
       return;
     }
     if (isLockedOut) {
-      Alert.alert('Temporary Lockout', 'Too many failed attempts. Please wait before trying again.');
+      Alert.alert('Temporary Lockout', `Too many failed attempts. Please wait ${lockoutSeconds}s before trying again.`);
       return;
     }
     if (!email.trim() || !password) {
@@ -85,15 +86,25 @@ export default function LoginScreen() {
 
         if (newAttempts >= 3) {
           const penaltyMultiplier = Math.pow(2, newAttempts - 3);
-          const cooldownSeconds = 30 * penaltyMultiplier;
+          const cooldownSeconds = Math.min(30 * penaltyMultiplier, 300);
           setIsLockedOut(true);
+          setLockoutSeconds(cooldownSeconds);
+
+          const interval = setInterval(() => {
+            setLockoutSeconds((prev) => {
+              if (prev <= 1) {
+                clearInterval(interval);
+                setIsLockedOut(false);
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+
           Alert.alert(
             'Too Many Attempts',
             `Too many failed attempts. Please wait ${cooldownSeconds} seconds before trying again.`
           );
-          setTimeout(() => {
-            setIsLockedOut(false);
-          }, cooldownSeconds * 1000);
         } else {
           Alert.alert(
             'Login Failed',
@@ -104,6 +115,7 @@ export default function LoginScreen() {
         }
       } else {
         setAttempts(0);
+        setIsLockedOut(false);
       }
     }
   };

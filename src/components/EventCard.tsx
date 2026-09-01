@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { Bookmark, Share2, MapPin, Clock, Users, IndianRupee, Check } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
 import { theme } from '../config/theme';
 import { getCategoryConfig } from '../lib/category-config';
 import { getCategoryPoster } from '../lib/asset-registry';
@@ -10,37 +11,68 @@ import { supabase } from '../lib/supabase';
 import { parseEventDateString, formatEventTime } from '../lib/utils/date';
 import type { EventRow } from '../types';
 
-interface EventCardProps {
-  event: EventRow;
+export interface EventCardProps {
+  event?: EventRow;
+  id?: string;
+  slug?: string;
+  title?: string;
+  category?: string;
+  dateString?: string;
+  location?: string;
+  city?: string;
+  organizerName?: string;
+  organizerUsername?: string;
+  isFree?: boolean;
+  isFeatured?: boolean;
+  posterUrl?: string;
+  interestedCount?: number;
+  hideOrganizer?: boolean;
+  hidePastBadge?: boolean;
   isSaved?: boolean;
-  onPress: () => void;
+  onPress?: () => void;
   onSaveToggle?: (eventId: string, isSaved: boolean) => void;
+  onOrganizerPress?: () => void;
 }
 
-export const EventCard: React.FC<EventCardProps> = ({
-  event,
-  isSaved: initialIsSaved = false,
-  onPress,
-  onSaveToggle,
-}) => {
+export const EventCard: React.FC<EventCardProps> = (props) => {
+  const navigation = useNavigation<any>();
   const { user } = useAuth();
-  const [isSaved, setIsSaved] = useState(initialIsSaved);
+
+  const id = props.event?.id || props.id || '';
+  const slug = props.event?.slug || props.slug || id;
+  const title = props.event?.title || props.title || 'Event';
+  const category = props.event?.category || props.category || 'General';
+  const dateString = props.event?.date_string || props.dateString || '';
+  const startTime = props.event?.start_time || undefined;
+  const location = props.event?.location || props.location || '';
+  const city = props.event?.city || props.city || '';
+  const collegeName = props.event?.college_name || undefined;
+  const organizerName = props.event?.organizer_name || props.organizerName || 'EvenTime Community';
+  const organizerUsername = props.organizerUsername;
+  const isFree = props.event?.is_free !== undefined ? props.event.is_free !== false : props.isFree !== false;
+  const isFeatured = Boolean(props.event?.is_featured ?? props.isFeatured);
+  const posterUrl = props.event?.poster_url || props.posterUrl;
+  const interestedCount = props.event?.interested_events?.[0]?.count ?? props.event?.interested_count ?? props.interestedCount ?? 0;
+  const hideOrganizer = props.hideOrganizer ?? false;
+  const hidePastBadge = props.hidePastBadge ?? false;
+
+  const [isSaved, setIsSaved] = useState(props.isSaved ?? false);
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const categoryConfig = getCategoryConfig(event.category);
-  const isCustomPoster = Boolean(event.is_featured && event.poster_url && event.poster_url.startsWith('http'));
-  const posterSource = isCustomPoster ? { uri: event.poster_url! } : getCategoryPoster(event.category);
+  const categoryConfig = getCategoryConfig(category);
+  const isCustomPoster = Boolean(isFeatured && posterUrl && posterUrl.startsWith('http'));
+  const posterSource = isCustomPoster ? { uri: posterUrl! } : getCategoryPoster(category);
 
   // Short Date Overlay e.g. "22 MAY" or "SOON"
-  const parsedDate = parseEventDateString(event.date_string || '');
+  const parsedDate = parseEventDateString(dateString);
   const shortDateOverlay = parsedDate
     ? parsedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }).toUpperCase()
     : 'SOON';
 
   // Status calculation
   const statusInfo = (() => {
-    if (!parsedDate) return null;
+    if (!parsedDate || hidePastBadge) return null;
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const evDate = new Date(parsedDate);
@@ -56,7 +88,24 @@ export const EventCard: React.FC<EventCardProps> = ({
     return null;
   })();
 
-  const isFree = event.is_free !== false;
+  const handlePress = () => {
+    if (props.onPress) {
+      props.onPress();
+    } else if (id || slug) {
+      navigation.navigate('EventDetail', { id, slug, eventId: id });
+    }
+  };
+
+  const handleOrganizerPress = () => {
+    if (props.onOrganizerPress) {
+      props.onOrganizerPress();
+    } else if (organizerUsername) {
+      navigation.navigate('CuratorProfile', {
+        username: organizerUsername,
+        name: organizerName,
+      });
+    }
+  };
 
   const handleBookmarkPress = async () => {
     if (!user) {
@@ -71,17 +120,17 @@ export const EventCard: React.FC<EventCardProps> = ({
     try {
       if (nextState) {
         await supabase.from('saved_events').insert({
-          event_id: event.id,
+          event_id: id,
           user_id: user.id,
         });
       } else {
         await supabase
           .from('saved_events')
           .delete()
-          .eq('event_id', event.id)
+          .eq('event_id', id)
           .eq('user_id', user.id);
       }
-      onSaveToggle?.(event.id, nextState);
+      props.onSaveToggle?.(id, nextState);
     } catch (err) {
       console.error('[EventCard] Save error:', err);
       setIsSaved(!nextState);
@@ -92,10 +141,10 @@ export const EventCard: React.FC<EventCardProps> = ({
 
   const handleSharePress = async () => {
     try {
-      const shareUrl = `https://eventime.in/events/${event.slug || event.id}`;
+      const shareUrl = `https://eventime.thesurfboard.in/events/${slug || id}`;
       await Share.share({
-        title: event.title,
-        message: `${event.title} on ${event.date_string || 'Soon'} in ${event.city || 'Online'}\nExplore on EvenTime 🎉\n${shareUrl}`,
+        title: title,
+        message: `${title} on ${dateString || 'Soon'} in ${city || 'Online'}\nExplore on EvenTime 🎉\n${shareUrl}`,
         url: shareUrl,
       });
       setCopied(true);
@@ -109,7 +158,7 @@ export const EventCard: React.FC<EventCardProps> = ({
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.92}
-      onPress={onPress}
+      onPress={handlePress}
     >
       {/* 16:9 Image Layer */}
       <View style={styles.imageContainer}>
@@ -143,7 +192,7 @@ export const EventCard: React.FC<EventCardProps> = ({
 
         {/* Bottom Left Status & Featured Badges */}
         <View style={styles.bottomOverlayCol}>
-          {event.is_featured && (
+          {isFeatured && (
             <View style={styles.featuredBadge}>
               <Text style={styles.featuredText}>Featured</Text>
             </View>
@@ -164,15 +213,25 @@ export const EventCard: React.FC<EventCardProps> = ({
       <View style={styles.content}>
         {/* Title */}
         <Text style={styles.title} numberOfLines={2}>
-          {event.title}
+          {title}
         </Text>
 
         {/* Organizer & Price */}
         <View style={styles.metaRow}>
-          <Text style={styles.organizerText} numberOfLines={1}>
-            Curated by <Text style={styles.organizerHighlight}>{event.organizer_name || 'EvenTime Community'}</Text>
-          </Text>
-          <View style={styles.dotSeparator} />
+          {!hideOrganizer && (
+            <>
+              <Text style={styles.organizerText} numberOfLines={1}>
+                Curated by{' '}
+                <Text
+                  style={[styles.organizerHighlight, Boolean(organizerUsername) && styles.organizerLink]}
+                  onPress={organizerUsername ? handleOrganizerPress : undefined}
+                >
+                  {organizerName}
+                </Text>
+              </Text>
+              <View style={styles.dotSeparator} />
+            </>
+          )}
           {isFree ? (
             <View style={styles.freeBadge}>
               <Text style={styles.freeText}>FREE</Text>
@@ -189,7 +248,7 @@ export const EventCard: React.FC<EventCardProps> = ({
         <View style={styles.infoRow}>
           <MapPin size={13} color="#94A3B8" />
           <Text style={styles.infoText} numberOfLines={1}>
-            {event.college_name ? `${event.college_name}, ${event.city || 'Online'}` : (event.city || 'Online')}
+            {collegeName ? `${collegeName}, ${city || 'Online'}` : (city || 'Online')}
           </Text>
         </View>
 
@@ -198,13 +257,13 @@ export const EventCard: React.FC<EventCardProps> = ({
           <View style={styles.timeSection}>
             <Clock size={13} color="#94A3B8" />
             <Text style={styles.infoText} numberOfLines={1}>
-              {formatEventTime(event.date_string, event.start_time)}
+              {formatEventTime(dateString, startTime)}
             </Text>
-            {Boolean(event.interested_count && event.interested_count > 0) && (
+            {Boolean(interestedCount && interestedCount > 0) && (
               <>
                 <View style={styles.dotSeparator} />
                 <Users size={13} color="#94A3B8" />
-                <Text style={styles.infoText}>{event.interested_count}</Text>
+                <Text style={styles.infoText}>{interestedCount}</Text>
               </>
             )}
           </View>
@@ -358,6 +417,10 @@ const styles = StyleSheet.create({
   organizerHighlight: {
     color: '#0F172A',
     fontWeight: '700',
+  },
+  organizerLink: {
+    color: theme.colors.brand,
+    textDecorationLine: 'underline',
   },
   dotSeparator: {
     width: 3,

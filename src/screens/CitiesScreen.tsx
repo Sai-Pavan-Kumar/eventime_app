@@ -36,7 +36,8 @@ export default function CitiesScreen() {
         const { data, error } = await supabase
           .from('events')
           .select('city, date_string')
-          .eq('status', 'approved');
+          .eq('status', 'approved')
+          .or('college_only.is.null,college_only.eq.false');
 
         if (!error && data) {
           const today = new Date();

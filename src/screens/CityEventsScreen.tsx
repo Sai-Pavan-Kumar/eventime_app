@@ -33,8 +33,9 @@ export default function CityEventsScreen() {
       try {
         const { data, error } = await supabase
           .from('events')
-          .select('*')
+          .select('*, colleges(name), profiles(username, full_name), interested_events(count)')
           .eq('status', 'approved')
+          .or('college_only.is.null,college_only.eq.false')
           .ilike('city', city)
           .order('created_at', { ascending: false });
 
@@ -51,7 +52,7 @@ export default function CityEventsScreen() {
             return evDate.getTime() >= today.getTime();
           });
 
-          setEvents(upcomingEvents);
+          setEvents((upcomingEvents as any[]) || []);
         }
       } catch (err) {
         console.error('[CityEventsScreen] Fetch error:', err);

@@ -5,6 +5,8 @@ import type { User } from '@supabase/supabase-js';
 export type EventRow = Database['public']['Tables']['events']['Row'] & {
   college_name?: string | null;
   interested_count?: number | null;
+  interested_events?: { count: number }[];
+  saved_events?: { count: number }[];
 };
 export type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 export type ReportRow = Database['public']['Tables']['event_reports']['Row'];
@@ -34,6 +36,7 @@ export type RootStackParamList = {
   Settings: undefined;
   CityEvents: { city: string };
   CategoryEvents: { category: string };
+  CuratorProfile: { username?: string; userId?: string; name?: string };
 };
 
 export type MainTabParamList = {

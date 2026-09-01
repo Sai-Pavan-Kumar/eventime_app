@@ -28,26 +28,31 @@ import {
   Flag,
   Users,
   Award,
+  CalendarPlus,
+  Heart,
   CheckCircle2,
 } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
-import { getCategoryMeta } from '../lib/category-config';
+import { getCategoryConfig } from '../lib/category-config';
 import { getCategoryPoster } from '../lib/asset-registry';
 import { useAuth } from '../context/AuthContext';
 import type { EventRow, RootStackParamList } from '../types';
 
 export default function EventDetailScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'EventDetail'>>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { user } = useAuth();
 
   const { slug, id, eventId } = (route.params || {}) as any;
 
-  const [event, setEvent] = useState<EventRow | null>(null);
+  const [event, setEvent] = useState<(EventRow & { profiles?: { username?: string; full_name?: string } }) | null>(null);
   const [isSaved, setIsSaved] = useState(false);
+  const [isInterested, setIsInterested] = useState(false);
+  const [interestCount, setInterestCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpdatingInterest, setIsUpdatingInterest] = useState(false);
 
   // Report Modal state
   const [showReportModal, setShowReportModal] = useState(false);
@@ -56,7 +61,7 @@ export default function EventDetailScreen() {
 
   const fetchEvent = useCallback(async () => {
     try {
-      let query = supabase.from('events').select('*');
+      let query = supabase.from('events').select('*, colleges(name), profiles(username, full_name), interested_events(count)');
 
       const targetId = eventId || id;
       if (targetId) {
@@ -67,23 +72,38 @@ export default function EventDetailScreen() {
 
       const { data, error } = await query.maybeSingle();
       if (error) throw error;
-      setEvent(data);
+      setEvent(data as any);
 
-      if (data && user) {
-        const { data: savedRow } = await supabase
-          .from('saved_events')
-          .select('id')
-          .eq('event_id', data.id)
-          .eq('user_id', user.id)
-          .maybeSingle();
-        setIsSaved(!!savedRow);
+      if (data) {
+        const initialCount = (data as any).interested_events?.[0]?.count ?? (data as any).interested_count ?? 0;
+        setInterestCount(initialCount);
+
+        if (user) {
+          const [{ data: savedRow }, { data: interestRow }] = await Promise.all([
+            supabase
+              .from('saved_events')
+              .select('id')
+              .eq('event_id', data.id)
+              .eq('user_id', user.id)
+              .maybeSingle(),
+            supabase
+              .from('interested_events')
+              .select('id')
+              .eq('event_id', data.id)
+              .eq('user_id', user.id)
+              .maybeSingle(),
+          ]);
+
+          setIsSaved(!!savedRow);
+          setIsInterested(!!interestRow);
+        }
       }
     } catch (err) {
       console.error('[EventDetail] Fetch error:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [id, slug, user]);
+  }, [id, slug, eventId, user]);
 
   useEffect(() => {
     fetchEvent();
@@ -92,9 +112,11 @@ export default function EventDetailScreen() {
   const handleShare = async () => {
     if (!event) return;
     try {
+      const shareUrl = `https://eventime.thesurfboard.in/events/${event.slug || event.id}`;
       await Share.share({
         title: event.title,
-        message: `Check out "${event.title}" on EvenTime!\nDate: ${event.date_string}\nRegister: ${event.registration_link || event.website || ''}`,
+        message: `${event.title} on ${event.date_string || 'Soon'} in ${event.city || 'Online'}\nExplore on EvenTime 🎉\n${shareUrl}`,
+        url: shareUrl,
       });
     } catch (err) {
       console.error('Share error:', err);
@@ -103,7 +125,7 @@ export default function EventDetailScreen() {
 
   const handleBookmarkToggle = async () => {
     if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to save this event.');
+      Alert.alert('Sign In Required', 'Please sign in to save this event to your profile.');
       return;
     }
     if (!event) return;
@@ -130,6 +152,88 @@ export default function EventDetailScreen() {
       setIsSaved(!nextState);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleInterestedToggle = async () => {
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to mark your interest in this event.');
+      return;
+    }
+    if (!event || isUpdatingInterest) return;
+
+    const previousState = isInterested;
+    const nextState = !previousState;
+
+    setIsInterested(nextState);
+    setInterestCount((prev) => (nextState ? prev + 1 : Math.max(0, prev - 1)));
+    setIsUpdatingInterest(true);
+
+    try {
+      if (nextState) {
+        // Upsert with ignoreDuplicates to prevent duplicate rows
+        const { data: inserted, error } = await supabase
+          .from('interested_events')
+          .upsert(
+            { event_id: event.id, user_id: user.id },
+            { onConflict: 'event_id,user_id', ignoreDuplicates: true }
+          )
+          .select();
+
+        if (error) throw error;
+
+        // Award +10 ET score to creator if a new interest was recorded
+        if (event.creator_id && inserted && inserted.length > 0) {
+          await supabase.rpc('increment_et_score', {
+            user_id: event.creator_id,
+            delta: 10,
+          } as any);
+        }
+      } else {
+        const { error } = await supabase
+          .from('interested_events')
+          .delete()
+          .eq('event_id', event.id)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('[EventDetail] Interested error:', err);
+      // Revert optimistic update
+      setIsInterested(previousState);
+      setInterestCount((prev) => (previousState ? prev + 1 : Math.max(0, prev - 1)));
+      Alert.alert('Error', 'Could not update interest status.');
+    } finally {
+      setIsUpdatingInterest(false);
+    }
+  };
+
+  const handleAddToCalendar = async () => {
+    if (!event) return;
+    const base = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+    const title = encodeURIComponent(`${event.title} · via EvenTime`);
+    const dateStr = event.date_string?.replace(/-/g, '') ?? '';
+    const dates = dateStr ? `${dateStr}/${dateStr}` : '';
+    const details = encodeURIComponent(event.description ?? '');
+    const location = encodeURIComponent(event.is_virtual ? 'Online' : (event.location || event.city || ''));
+    const url = `${base}&text=${title}&dates=${dates}&details=${details}&location=${location}`;
+
+    await WebBrowser.openBrowserAsync(url);
+  };
+
+  const handleOrganizerPress = () => {
+    const username = event?.profiles?.username;
+    if (username) {
+      navigation.navigate('CuratorProfile', {
+        username,
+        name: event?.organizer_name,
+      });
+    } else if (event?.creator_id) {
+      navigation.navigate('CuratorProfile', {
+        userId: event.creator_id,
+        name: event?.organizer_name,
+      });
     }
   };
 
@@ -193,27 +297,46 @@ export default function EventDetailScreen() {
     );
   }
 
-  const categoryMeta = getCategoryMeta(event.category);
+  const categoryConfig = getCategoryConfig(event.category);
+  const isCustomPoster = Boolean(event.is_featured && event.poster_url && event.poster_url.startsWith('http'));
+  const posterSource = isCustomPoster ? { uri: event.poster_url! } : getCategoryPoster(event.category);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Top Header Bar */}
       <View style={styles.topNav}>
         <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={22} color={theme.colors.textPrimary} />
+          <ArrowLeft size={20} color={theme.colors.textPrimary} />
         </TouchableOpacity>
 
         <View style={styles.topNavActions}>
-          <TouchableOpacity style={styles.iconBtn} onPress={handleShare}>
-            <Share2 size={20} color={theme.colors.textPrimary} />
+          {/* Interested Button in Header */}
+          <TouchableOpacity
+            style={[styles.interestedHeaderBtn, isInterested && styles.interestedHeaderBtnActive]}
+            onPress={handleInterestedToggle}
+            activeOpacity={0.8}
+          >
+            <Heart
+              size={15}
+              color={isInterested ? '#EF4444' : '#64748B'}
+              fill={isInterested ? '#EF4444' : 'none'}
+            />
+            <Text style={[styles.interestedHeaderText, isInterested && styles.interestedHeaderTextActive]}>
+              {interestCount > 0 ? `${interestCount}` : 'Interested'}
+            </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.iconBtn} onPress={handleShare}>
+            <Share2 size={18} color={theme.colors.textPrimary} />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.iconBtn, isSaved && styles.iconBtnSaved]}
             onPress={handleBookmarkToggle}
             disabled={isSaving}
           >
             <Bookmark
-              size={20}
+              size={18}
               color={isSaved ? '#FFF' : theme.colors.textPrimary}
               fill={isSaved ? '#FFF' : 'transparent'}
             />
@@ -225,19 +348,14 @@ export default function EventDetailScreen() {
         {/* Poster Media */}
         <View style={styles.posterContainer}>
           <Image
-            source={event.poster_url && event.poster_url.startsWith('http') ? { uri: event.poster_url } : getCategoryPoster(event.category)}
+            source={posterSource}
             style={styles.posterImage}
             contentFit="cover"
             transition={300}
           />
 
-          <View
-            style={[
-              styles.categoryBadge,
-              { backgroundColor: 'rgba(15, 23, 42, 0.75)' },
-            ]}
-          >
-            <Text style={[styles.categoryBadgeText, { color: '#FFFFFF' }]}>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryBadgeText}>
               {event.category || 'Event'}
             </Text>
           </View>
@@ -255,9 +373,41 @@ export default function EventDetailScreen() {
               </Text>
             </View>
 
-            <Text style={styles.organizerLabel}>
-              Organized by <Text style={styles.organizerName}>{event.organizer_name}</Text>
-            </Text>
+            <TouchableOpacity onPress={handleOrganizerPress} activeOpacity={0.7}>
+              <Text style={styles.organizerLabel}>
+                Curated by{' '}
+                <Text style={styles.organizerName}>
+                  {event.profiles?.full_name || event.organizer_name || 'EvenTime Community'}
+                </Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Quick Action Strip: Add to Calendar */}
+          <View style={styles.actionStrip}>
+            <TouchableOpacity
+              style={styles.calendarActionBtn}
+              onPress={handleAddToCalendar}
+              activeOpacity={0.8}
+            >
+              <CalendarPlus size={16} color={theme.colors.brand} />
+              <Text style={styles.calendarActionText}>Add to Google Calendar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.interestedBigBtn, isInterested && styles.interestedBigBtnActive]}
+              onPress={handleInterestedToggle}
+              activeOpacity={0.8}
+            >
+              <Heart
+                size={16}
+                color={isInterested ? '#EF4444' : '#0F172A'}
+                fill={isInterested ? '#EF4444' : 'none'}
+              />
+              <Text style={[styles.interestedBigText, isInterested && styles.interestedBigTextActive]}>
+                {isInterested ? 'Interested' : 'I\'m Interested'} ({interestCount})
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Meta Badges Grid */}
@@ -416,7 +566,7 @@ export default function EventDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#F8FAFC',
   },
   center: {
     flex: 1,
@@ -444,116 +594,172 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.borderLight,
+    borderBottomColor: '#F1F5F9',
   },
   topNavActions: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.surfaceSecondary,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconBtnSaved: {
     backgroundColor: theme.colors.brand,
   },
+  interestedHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+  },
+  interestedHeaderBtnActive: {
+    backgroundColor: '#FEE2E2',
+  },
+  interestedHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  interestedHeaderTextActive: {
+    color: '#EF4444',
+  },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 110,
   },
   posterContainer: {
     width: '100%',
-    height: 240,
-    backgroundColor: theme.colors.surfaceSecondary,
+    aspectRatio: 16 / 9,
+    backgroundColor: '#F1F5F9',
     position: 'relative',
   },
   posterImage: {
     width: '100%',
     height: '100%',
   },
-  fallbackPoster: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  fallbackCatText: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
   categoryBadge: {
     position: 'absolute',
-    bottom: 16,
-    left: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: theme.borderRadius.full,
-    borderWidth: 1,
-    ...theme.shadows.sm,
+    bottom: 12,
+    left: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
   },
   categoryBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   mainInfo: {
-    padding: theme.spacing.xl,
+    padding: 18,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: theme.colors.textPrimary,
-    lineHeight: 28,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+    lineHeight: 26,
     marginBottom: 8,
+    letterSpacing: -0.3,
   },
   pillRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: theme.spacing.lg,
+    marginBottom: 16,
   },
   pricePill: {
-    backgroundColor: theme.colors.successBg,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.full,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   pricePillText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
-    color: theme.colors.success,
+    color: '#059669',
   },
   paidPricePill: {
-    backgroundColor: theme.colors.brandLight,
+    backgroundColor: '#EEF2FF',
   },
   paidPriceText: {
     color: theme.colors.brand,
   },
   organizerLabel: {
     fontSize: 13,
-    color: theme.colors.textSecondary,
+    color: '#64748B',
   },
   organizerName: {
     fontWeight: '700',
-    color: theme.colors.textPrimary,
+    color: theme.colors.brand,
+    textDecorationLine: 'underline',
+  },
+  actionStrip: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  calendarActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#EEF2FF',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  calendarActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.brand,
+  },
+  interestedBigBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  interestedBigBtnActive: {
+    backgroundColor: '#FEE2E2',
+  },
+  interestedBigText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  interestedBigTextActive: {
+    color: '#EF4444',
   },
   detailsCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: theme.spacing.xl,
+    borderColor: '#E2E8F0',
+    marginBottom: 20,
     gap: 14,
-    ...theme.shadows.sm,
   },
   detailRow: {
     flexDirection: 'row',
@@ -564,37 +770,45 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: theme.colors.surfaceSecondary,
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   detailTextWrapper: {
     flex: 1,
   },
   detailLabel: {
     fontSize: 11,
-    color: theme.colors.textSecondary,
-    fontWeight: '600',
+    color: '#94A3B8',
+    fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   detailValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: theme.colors.textPrimary,
+    color: '#0F172A',
     marginTop: 2,
   },
   section: {
-    marginBottom: theme.spacing.xl,
+    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: theme.colors.textPrimary,
+    color: '#0F172A',
     marginBottom: 8,
   },
   descriptionText: {
     fontSize: 14,
-    color: theme.colors.textPrimary,
+    color: '#334155',
     lineHeight: 22,
   },
   reportRow: {
@@ -606,7 +820,7 @@ const styles = StyleSheet.create({
   },
   reportText: {
     fontSize: 12,
-    color: theme.colors.textMuted,
+    color: '#94A3B8',
     fontWeight: '600',
   },
   bottomBar: {
@@ -614,12 +828,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: theme.colors.surface,
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.md,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    ...theme.shadows.md,
+    borderTopColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 6,
   },
   registerBtn: {
     flexDirection: 'row',
@@ -627,13 +845,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: theme.colors.brand,
     paddingVertical: 14,
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: 16,
     gap: 8,
-    ...theme.shadows.brand,
   },
   registerBtnText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
   },
   modalOverlay: {
@@ -643,29 +860,29 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.xl,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: theme.colors.textPrimary,
+    color: '#0F172A',
     marginBottom: 4,
   },
   modalSubtitle: {
     fontSize: 13,
-    color: theme.colors.textSecondary,
+    color: '#64748B',
     marginBottom: 14,
   },
   reportInput: {
-    backgroundColor: theme.colors.surfaceSecondary,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
     padding: 12,
     fontSize: 14,
-    color: theme.colors.textPrimary,
+    color: '#0F172A',
     textAlignVertical: 'top',
     marginBottom: 16,
   },
@@ -681,13 +898,13 @@ const styles = StyleSheet.create({
   modalCancelText: {
     fontSize: 14,
     fontWeight: '600',
-    color: theme.colors.textSecondary,
+    color: '#64748B',
   },
   modalSubmitBtn: {
     backgroundColor: theme.colors.danger,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: 10,
   },
   modalSubmitText: {
     color: '#FFF',

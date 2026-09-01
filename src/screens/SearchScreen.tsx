@@ -59,8 +59,9 @@ export default function SearchScreen() {
     try {
       let query = supabase
         .from('events')
-        .select('*')
+        .select('*, colleges(name), profiles(username, full_name), interested_events(count)')
         .eq('status', 'approved')
+        .or('college_only.is.null,college_only.eq.false')
         .order('created_at', { ascending: false });
 
       if (keyword.trim()) {
@@ -90,7 +91,7 @@ export default function SearchScreen() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const activeEvents = (data || []).filter((ev) => {
+      const activeEvents = ((data as any[]) || []).filter((ev) => {
         const parsed = parseEventDateString(ev.date_string || '');
         if (!parsed) return true;
         const evDate = new Date(parsed);
@@ -205,7 +206,19 @@ export default function SearchScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <EventCard
-              event={item}
+              id={item.id}
+              slug={item.slug || item.id}
+              title={item.title}
+              category={item.category || 'General'}
+              dateString={item.date_string || ''}
+              location={item.location || ''}
+              city={item.city || ''}
+              organizerName={(item as any).profiles?.full_name || item.organizer_name || 'Organizer'}
+              organizerUsername={(item as any).profiles?.username || undefined}
+              isFree={item.is_free ?? true}
+              isFeatured={item.is_featured ?? false}
+              posterUrl={item.poster_url || undefined}
+              interestedCount={(item as any).interested_events?.[0]?.count ?? item.interested_count ?? 0}
               isSaved={savedEventIds.has(item.id)}
               onPress={() => navigation.navigate('EventDetail', { eventId: item.id })}
               onSaveToggle={(id, saved) => {
