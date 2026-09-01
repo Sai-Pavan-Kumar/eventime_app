@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,8 +21,12 @@ import {
   Filter,
   ChevronDown,
   Building2,
-  Calendar,
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
   X,
+  Clock,
+  RotateCcw,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -36,6 +40,12 @@ import type { EventRow, RootStackParamList } from '../types';
 
 const { width } = Dimensions.get('window');
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+const WEEKDAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user, profile } = useAuth();
@@ -43,6 +53,13 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<'all' | 'forYou'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  // Calendar modal state
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
+  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
+  const [eventDates, setEventDates] = useState<Set<string>>(new Set());
 
   const [events, setEvents] = useState<EventRow[]>([]);
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(new Set());
@@ -52,6 +69,29 @@ export default function HomeScreen() {
   // Filter Modals
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showCityModal, setShowCityModal] = useState(false);
+
+  // Fetch all distinct event dates to show dot indicators in the calendar
+  useEffect(() => {
+    supabase
+      .from('events')
+      .select('date_string')
+      .eq('status', 'approved')
+      .then(({ data }) => {
+        if (data) {
+          const datesSet = new Set<string>();
+          data.forEach((e) => {
+            const parsed = parseEventDateString(e.date_string || '');
+            if (parsed) {
+              const y = parsed.getFullYear();
+              const m = String(parsed.getMonth() + 1).padStart(2, '0');
+              const d = String(parsed.getDate()).padStart(2, '0');
+              datesSet.add(`${y}-${m}-${d}`);
+            }
+          });
+          setEventDates(datesSet);
+        }
+      });
+  }, []);
 
   const fetchSavedEventIds = useCallback(async () => {
     if (!user) {
@@ -94,35 +134,47 @@ export default function HomeScreen() {
         return;
       }
 
+      const rawEvents = data || [];
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Exclude past events so only upcoming / today's events appear in active feed
-      const allApproved = (data || []).filter((ev) => {
+      // Filtering Logic:
+      // 1. If a specific calendar date is selected, filter specifically for that date (even if past).
+      // 2. If no calendar date is selected, exclude past events from upcoming feed.
+      let filtered = rawEvents.filter((ev) => {
         const parsed = parseEventDateString(ev.date_string || '');
         if (!parsed) return true;
+
+        if (selectedDate) {
+          const y = parsed.getFullYear();
+          const m = String(parsed.getMonth() + 1).padStart(2, '0');
+          const d = String(parsed.getDate()).padStart(2, '0');
+          return `${y}-${m}-${d}` === selectedDate;
+        }
+
+        // Default feed: Only today & upcoming events
         const evDate = new Date(parsed);
         evDate.setHours(0, 0, 0, 0);
         return evDate.getTime() >= today.getTime();
       });
 
-      if (activeTab === 'forYou') {
+      if (activeTab === 'forYou' && !selectedDate) {
         const preferredCities = profile?.preferred_cities || [];
         const preferredGoals = profile?.goals || [];
 
         if (preferredCities.length > 0 || preferredGoals.length > 0) {
-          const personalized = allApproved.filter((ev) => {
+          const personalized = filtered.filter((ev) => {
             const matchesCity = ev.city && preferredCities.includes(ev.city);
             const matchesCategory = ev.category && preferredGoals.includes(ev.category);
             const isVirtual = ev.is_virtual === true;
             return matchesCity || matchesCategory || isVirtual;
           });
-          setEvents(personalized.length > 0 ? personalized : allApproved);
+          setEvents(personalized.length > 0 ? personalized : filtered);
         } else {
-          setEvents(allApproved);
+          setEvents(filtered);
         }
       } else {
-        setEvents(allApproved);
+        setEvents(filtered);
       }
     } catch (err) {
       console.error('[HomeScreen] Fetch error:', err);
@@ -130,7 +182,7 @@ export default function HomeScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [selectedCategory, selectedCity, activeTab, profile]);
+  }, [selectedCategory, selectedCity, selectedDate, activeTab, profile]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -144,11 +196,76 @@ export default function HomeScreen() {
     fetchSavedEventIds();
   };
 
+  const isViewingPastDate = useMemo(() => {
+    if (!selectedDate) return false;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const sel = new Date(selectedDate);
+    sel.setHours(0, 0, 0, 0);
+    return sel.getTime() < now.getTime();
+  }, [selectedDate]);
+
+  // Calendar calculations
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
+    const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+    const days: (number | null)[] = [];
+
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      days.push(d);
+    }
+    return days;
+  }, [calendarYear, calendarMonth]);
+
+  const handlePrevMonth = () => {
+    if (calendarMonth === 0) {
+      setCalendarMonth(11);
+      setCalendarYear((y) => y - 1);
+    } else {
+      setCalendarMonth((m) => m - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (calendarMonth === 11) {
+      setCalendarMonth(0);
+      setCalendarYear((y) => y + 1);
+    } else {
+      setCalendarMonth((m) => m + 1);
+    }
+  };
+
+  const handleSelectDay = (day: number) => {
+    const m = String(calendarMonth + 1).padStart(2, '0');
+    const d = String(day).padStart(2, '0');
+    setSelectedDate(`${calendarYear}-${m}-${d}`);
+    setShowDateModal(false);
+  };
+
+  const handleSelectToday = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    setSelectedDate(`${y}-${m}-${d}`);
+    setCalendarYear(y);
+    setCalendarMonth(now.getMonth());
+    setShowDateModal(false);
+  };
+
+  const handleClearDate = () => {
+    setSelectedDate(null);
+    setShowDateModal(false);
+  };
+
   const renderHeader = () => (
     <View style={styles.headerContainer}>
-      {/* Top App Bar with Genuine EvenTime Logo */}
+      {/* Top Bar with Brand Logo and Action Icons */}
       <View style={styles.topBar}>
-        <View style={styles.logoRow}>
+        <View style={styles.brandRow}>
           <Image
             source={APP_ASSETS.logo}
             style={styles.brandLogo}
@@ -156,27 +273,34 @@ export default function HomeScreen() {
           />
         </View>
 
-        <TouchableOpacity
-          style={styles.searchIconBtn}
-          onPress={() => (navigation as any).navigate('SearchTab')}
-          activeOpacity={0.8}
-        >
-          <Search size={20} color="#0F172A" />
-        </TouchableOpacity>
+        <View style={styles.topActions}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => (navigation as any).navigate('SearchTab')}
+            activeOpacity={0.8}
+          >
+            <Search size={20} color="#0F172A" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => (navigation as any).navigate('CitiesTab')}
+            activeOpacity={0.8}
+          >
+            <Building2 size={20} color="#0F172A" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Hero Section Matching Website */}
-      <View style={styles.heroCard}>
-        <View style={styles.heroTextContainer}>
-          <Text style={styles.heroTitle}>
-            The Dictionary{'\n'}
-            for <Text style={styles.heroHighlight}>Events.</Text>
-          </Text>
+      {/* Hero Banner Section */}
+      <View style={styles.heroSection}>
+        <View style={styles.heroTextContent}>
+          <Text style={styles.heroBadge}>DISCOVER & EXPERIENCE</Text>
+          <Text style={styles.heroTitle}>The Dictionary for Events.</Text>
           <Text style={styles.heroSubtitle}>
-            Discover verified tech, college, networking & cultural events across India.
+            Tech, Cultural, College & Professional events curated across India.
           </Text>
         </View>
-
         <Image
           source={APP_ASSETS.heroBanner}
           style={styles.heroImage}
@@ -184,7 +308,23 @@ export default function HomeScreen() {
         />
       </View>
 
-      {/* Filter Chips Bar (Category & City Pickers) */}
+      {/* Archive Warning Banner if viewing past date */}
+      {isViewingPastDate && (
+        <View style={styles.archiveBanner}>
+          <Clock size={16} color="#B45309" />
+          <Text style={styles.archiveBannerText}>
+            Viewing Archive for {selectedDate}
+          </Text>
+          <TouchableOpacity
+            style={styles.resetArchiveBtn}
+            onPress={() => setSelectedDate(null)}
+          >
+            <Text style={styles.resetArchiveBtnText}>Back to Live</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Filter Chips Bar (Category, City & Date Pickers) */}
       <View style={styles.filterBar}>
         <ScrollView
           horizontal
@@ -193,22 +333,42 @@ export default function HomeScreen() {
         >
           {/* Feed Tabs: All vs For You */}
           <TouchableOpacity
-            style={[styles.feedPill, activeTab === 'all' && styles.feedPillActive]}
-            onPress={() => setActiveTab('all')}
+            style={[styles.feedPill, activeTab === 'all' && !selectedDate && styles.feedPillActive]}
+            onPress={() => {
+              setActiveTab('all');
+              setSelectedDate(null);
+            }}
           >
-            <Compass size={14} color={activeTab === 'all' ? '#FFF' : '#64748B'} />
-            <Text style={[styles.feedPillText, activeTab === 'all' && styles.feedPillTextActive]}>
+            <Compass size={14} color={activeTab === 'all' && !selectedDate ? '#FFF' : '#64748B'} />
+            <Text style={[styles.feedPillText, activeTab === 'all' && !selectedDate && styles.feedPillTextActive]}>
               Explore All
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.feedPill, activeTab === 'forYou' && styles.feedPillActive]}
-            onPress={() => setActiveTab('forYou')}
+            style={[styles.feedPill, activeTab === 'forYou' && !selectedDate && styles.feedPillActive]}
+            onPress={() => {
+              setActiveTab('forYou');
+              setSelectedDate(null);
+            }}
           >
-            <Text style={[styles.feedPillText, activeTab === 'forYou' && styles.feedPillTextActive]}>
+            <Text style={[styles.feedPillText, activeTab === 'forYou' && !selectedDate && styles.feedPillTextActive]}>
               For You
             </Text>
+          </TouchableOpacity>
+
+          {/* Calendar Date Filter */}
+          <TouchableOpacity
+            style={[styles.filterPill, Boolean(selectedDate) && styles.filterPillSelected]}
+            onPress={() => setShowDateModal(true)}
+          >
+            <CalendarIcon size={13} color={selectedDate ? '#6C47FF' : '#64748B'} />
+            <Text style={[styles.filterPillText, Boolean(selectedDate) && styles.filterPillTextSelected]}>
+              {selectedDate
+                ? new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
+                : 'Calendar'}
+            </Text>
+            <ChevronDown size={14} color={selectedDate ? '#6C47FF' : '#64748B'} />
           </TouchableOpacity>
 
           {/* Category Dropdown Filter */}
@@ -217,7 +377,7 @@ export default function HomeScreen() {
             onPress={() => setShowCategoryModal(true)}
           >
             <Text style={[styles.filterPillText, Boolean(selectedCategory) && styles.filterPillTextSelected]}>
-              {selectedCategory || 'All Categories'}
+              {selectedCategory || 'Categories'}
             </Text>
             <ChevronDown size={14} color={selectedCategory ? '#6C47FF' : '#64748B'} />
           </TouchableOpacity>
@@ -229,21 +389,22 @@ export default function HomeScreen() {
           >
             <MapPin size={13} color={selectedCity ? '#6C47FF' : '#64748B'} />
             <Text style={[styles.filterPillText, Boolean(selectedCity) && styles.filterPillTextSelected]}>
-              {selectedCity || 'All Cities'}
+              {selectedCity || 'Cities'}
             </Text>
             <ChevronDown size={14} color={selectedCity ? '#6C47FF' : '#64748B'} />
           </TouchableOpacity>
 
           {/* Clear Filter Button if active */}
-          {(selectedCategory || selectedCity) && (
+          {(selectedCategory || selectedCity || selectedDate) && (
             <TouchableOpacity
               style={styles.clearPill}
               onPress={() => {
                 setSelectedCategory(null);
                 setSelectedCity(null);
+                setSelectedDate(null);
               }}
             >
-              <X size={13} color="#EF4444" />
+              <RotateCcw size={12} color="#EF4444" />
               <Text style={styles.clearPillText}>Reset</Text>
             </TouchableOpacity>
           )}
@@ -253,7 +414,11 @@ export default function HomeScreen() {
       {/* Section Title */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>
-          {activeTab === 'forYou' ? 'Recommended For You' : 'Upcoming Events'}
+          {selectedDate
+            ? `Events on ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`
+            : activeTab === 'forYou'
+            ? 'Recommended For You'
+            : 'Upcoming Events'}
         </Text>
         <Text style={styles.sectionCount}>
           {events.length} {events.length === 1 ? 'event' : 'events'}
@@ -269,9 +434,13 @@ export default function HomeScreen() {
         style={styles.emptyIllustration}
         contentFit="contain"
       />
-      <Text style={styles.emptyTitle}>The stage is waiting!</Text>
+      <Text style={styles.emptyTitle}>
+        {selectedDate ? 'No events on this date' : 'The stage is waiting!'}
+      </Text>
       <Text style={styles.emptySubtitle}>
-        {selectedCategory || selectedCity
+        {selectedDate
+          ? 'There were no events hosted on this specific date. Try selecting another date from the calendar.'
+          : selectedCategory || selectedCity
           ? 'No events match the selected filters right now. Try resetting filters or exploring other categories.'
           : 'No upcoming events found. Be the first to host an event on EvenTime!'}
       </Text>
@@ -301,11 +470,17 @@ export default function HomeScreen() {
               <EventCard
                 event={item}
                 isSaved={savedEventIds.has(item.id)}
-                onPress={() => navigation.navigate('EventDetail', { eventId: item.id })}
-                onSaveToggle={(id, saved) => {
+                onPress={() =>
+                  navigation.navigate('EventDetail', {
+                    id: item.id,
+                    eventId: item.id,
+                    slug: item.slug || item.id,
+                  })
+                }
+                onSaveToggle={(id, isSaved) => {
                   setSavedEventIds((prev) => {
                     const next = new Set(prev);
-                    if (saved) next.add(id);
+                    if (isSaved) next.add(id);
                     else next.delete(id);
                     return next;
                   });
@@ -321,49 +496,167 @@ export default function HomeScreen() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={onRefresh}
-              colors={['#6C47FF']}
               tintColor="#6C47FF"
+              colors={['#6C47FF']}
             />
           }
         />
       )}
 
-      {/* Category Selection Modal */}
+      {/* CALENDAR DATE PICKER MODAL */}
+      {showDateModal && (
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowDateModal(false)}
+          />
+          <View style={styles.calendarModalSheet}>
+            {/* Header */}
+            <View style={styles.calendarModalHeader}>
+              <View style={styles.monthNavRow}>
+                <TouchableOpacity onPress={handlePrevMonth} style={styles.monthNavBtn}>
+                  <ChevronLeft size={20} color="#0F172A" />
+                </TouchableOpacity>
+                <Text style={styles.calendarMonthTitle}>
+                  {MONTH_NAMES[calendarMonth]} {calendarYear}
+                </Text>
+                <TouchableOpacity onPress={handleNextMonth} style={styles.monthNavBtn}>
+                  <ChevronRight size={20} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity onPress={() => setShowDateModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Weekdays Header */}
+            <View style={styles.weekdaysRow}>
+              {WEEKDAY_NAMES.map((w, idx) => (
+                <Text key={idx} style={styles.weekdayLabel}>
+                  {w}
+                </Text>
+              ))}
+            </View>
+
+            {/* Days Grid */}
+            <View style={styles.daysGrid}>
+              {calendarDays.map((day, idx) => {
+                if (day === null) {
+                  return <View key={`empty-${idx}`} style={styles.dayCellEmpty} />;
+                }
+
+                const mStr = String(calendarMonth + 1).padStart(2, '0');
+                const dStr = String(day).padStart(2, '0');
+                const cellDateStr = `${calendarYear}-${mStr}-${dStr}`;
+
+                const isSelected = selectedDate === cellDateStr;
+                const hasEvents = eventDates.has(cellDateStr);
+
+                const todayObj = new Date();
+                const isToday =
+                  todayObj.getFullYear() === calendarYear &&
+                  todayObj.getMonth() === calendarMonth &&
+                  todayObj.getDate() === day;
+
+                return (
+                  <TouchableOpacity
+                    key={`day-${day}`}
+                    style={[
+                      styles.dayCell,
+                      isToday && styles.dayCellToday,
+                      isSelected && styles.dayCellSelected,
+                    ]}
+                    onPress={() => handleSelectDay(day)}
+                  >
+                    <Text
+                      style={[
+                        styles.dayText,
+                        isToday && styles.dayTextToday,
+                        isSelected && styles.dayTextSelected,
+                      ]}
+                    >
+                      {day}
+                    </Text>
+                    {hasEvents && !isSelected && <View style={styles.eventDot} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Quick Actions Footer */}
+            <View style={styles.calendarFooter}>
+              <TouchableOpacity
+                style={styles.calendarFooterBtnSecondary}
+                onPress={handleSelectToday}
+              >
+                <Text style={styles.calendarFooterBtnSecondaryText}>Today</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.calendarFooterBtnPrimary}
+                onPress={handleClearDate}
+              >
+                <Text style={styles.calendarFooterBtnPrimaryText}>All Dates (Upcoming)</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* CATEGORY PICKER MODAL */}
       {showCategoryModal && (
         <View style={styles.modalOverlay}>
           <TouchableOpacity
             style={styles.modalBackdrop}
+            activeOpacity={1}
             onPress={() => setShowCategoryModal(false)}
           />
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Category</Text>
+              <Text style={styles.modalTitle}>Filter by Category</Text>
               <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
-                <X size={22} color="#0F172A" />
+                <X size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalList}>
               <TouchableOpacity
-                style={[styles.modalItem, !selectedCategory && styles.modalItemActive]}
+                style={[
+                  styles.modalItem,
+                  selectedCategory === null && styles.modalItemActive,
+                ]}
                 onPress={() => {
                   setSelectedCategory(null);
                   setShowCategoryModal(false);
                 }}
               >
-                <Text style={[styles.modalItemText, !selectedCategory && styles.modalItemTextActive]}>
+                <Text
+                  style={[
+                    styles.modalItemText,
+                    selectedCategory === null && styles.modalItemTextActive,
+                  ]}
+                >
                   All Categories
                 </Text>
               </TouchableOpacity>
               {CATEGORIES_LIST.map((cat) => (
                 <TouchableOpacity
                   key={cat}
-                  style={[styles.modalItem, selectedCategory === cat && styles.modalItemActive]}
+                  style={[
+                    styles.modalItem,
+                    selectedCategory === cat && styles.modalItemActive,
+                  ]}
                   onPress={() => {
                     setSelectedCategory(cat);
                     setShowCategoryModal(false);
                   }}
                 >
-                  <Text style={[styles.modalItemText, selectedCategory === cat && styles.modalItemTextActive]}>
+                  <Text
+                    style={[
+                      styles.modalItemText,
+                      selectedCategory === cat && styles.modalItemTextActive,
+                    ]}
+                  >
                     {cat}
                   </Text>
                 </TouchableOpacity>
@@ -373,43 +666,60 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* City Selection Modal */}
+      {/* CITY PICKER MODAL */}
       {showCityModal && (
         <View style={styles.modalOverlay}>
           <TouchableOpacity
             style={styles.modalBackdrop}
+            activeOpacity={1}
             onPress={() => setShowCityModal(false)}
           />
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select City</Text>
+              <Text style={styles.modalTitle}>Filter by City</Text>
               <TouchableOpacity onPress={() => setShowCityModal(false)}>
-                <X size={22} color="#0F172A" />
+                <X size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalList}>
               <TouchableOpacity
-                style={[styles.modalItem, !selectedCity && styles.modalItemActive]}
+                style={[
+                  styles.modalItem,
+                  selectedCity === null && styles.modalItemActive,
+                ]}
                 onPress={() => {
                   setSelectedCity(null);
                   setShowCityModal(false);
                 }}
               >
-                <Text style={[styles.modalItemText, !selectedCity && styles.modalItemTextActive]}>
-                  All Cities
+                <Text
+                  style={[
+                    styles.modalItemText,
+                    selectedCity === null && styles.modalItemTextActive,
+                  ]}
+                >
+                  All Cities (India & Online)
                 </Text>
               </TouchableOpacity>
-              {CITIES.map((c) => (
+              {CITIES.map((city) => (
                 <TouchableOpacity
-                  key={c}
-                  style={[styles.modalItem, selectedCity === c && styles.modalItemActive]}
+                  key={city}
+                  style={[
+                    styles.modalItem,
+                    selectedCity === city && styles.modalItemActive,
+                  ]}
                   onPress={() => {
-                    setSelectedCity(c);
+                    setSelectedCity(city);
                     setShowCityModal(false);
                   }}
                 >
-                  <Text style={[styles.modalItemText, selectedCity === c && styles.modalItemTextActive]}>
-                    {c}
+                  <Text
+                    style={[
+                      styles.modalItemText,
+                      selectedCity === city && styles.modalItemTextActive,
+                    ]}
+                  >
+                    {city}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -427,10 +737,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   listContent: {
-    paddingBottom: 40,
-  },
-  cardWrapper: {
-    paddingHorizontal: 16,
+    paddingBottom: 100,
   },
   headerContainer: {
     backgroundColor: '#FFFFFF',
@@ -444,59 +751,98 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
   },
-  logoRow: {
-    height: 38,
-    width: 140,
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   brandLogo: {
-    width: '100%',
-    height: '100%',
+    width: 130,
+    height: 34,
   },
-  searchIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroCard: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-    backgroundColor: '#FFFFFF',
+  heroSection: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 20,
+    alignItems: 'center',
   },
-  heroTextContainer: {
+  heroTextContent: {
+    alignItems: 'center',
     marginBottom: 12,
   },
+  heroBadge: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#6C47FF',
+    letterSpacing: 1.2,
+    marginBottom: 4,
+  },
   heroTitle: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: '900',
     color: '#0F172A',
-    lineHeight: 38,
+    textAlign: 'center',
     letterSpacing: -0.5,
-  },
-  heroHighlight: {
-    color: '#6C47FF',
+    marginBottom: 6,
   },
   heroSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#64748B',
-    fontWeight: '500',
-    marginTop: 8,
-    lineHeight: 20,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 10,
   },
   heroImage: {
-    width: '100%',
-    height: 140,
-    marginTop: 4,
+    width: width - 32,
+    height: 170,
+    borderRadius: 16,
+  },
+  archiveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FEF3C7',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  archiveBannerText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#92400E',
+    flex: 1,
+    marginLeft: 8,
+  },
+  resetArchiveBtn: {
+    backgroundColor: '#92400E',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  resetArchiveBtnText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   filterBar: {
     paddingVertical: 12,
-    backgroundColor: '#F8FAFC',
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
@@ -583,6 +929,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#94A3B8',
+  },
+  cardWrapper: {
+    paddingHorizontal: 16,
   },
   loaderContainer: {
     flex: 1,
@@ -693,5 +1042,125 @@ const styles = StyleSheet.create({
   modalItemTextActive: {
     color: '#6C47FF',
     fontWeight: '800',
+  },
+  calendarModalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 32,
+  },
+  calendarModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  monthNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  monthNavBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarMonthTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  weekdaysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingHorizontal: 6,
+  },
+  weekdayLabel: {
+    width: (width - 52) / 7,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#94A3B8',
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  dayCellEmpty: {
+    width: (width - 40) / 7,
+    height: 40,
+  },
+  dayCell: {
+    width: (width - 40) / 7,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    position: 'relative',
+  },
+  dayCellToday: {
+    backgroundColor: '#F1F5F9',
+  },
+  dayCellSelected: {
+    backgroundColor: '#6C47FF',
+  },
+  dayText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  dayTextToday: {
+    color: '#6C47FF',
+    fontWeight: '800',
+  },
+  dayTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  eventDot: {
+    position: 'absolute',
+    bottom: 4,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#6C47FF',
+  },
+  calendarFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  calendarFooterBtnSecondary: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 100,
+    backgroundColor: '#F1F5F9',
+  },
+  calendarFooterBtnSecondaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  calendarFooterBtnPrimary: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 100,
+    backgroundColor: '#6C47FF',
+    alignItems: 'center',
+  },
+  calendarFooterBtnPrimaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });
