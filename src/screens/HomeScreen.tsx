@@ -22,6 +22,8 @@ import {
   ChevronDown,
   Building2,
   Calendar as CalendarIcon,
+  CalendarDays,
+  Trophy,
   ChevronLeft,
   ChevronRight,
   X,
@@ -265,20 +267,36 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.topActions}>
+          {/* Top Calendar Date Button */}
+          <TouchableOpacity
+            style={[styles.topCalendarBtn, Boolean(selectedDate) && styles.topCalendarBtnActive]}
+            onPress={() => setShowDateModal(true)}
+            activeOpacity={0.8}
+          >
+            <CalendarDays size={15} color={selectedDate ? '#6C47FF' : '#475569'} />
+            <Text style={[styles.topCalendarBtnText, Boolean(selectedDate) && styles.topCalendarBtnTextActive]}>
+              {selectedDate
+                ? new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
+                : new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Leaderboard Trophy Icon */}
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => navigation.navigate('Leaderboard')}
+            activeOpacity={0.8}
+          >
+            <Trophy size={18} color="#D97706" />
+          </TouchableOpacity>
+
+          {/* Search Icon */}
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => (navigation as any).navigate('SearchTab')}
             activeOpacity={0.8}
           >
-            <Search size={20} color="#0F172A" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => (navigation as any).navigate('CitiesTab')}
-            activeOpacity={0.8}
-          >
-            <Building2 size={20} color="#0F172A" />
+            <Search size={18} color="#0F172A" />
           </TouchableOpacity>
         </View>
       </View>
@@ -740,10 +758,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  topCalendarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 100,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  topCalendarBtnActive: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#6C47FF',
+  },
+  topCalendarBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  topCalendarBtnTextActive: {
+    color: '#6C47FF',
+  },
   iconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
