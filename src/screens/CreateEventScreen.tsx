@@ -34,7 +34,7 @@ import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { CATEGORIES_LIST } from '../lib/category-config';
 import { CITIES } from '../lib/constants/cities';
-import { uploadImageToR2 } from '../lib/r2';
+import { uploadEventPoster } from '../lib/storage';
 import type { RootStackParamList } from '../types';
 
 export default function CreateEventScreen() {
@@ -210,30 +210,9 @@ export default function CreateEventScreen() {
     try {
       let finalPosterUrl = posterUri;
 
-      // If a local image URI was selected (file://), upload to Cloudflare R2 (or fallback to Supabase)
+      // If a local image URI was selected (file://), upload to storage
       if (posterUri && posterUri.startsWith('file://')) {
-        try {
-          finalPosterUrl = await uploadImageToR2(posterUri);
-        } catch (r2Err) {
-          console.warn('[CreateEvent] R2 upload error, falling back to Supabase Storage:', r2Err);
-          const fileExt = posterUri.split('.').pop() || 'jpg';
-          const fileName = `events/poster_${Date.now()}.${fileExt}`;
-          const formData = new FormData();
-          formData.append('file', {
-            uri: posterUri,
-            name: fileName,
-            type: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-          } as any);
-
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('events')
-            .upload(fileName, formData, { contentType: `image/${fileExt}` });
-
-          if (!uploadError && uploadData) {
-            const { data: publicUrlData } = supabase.storage.from('events').getPublicUrl(uploadData.path);
-            finalPosterUrl = publicUrlData.publicUrl;
-          }
-        }
+        finalPosterUrl = await uploadEventPoster(posterUri);
       }
 
       const effectiveCity = isVirtual ? 'online' : city;

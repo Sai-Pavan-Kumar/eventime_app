@@ -10,12 +10,11 @@
     "ts:check": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1123.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
     "@react-navigation/native-stack": "^7.2.0",
-    "@supabase/supabase-js": "^2.49.1",
+    "@supabase/supabase-js": "2.48.1",
     "expo": "~54.0.37",
     "expo-auth-session": "~7.0.11",
     "expo-constants": "~18.0.14",
@@ -38,8 +37,13 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@babel/plugin-transform-class-properties": "^8.0.1",
+    "@babel/plugin-transform-private-methods": "^8.0.1",
+    "@babel/plugin-transform-private-property-in-object": "^8.0.1",
     "@octokit/rest": "^22.0.1",
     "@types/react": "~19.1.10",
+    "babel-preset-expo": "~54.0.10",
+    "sharp": "^0.35.4",
     "supabase": "^2.116.0",
     "typescript": "~5.9.2",
     "wrangler": "^4.127.1"
