@@ -12,9 +12,11 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Mail, Lock, Eye, EyeOff, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react-native';
+import { Image } from 'expo-image';
+import { Mail, Lock, Eye, EyeOff, CheckCircle2, ShieldCheck } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../config/theme';
+import { APP_ASSETS } from '../lib/asset-registry';
 
 export default function LoginScreen() {
   const { signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset } = useAuth();
@@ -146,10 +148,11 @@ export default function LoginScreen() {
         >
           {/* Brand Header */}
           <View style={styles.header}>
-            <View style={styles.logoBadge}>
-              <Sparkles size={28} color={theme.colors.surface} />
-            </View>
-            <Text style={styles.appName}>EvenTime</Text>
+            <Image
+              source={APP_ASSETS.logo}
+              style={styles.brandLogoImage}
+              contentFit="contain"
+            />
             <Text style={styles.tagline}>Stop Searching. Start Attending.</Text>
             <Text style={styles.subtagline}>
               India's cleanest directory for tech, college, and professional events.
@@ -316,7 +319,12 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: theme.spacing.xxl,
+    marginBottom: theme.spacing.xl,
+  },
+  brandLogoImage: {
+    width: 200,
+    height: 50,
+    marginBottom: 8,
   },
   logoBadge: {
     width: 60,

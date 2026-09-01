@@ -34,6 +34,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { getCategoryMeta } from '../lib/category-config';
+import { getCategoryPoster } from '../lib/asset-registry';
 import { useAuth } from '../context/AuthContext';
 import type { EventRow, RootStackParamList } from '../types';
 
@@ -42,7 +43,7 @@ export default function EventDetailScreen() {
   const navigation = useNavigation();
   const { user } = useAuth();
 
-  const { slug, id } = route.params;
+  const { slug, id, eventId } = (route.params || {}) as any;
 
   const [event, setEvent] = useState<EventRow | null>(null);
   const [isSaved, setIsSaved] = useState(false);
@@ -58,8 +59,9 @@ export default function EventDetailScreen() {
     try {
       let query = supabase.from('events').select('*');
 
-      if (id) {
-        query = query.eq('id', id);
+      const targetId = eventId || id;
+      if (targetId) {
+        query = query.eq('id', targetId);
       } else if (slug) {
         query = query.eq('slug', slug);
       }
@@ -223,25 +225,21 @@ export default function EventDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Poster Media */}
         <View style={styles.posterContainer}>
-          {event.poster_url ? (
-            <Image source={{ uri: event.poster_url }} style={styles.posterImage} contentFit="cover" />
-          ) : (
-            <View style={[styles.fallbackPoster, { backgroundColor: categoryMeta.bgLight }]}>
-              <Sparkles size={48} color={categoryMeta.accentColor} />
-              <Text style={[styles.fallbackCatText, { color: categoryMeta.accentColor }]}>
-                {event.category}
-              </Text>
-            </View>
-          )}
+          <Image
+            source={event.poster_url && event.poster_url.startsWith('http') ? { uri: event.poster_url } : getCategoryPoster(event.category)}
+            style={styles.posterImage}
+            contentFit="cover"
+            transition={300}
+          />
 
           <View
             style={[
               styles.categoryBadge,
-              { backgroundColor: categoryMeta.bgLight, borderColor: categoryMeta.accentColor },
+              { backgroundColor: 'rgba(15, 23, 42, 0.75)' },
             ]}
           >
-            <Text style={[styles.categoryBadgeText, { color: categoryMeta.accentColor }]}>
-              {event.category}
+            <Text style={[styles.categoryBadgeText, { color: '#FFFFFF' }]}>
+              {event.category || 'Event'}
             </Text>
           </View>
         </View>

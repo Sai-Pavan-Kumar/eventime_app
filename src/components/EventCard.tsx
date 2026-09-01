@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share, Alert } from 'react-native';
 import { Image } from 'expo-image';
-import { Calendar, MapPin, Bookmark, Video, Sparkles } from 'lucide-react-native';
+import { Bookmark, Share2, MapPin, Clock, Users, IndianRupee, Sparkles, Check } from 'lucide-react-native';
 import { theme } from '../config/theme';
-import { getCategoryMeta } from '../lib/category-config';
+import { getCategoryConfig } from '../lib/category-config';
+import { getCategoryPoster } from '../lib/asset-registry';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { parseEventDateString } from '../lib/utils/date';
 import type { EventRow } from '../types';
 
 interface EventCardProps {
@@ -13,6 +15,7 @@ interface EventCardProps {
   isSaved?: boolean;
   onPress: () => void;
   onSaveToggle?: (eventId: string, isSaved: boolean) => void;
+  layout?: 'grid' | 'full';
 }
 
 export const EventCard: React.FC<EventCardProps> = ({
@@ -24,13 +27,32 @@ export const EventCard: React.FC<EventCardProps> = ({
   const { user } = useAuth();
   const [isSaved, setIsSaved] = useState(initialIsSaved);
   const [isSaving, setIsSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const categoryMeta = getCategoryMeta(event.category);
+  const categoryConfig = getCategoryConfig(event.category);
+  const isCustomPoster = Boolean(event.is_featured && event.poster_url && event.poster_url.startsWith('http'));
+  const posterSource = isCustomPoster ? { uri: event.poster_url! } : getCategoryPoster(event.category);
 
-  const handleBookmarkPress = async (e: any) => {
-    e.stopPropagation();
+  // Date parsing & FOMO Status
+  const parsedDate = parseEventDateString(event.date_string || '');
+  const shortDateOverlay = parsedDate
+    ? parsedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }).toUpperCase()
+    : 'SOON';
+
+  const isPastEvent = (() => {
+    if (!parsedDate) return false;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const evDate = new Date(parsedDate);
+    evDate.setHours(0, 0, 0, 0);
+    return evDate.getTime() < now.getTime();
+  })();
+
+  const isFree = event.is_free !== false;
+
+  const handleBookmarkPress = async () => {
     if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to bookmark and save events to your list.');
+      Alert.alert('Sign In Required', 'Please sign in to save events to your profile.');
       return;
     }
 
@@ -54,116 +76,148 @@ export const EventCard: React.FC<EventCardProps> = ({
       onSaveToggle?.(event.id, nextState);
     } catch (err) {
       console.error('[EventCard] Save error:', err);
-      // Revert optimistic update
       setIsSaved(!nextState);
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleSharePress = async () => {
+    try {
+      const shareUrl = `https://eventime.in/events/${event.slug || event.id}`;
+      await Share.share({
+        title: event.title,
+        message: `${event.title} on ${event.date_string || 'Soon'} in ${event.city || 'Online'}\nExplore on EvenTime 🎉\n${shareUrl}`,
+        url: shareUrl,
+      });
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.error('Share error:', e);
+    }
+  };
+
   return (
     <TouchableOpacity
       style={styles.card}
-      activeOpacity={0.92}
+      activeOpacity={0.93}
       onPress={onPress}
     >
-      {/* Poster / Visual Header */}
+      {/* Visual Image Banner with 100% genuine WebP */}
       <View style={styles.imageContainer}>
-        {event.poster_url ? (
-          <Image
-            source={{ uri: event.poster_url }}
-            style={styles.posterImage}
-            contentFit="cover"
-            transition={300}
-          />
-        ) : (
-          <View style={[styles.fallbackBanner, { backgroundColor: categoryMeta.bgLight }]}>
-            <Sparkles size={32} color={categoryMeta.accentColor} />
-            <Text style={[styles.fallbackCatText, { color: categoryMeta.accentColor }]}>
-              {event.category}
-            </Text>
-          </View>
-        )}
+        <Image
+          source={posterSource}
+          style={styles.posterImage}
+          contentFit="cover"
+          transition={250}
+        />
+
+        {/* Short Date Badge Overlay */}
+        <View style={styles.dateOverlay}>
+          <Text style={[styles.dateOverlayText, { color: categoryConfig.dateColor || '#6C47FF' }]}>
+            {shortDateOverlay}
+          </Text>
+        </View>
+
+        {/* Category Pill Over Image */}
+        <View style={styles.categoryPill}>
+          <Text style={styles.categoryPillText} numberOfLines={1}>
+            {event.category || 'Event'}
+          </Text>
+        </View>
 
         {/* Featured Badge */}
         {event.is_featured && (
           <View style={styles.featuredBadge}>
-            <Sparkles size={11} color="#FFF" />
+            <Sparkles size={10} color="#FFF" />
             <Text style={styles.featuredText}>FEATURED</Text>
           </View>
         )}
 
-        {/* Category Pill Over Image */}
-        <View
-          style={[
-            styles.categoryPill,
-            { backgroundColor: categoryMeta.bgLight, borderColor: categoryMeta.accentColor },
-          ]}
-        >
-          <View style={[styles.categoryDot, { backgroundColor: categoryMeta.accentColor }]} />
-          <Text style={[styles.categoryPillText, { color: categoryMeta.accentColor }]}>
-            {event.category}
-          </Text>
-        </View>
-
-        {/* Bookmark Action Button */}
-        <TouchableOpacity
-          style={[styles.bookmarkBtn, isSaved && styles.bookmarkBtnActive]}
-          activeOpacity={0.8}
-          onPress={handleBookmarkPress}
-          disabled={isSaving}
-        >
-          <Bookmark
-            size={16}
-            color={isSaved ? '#FFF' : theme.colors.textPrimary}
-            fill={isSaved ? '#FFF' : 'transparent'}
-          />
-        </TouchableOpacity>
+        {/* Past Event Badge */}
+        {isPastEvent && (
+          <View style={styles.pastBadge}>
+            <Text style={styles.pastText}>Past Event</Text>
+          </View>
+        )}
       </View>
 
-      {/* Card Content Body */}
-      <View style={styles.body}>
-        {/* Date Row */}
-        <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <Calendar size={13} color={theme.colors.brand} />
-            <Text style={styles.dateText}>{event.date_string || 'Date TBA'}</Text>
-          </View>
-
-          {/* Pricing Pill */}
-          <View style={[styles.pricePill, event.is_free === false && styles.paidPricePill]}>
-            <Text style={[styles.priceText, event.is_free === false && styles.paidPriceText]}>
-              {event.is_free === false ? (event.price ? `₹${event.price}` : 'Paid') : 'FREE'}
-            </Text>
-          </View>
-        </View>
-
+      {/* Card Content Matching Website Details */}
+      <View style={styles.content}>
         {/* Title */}
         <Text style={styles.title} numberOfLines={2}>
           {event.title}
         </Text>
 
-        {/* Location & Organizer Info */}
-        <View style={styles.footerRow}>
-          <View style={styles.locationContainer}>
-            {event.is_virtual ? (
-              <View style={styles.virtualTag}>
-                <Video size={13} color={theme.colors.brand} />
-                <Text style={styles.locationText}>Online / Virtual</Text>
-              </View>
-            ) : (
-              <View style={styles.locationTag}>
-                <MapPin size={13} color={theme.colors.textSecondary} />
-                <Text style={styles.locationText} numberOfLines={1}>
-                  {event.city || event.location || 'India'}
-                </Text>
-              </View>
+        {/* Organizer & Price */}
+        <View style={styles.metaRow}>
+          <Text style={styles.organizerText} numberOfLines={1}>
+            Curated by <Text style={styles.organizerHighlight}>{event.organizer_name || 'EvenTime Community'}</Text>
+          </Text>
+          <View style={styles.dotSeparator} />
+          {isFree ? (
+            <View style={styles.freeBadge}>
+              <Text style={styles.freeText}>FREE</Text>
+            </View>
+          ) : (
+            <View style={styles.paidBadge}>
+              <IndianRupee size={11} color="#059669" />
+              <Text style={styles.paidText}>PAID</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Location / College */}
+        <View style={styles.infoRow}>
+          <MapPin size={13} color="#94A3B8" />
+          <Text style={styles.infoText} numberOfLines={1}>
+            {event.college_name ? `${event.college_name}, ${event.city || 'Online'}` : (event.city || 'Online / Virtual')}
+          </Text>
+        </View>
+
+        {/* Time & Interested Count */}
+        <View style={styles.bottomRow}>
+          <View style={styles.timeSection}>
+            <Clock size={13} color="#94A3B8" />
+            <Text style={styles.infoText} numberOfLines={1}>
+              {event.date_string?.includes('·') ? event.date_string.split('·')[1].trim() : 'TBA'}
+            </Text>
+            {Boolean(event.interested_count && event.interested_count > 0) && (
+              <>
+                <View style={styles.dotSeparator} />
+                <Users size={13} color="#94A3B8" />
+                <Text style={styles.infoText}>{event.interested_count}</Text>
+              </>
             )}
           </View>
 
-          <Text style={styles.organizerText} numberOfLines={1}>
-            by {event.organizer_name || 'EvenTime Curator'}
-          </Text>
+          {/* Action Buttons: Save & Share */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              onPress={handleBookmarkPress}
+              disabled={isSaving}
+              style={[styles.actionBtn, isSaved && styles.actionBtnSaved]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Bookmark
+                size={16}
+                color={isSaved ? '#6C47FF' : '#94A3B8'}
+                fill={isSaved ? '#6C47FF' : 'none'}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleSharePress}
+              style={styles.actionBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              {copied ? (
+                <Check size={16} color="#10B981" />
+              ) : (
+                <Share2 size={16} color="#94A3B8" />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -172,166 +226,191 @@ export const EventCard: React.FC<EventCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: theme.spacing.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    marginBottom: 16,
     overflow: 'hidden',
-    ...theme.shadows.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
   },
   imageContainer: {
     width: '100%',
-    height: 180,
+    aspectRatio: 16 / 9,
+    backgroundColor: '#F8FAFC',
     position: 'relative',
-    backgroundColor: theme.colors.surfaceSecondary,
   },
   posterImage: {
     width: '100%',
     height: '100%',
   },
-  fallbackBanner: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+  dateOverlay: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  fallbackCatText: {
-    fontSize: 14,
+  dateOverlayText: {
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
-  featuredBadge: {
+  categoryPill: {
     position: 'absolute',
     top: 12,
     left: 12,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 100,
+    maxWidth: '55%',
+  },
+  categoryPillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  featuredBadge: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    backgroundColor: '#6C47FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.sm,
     gap: 4,
-    ...theme.shadows.sm,
   },
   featuredText: {
     color: '#FFF',
     fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  categoryPill: {
+  pastBadge: {
     position: 'absolute',
     bottom: 12,
-    left: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: theme.borderRadius.full,
-    borderWidth: 1,
-    ...theme.shadows.sm,
+    right: 12,
+    backgroundColor: 'rgba(30, 41, 59, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  categoryDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
-  },
-  categoryPillText: {
-    fontSize: 11,
+  pastText: {
+    color: '#F1F5F9',
+    fontSize: 10,
     fontWeight: '700',
   },
-  bookmarkBtn: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...theme.shadows.sm,
+  content: {
+    padding: 16,
   },
-  bookmarkBtnActive: {
-    backgroundColor: theme.colors.brand,
-  },
-  body: {
-    padding: theme.spacing.lg,
+  title: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+    lineHeight: 23,
+    marginBottom: 8,
   },
   metaRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dateText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: theme.colors.brand,
-  },
-  pricePill: {
-    backgroundColor: theme.colors.successBg,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: theme.borderRadius.sm,
-  },
-  priceText: {
-    color: theme.colors.success,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  paidPricePill: {
-    backgroundColor: theme.colors.brandLight,
-  },
-  paidPriceText: {
-    color: theme.colors.brand,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: theme.colors.textPrimary,
-    lineHeight: 22,
-    marginBottom: 12,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.borderLight,
-  },
-  locationContainer: {
-    flex: 1,
-    marginRight: 8,
-  },
-  locationTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  virtualTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  locationText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
-  },
   organizerText: {
-    fontSize: 11,
-    color: theme.colors.textSecondary,
-    maxWidth: 130,
-    textAlign: 'right',
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  organizerHighlight: {
+    color: '#0F172A',
+    fontWeight: '700',
+  },
+  dotSeparator: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#CBD5E1',
+    marginHorizontal: 6,
+  },
+  freeBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  freeText: {
+    color: '#059669',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  paidBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  paidText: {
+    color: '#059669',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 10,
+  },
+  infoText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  bottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  timeSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 1,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  actionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnSaved: {
+    backgroundColor: '#EEF2FF',
   },
 });

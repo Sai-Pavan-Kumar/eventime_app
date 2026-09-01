@@ -8,13 +8,15 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft, MapPin, Compass } from 'lucide-react-native';
+import { ArrowLeft, MapPin } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
+import { getCityCover, APP_ASSETS } from '../lib/asset-registry';
 import type { EventRow, RootStackParamList } from '../types';
 
 export default function CityEventsScreen() {
@@ -32,71 +34,90 @@ export default function CityEventsScreen() {
           .from('events')
           .select('*')
           .eq('status', 'approved')
-          .eq('city', city)
-          .order('date_string', { ascending: true });
+          .ilike('city', city)
+          .order('created_at', { ascending: false });
 
         if (!error && data) {
           setEvents(data);
         }
       } catch (err) {
-        console.error('Fetch city events error:', err);
+        console.error('[CityEventsScreen] Fetch error:', err);
       } finally {
         setIsLoading(false);
       }
     })();
   }, [city]);
 
+  const cityCover = getCityCover(city);
+
+  const renderHeader = () => (
+    <View style={styles.headerBannerContainer}>
+      <Image
+        source={cityCover}
+        style={styles.cityCoverImage}
+        contentFit="cover"
+      />
+      <View style={styles.coverOverlay} />
+
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+        activeOpacity={0.8}
+      >
+        <ArrowLeft size={20} color="#0F172A" />
+      </TouchableOpacity>
+
+      <View style={styles.coverTextContainer}>
+        <View style={styles.badgeRow}>
+          <MapPin size={14} color="#FFF" />
+          <Text style={styles.cityBadgeText}>{city}</Text>
+        </View>
+        <Text style={styles.coverTitle}>Events in {city}</Text>
+        <Text style={styles.coverSubtitle}>
+          {events.length} {events.length === 1 ? 'event' : 'events'} curated
+        </Text>
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Top Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={22} color={theme.colors.textPrimary} />
-        </TouchableOpacity>
-
-        <View style={styles.headerTitleContainer}>
-          <View style={styles.cityBadge}>
-            <MapPin size={14} color={theme.colors.brand} />
-            <Text style={styles.cityName}>{city}</Text>
-          </View>
-          <Text style={styles.subtitle}>
-            {events.length} {events.length === 1 ? 'event' : 'events'} upcoming
-          </Text>
-        </View>
-
-        <View style={{ width: 40 }} />
-      </View>
-
       {isLoading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={theme.colors.brand} />
+          <ActivityIndicator size="large" color="#6C47FF" />
+          <Text style={styles.loadingText}>Loading {city} events...</Text>
         </View>
       ) : (
         <FlatList
           data={events}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={renderHeader}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <EventCard
-              event={item}
-              onPress={() =>
-                navigation.navigate('EventDetail', { slug: item.slug || item.id, id: item.id })
-              }
-            />
+            <View style={styles.cardWrapper}>
+              <EventCard
+                event={item}
+                onPress={() => navigation.navigate('EventDetail', { eventId: item.id })}
+              />
+            </View>
           )}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Compass size={44} color={theme.colors.textMuted} />
+              <Image
+                source={APP_ASSETS.illustrations.empty}
+                style={styles.emptyIllustration}
+                contentFit="contain"
+              />
               <Text style={styles.emptyTitle}>No events in {city} right now</Text>
               <Text style={styles.emptySubtitle}>
-                Be the first to curate and share an event happening in {city}!
+                Be the first organizer to list an event in {city}!
               </Text>
               <TouchableOpacity
                 style={styles.createBtn}
-                onPress={() => navigation.navigate('CreateEvent', {})}
+                onPress={() => (navigation as any).navigate('CreateTab')}
               >
-                <Text style={styles.createBtnText}>+ Post an Event in {city}</Text>
+                <Text style={styles.createBtnText}>+ Host Event in {city}</Text>
               </TouchableOpacity>
             </View>
           }
@@ -109,80 +130,114 @@ export default function CityEventsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#F8FAFC',
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '600',
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.surfaceSecondary,
+  headerBannerContainer: {
+    width: '100%',
+    height: 180,
+    position: 'relative',
+    marginBottom: 16,
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  cityCoverImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  coverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 14,
+    left: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitleContainer: {
-    alignItems: 'center',
+  coverTextContainer: {
+    zIndex: 10,
   },
-  cityBadge: {
+  badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
   },
-  cityName: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: theme.colors.textPrimary,
-  },
-  subtitle: {
+  cityBadgeText: {
+    color: '#FFF',
     fontSize: 12,
-    color: theme.colors.textSecondary,
+    fontWeight: '800',
+  },
+  coverTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  coverSubtitle: {
+    fontSize: 13,
+    color: '#E2E8F0',
+    fontWeight: '600',
     marginTop: 2,
   },
   listContent: {
-    padding: theme.spacing.xl,
     paddingBottom: 40,
+  },
+  cardWrapper: {
+    paddingHorizontal: 16,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
-    gap: 10,
+    paddingVertical: 40,
+    paddingHorizontal: 32,
+  },
+  emptyIllustration: {
+    width: 200,
+    height: 140,
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
-    color: theme.colors.textPrimary,
+    color: '#0F172A',
+    marginBottom: 6,
   },
   emptySubtitle: {
     fontSize: 13,
-    color: theme.colors.textSecondary,
+    color: '#64748B',
     textAlign: 'center',
-    maxWidth: 260,
+    marginBottom: 18,
+    lineHeight: 19,
   },
   createBtn: {
-    marginTop: 10,
-    backgroundColor: theme.colors.brand,
-    paddingHorizontal: 18,
+    backgroundColor: '#6C47FF',
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: 100,
   },
   createBtnText: {
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
   },
 });

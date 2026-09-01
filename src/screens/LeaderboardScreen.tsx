@@ -14,6 +14,7 @@ import { Image } from 'expo-image';
 import { ArrowLeft, Trophy, Sparkles, Award, Medal, Crown } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
+import { APP_ASSETS } from '../lib/asset-registry';
 import { useAuth } from '../context/AuthContext';
 import type { LeaderboardViewRow } from '../types';
 
@@ -206,6 +207,19 @@ export default function LeaderboardScreen() {
               {restList.length > 0 && (
                 <Text style={styles.listSectionTitle}>All Top Curators</Text>
               )}
+            </View>
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Image
+                source={APP_ASSETS.illustrations.throneEmpty}
+                style={styles.emptyIllustration}
+                contentFit="contain"
+              />
+              <Text style={styles.emptyTitle}>The Throne is Empty!</Text>
+              <Text style={styles.emptySubtitle}>
+                Be the first curator to post approved events and claim the #1 spot on the leaderboard.
+              </Text>
             </View>
           }
           renderItem={({ item, index }) => {
@@ -509,5 +523,29 @@ const styles = StyleSheet.create({
     color: '#F59E0B',
     fontSize: 16,
     fontWeight: '900',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 50,
+  },
+  emptyIllustration: {
+    width: 220,
+    height: 160,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: theme.colors.textPrimary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

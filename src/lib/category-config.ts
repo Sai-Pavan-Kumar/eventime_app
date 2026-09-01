@@ -1,53 +1,86 @@
 export interface CategoryMeta {
   accentColor: string;
   bgLight: string;
-  template?: string;
+  dateColor?: string;
 }
 
 export const CATEGORIES_LIST = [
-  "AI Event", "Auto & EV Expo", "Awards Night", "Career Event", "Charity Event", "College Event", "College Fest",
-  "Comedy Show", "Community Event", "Concert", "Conference", "Creator Meetup", "Developer Event", "Exhibition", "Film Festival",
-  "Fitness Event", "Food Festival", "Founder Meetup", "Gaming & Esports", "Hackathon", "Investor Event", "Music Festival",
-  "Open Mic", "Pet Event", "Running Event", "Sports Tournament", "Startup Event", "Summit", "Tech Event",
-  "Wellness Event", "Women Event", "Workshop"
+  'AI Event',
+  'Auto & EV Expo',
+  'Awards Night',
+  'Career Event',
+  'Charity Event',
+  'College Event',
+  'College Fest',
+  'Comedy Show',
+  'Community Event',
+  'Concert',
+  'Conference',
+  'Creator Meetup',
+  'Developer Event',
+  'Exhibition',
+  'Film Festival',
+  'Fitness Event',
+  'Food Festival',
+  'Founder Meetup',
+  'Gaming & Esports',
+  'Hackathon',
+  'Investor Event',
+  'Music Festival',
+  'Open Mic',
+  'Pet Event',
+  'Running Event',
+  'Sports Tournament',
+  'Startup Event',
+  'Summit',
+  'Tech Event',
+  'Wellness Event',
+  'Women Event',
+  'Workshop',
 ] as const;
 
-export const CATEGORY_CONFIG: Record<string, { accentColor: string; bgLight: string }> = {
-  'AI Event': { accentColor: '#7C3AED', bgLight: '#F5F3FF' },
-  'Auto & EV Expo': { accentColor: '#06B6D4', bgLight: '#ECFEFF' },
-  'Awards Night': { accentColor: '#EAB308', bgLight: '#FEFCE8' },
-  'Career Event': { accentColor: '#0EA5E9', bgLight: '#F0F9FF' },
-  'Charity Event': { accentColor: '#06B6D4', bgLight: '#ECFEFF' },
-  'College Event': { accentColor: '#2563EB', bgLight: '#EFF6FF' },
-  'College Fest': { accentColor: '#9333EA', bgLight: '#FAF5FF' },
-  'Comedy Show': { accentColor: '#F59E0B', bgLight: '#FFFBEB' },
-  'Community Event': { accentColor: '#14B8A6', bgLight: '#F0FDFA' },
-  'Concert': { accentColor: '#D946EF', bgLight: '#FDF4FF' },
-  'Conference': { accentColor: '#6366F1', bgLight: '#EEF2FF' },
-  'Creator Meetup': { accentColor: '#F97316', bgLight: '#FFF7ED' },
-  'Default Event': { accentColor: '#6C47FF', bgLight: '#EEF0FF' },
-  'Developer Event': { accentColor: '#2563EB', bgLight: '#EFF6FF' },
-  'Exhibition': { accentColor: '#EC4899', bgLight: '#FDF2F8' },
-  'Film Festival': { accentColor: '#DC2626', bgLight: '#FEF2F2' },
-  'Fitness Event': { accentColor: '#16A34A', bgLight: '#F0FDF4' },
-  'Food Festival': { accentColor: '#EA580C', bgLight: '#FFF7ED' },
-  'Founder Meetup': { accentColor: '#8B5CF6', bgLight: '#F5F3FF' },
-  'Gaming & Esports': { accentColor: '#0284C7', bgLight: '#F0F9FF' },
-  'Hackathon': { accentColor: '#4F46E5', bgLight: '#EEF2FF' },
-  'Investor Event': { accentColor: '#059669', bgLight: '#ECFDF5' },
-  'Music Festival': { accentColor: '#C026D3', bgLight: '#FDF4FF' },
-  'Open Mic': { accentColor: '#D97706', bgLight: '#FFFBEB' },
-  'Pet Event': { accentColor: '#0D9488', bgLight: '#F0FDFA' },
-  'Running Event': { accentColor: '#16A34A', bgLight: '#F0FDF4' },
-  'Sports Tournament': { accentColor: '#2563EB', bgLight: '#EFF6FF' },
-  'Startup Event': { accentColor: '#6C47FF', bgLight: '#EEF0FF' },
-  'Summit': { accentColor: '#4338CA', bgLight: '#EEF2FF' },
-  'Tech Event': { accentColor: '#7C3AED', bgLight: '#F5F3FF' },
-  'Wellness Event': { accentColor: '#059669', bgLight: '#ECFDF5' },
-  'Women Event': { accentColor: '#DB2777', bgLight: '#FDF2F8' },
-  'Workshop': { accentColor: '#0891B2', bgLight: '#ECFEFF' },
+export const CATEGORY_CONFIG: Record<string, { accentColor: string; bgLight: string; dateColor: string }> = {
+  'ai-event': { accentColor: '#7C3AED', bgLight: '#F5F3FF', dateColor: '#7C3AED' },
+  'auto-ev-expo': { accentColor: '#06B6D4', bgLight: '#ECFEFF', dateColor: '#06B6D4' },
+  'awards-night': { accentColor: '#EAB308', bgLight: '#FEFCE8', dateColor: '#EAB308' },
+  'career-event': { accentColor: '#0EA5E9', bgLight: '#F0F9FF', dateColor: '#0EA5E9' },
+  'charity-event': { accentColor: '#06B6D4', bgLight: '#ECFEFF', dateColor: '#06B6D4' },
+  'college-event': { accentColor: '#2563EB', bgLight: '#EFF6FF', dateColor: '#2563EB' },
+  'college-fest': { accentColor: '#9333EA', bgLight: '#FAF5FF', dateColor: '#9333EA' },
+  'comedy-show': { accentColor: '#F59E0B', bgLight: '#FFFBEB', dateColor: '#FACC15' },
+  'community-event': { accentColor: '#14B8A6', bgLight: '#F0FDFA', dateColor: '#14B8A6' },
+  'concert': { accentColor: '#D946EF', bgLight: '#FDF4FF', dateColor: '#D946EF' },
+  'conference': { accentColor: '#6366F1', bgLight: '#EEF2FF', dateColor: '#6366F1' },
+  'creator-meetup': { accentColor: '#F97316', bgLight: '#FFF7ED', dateColor: '#F97316' },
+  'default-event': { accentColor: '#6C47FF', bgLight: '#EEF0FF', dateColor: '#6C47FF' },
+  'developer-event': { accentColor: '#2563EB', bgLight: '#EFF6FF', dateColor: '#2563EB' },
+  'exhibition': { accentColor: '#EC4899', bgLight: '#FDF2F8', dateColor: '#EC4899' },
+  'film-festival': { accentColor: '#DC2626', bgLight: '#FEF2F2', dateColor: '#DC2626' },
+  'fitness-event': { accentColor: '#16A34A', bgLight: '#F0FDF4', dateColor: '#22C55E' },
+  'food-festival': { accentColor: '#EA580C', bgLight: '#FFF7ED', dateColor: '#F59E0B' },
+  'founder-meetup': { accentColor: '#8B5CF6', bgLight: '#F5F3FF', dateColor: '#A855F7' },
+  'gaming-esports': { accentColor: '#0284C7', bgLight: '#F0F9FF', dateColor: '#3B82F6' },
+  'hackathon': { accentColor: '#4F46E5', bgLight: '#EEF2FF', dateColor: '#3B82F6' },
+  'investor-event': { accentColor: '#059669', bgLight: '#ECFDF5', dateColor: '#10B981' },
+  'music-festival': { accentColor: '#C026D3', bgLight: '#FDF4FF', dateColor: '#8B5CF6' },
+  'open-mic': { accentColor: '#D97706', bgLight: '#FFFBEB', dateColor: '#FB923C' },
+  'pet-event': { accentColor: '#0D9488', bgLight: '#F0FDFA', dateColor: '#10B981' },
+  'running-event': { accentColor: '#16A34A', bgLight: '#F0FDF4', dateColor: '#F97316' },
+  'sports-tournament': { accentColor: '#2563EB', bgLight: '#EFF6FF', dateColor: '#EF4444' },
+  'startup-event': { accentColor: '#6C47FF', bgLight: '#EEF0FF', dateColor: '#8B5CF6' },
+  'summit': { accentColor: '#4338CA', bgLight: '#EEF2FF', dateColor: '#1E3A8A' },
+  'tech-event': { accentColor: '#7C3AED', bgLight: '#F5F3FF', dateColor: '#4F46E5' },
+  'wellness-event': { accentColor: '#059669', bgLight: '#ECFDF5', dateColor: '#84CC16' },
+  'women-event': { accentColor: '#DB2777', bgLight: '#FDF2F8', dateColor: '#EC4899' },
+  'workshop': { accentColor: '#0891B2', bgLight: '#ECFEFF', dateColor: '#F59E0B' },
 };
 
-export function getCategoryMeta(categoryName: string) {
-  return CATEGORY_CONFIG[categoryName] || { accentColor: '#6C47FF', bgLight: '#EEF0FF' };
+export function getCategoryConfig(category?: string | null) {
+  if (!category) return CATEGORY_CONFIG['default-event'];
+  const slug = category.toLowerCase().trim().replace(/\s+/g, '-');
+  return CATEGORY_CONFIG[slug] || CATEGORY_CONFIG['default-event'];
+}
+
+export function getCategoryMeta(categoryName?: string | null) {
+  return getCategoryConfig(categoryName);
 }

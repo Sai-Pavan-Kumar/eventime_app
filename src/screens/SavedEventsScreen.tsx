@@ -9,12 +9,14 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ArrowLeft, Bookmark, Compass } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
+import { APP_ASSETS } from '../lib/asset-registry';
 import { useAuth } from '../context/AuthContext';
 import type { EventRow, RootStackParamList } from '../types';
 
@@ -116,16 +118,18 @@ export default function SavedEventsScreen() {
           )}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconBg}>
-                <Bookmark size={36} color={theme.colors.brand} />
-              </View>
+              <Image
+                source={APP_ASSETS.illustrations.emptySaved}
+                style={styles.emptyIllustration}
+                contentFit="contain"
+              />
               <Text style={styles.emptyTitle}>No Saved Events</Text>
               <Text style={styles.emptySubtitle}>
                 Bookmark events you're interested in attending to keep track of deadlines and updates.
               </Text>
               <TouchableOpacity
                 style={styles.exploreBtn}
-                onPress={() => navigation.navigate('MainTabs')}
+                onPress={() => (navigation as any).navigate('MainTabs')}
               >
                 <Text style={styles.exploreBtnText}>Explore Events</Text>
               </TouchableOpacity>
@@ -183,9 +187,13 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
-    paddingHorizontal: 24,
-    gap: 10,
+    paddingVertical: 50,
+    paddingHorizontal: 32,
+  },
+  emptyIllustration: {
+    width: 220,
+    height: 160,
+    marginBottom: 16,
   },
   emptyIconBg: {
     width: 68,

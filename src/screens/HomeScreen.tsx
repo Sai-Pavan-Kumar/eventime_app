@@ -8,24 +8,39 @@ import {
   RefreshControl,
   ActivityIndicator,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Sparkles, Trophy, MapPin, Compass, Search } from 'lucide-react-native';
+import {
+  Sparkles,
+  MapPin,
+  Compass,
+  Search,
+  Filter,
+  ChevronDown,
+  Building2,
+  Calendar,
+  X,
+} from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
+import { APP_ASSETS, getCityImage } from '../lib/asset-registry';
 import { CATEGORIES_LIST } from '../lib/category-config';
 import { CITIES } from '../lib/constants/cities';
 import type { EventRow, RootStackParamList } from '../types';
 
+const { width } = Dimensions.get('window');
+
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user, profile, isOnboarded } = useAuth();
+  const { user, profile } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'forYou' | 'aroundYou'>('forYou');
+  const [activeTab, setActiveTab] = useState<'all' | 'forYou'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
 
@@ -33,6 +48,10 @@ export default function HomeScreen() {
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Filter Modals
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showCityModal, setShowCityModal] = useState(false);
 
   const fetchSavedEventIds = useCallback(async () => {
     if (!user) {
@@ -48,7 +67,7 @@ export default function HomeScreen() {
         setSavedEventIds(new Set(data.map((d) => d.event_id).filter(Boolean) as string[]));
       }
     } catch (e) {
-      console.error('Fetch saved events error:', e);
+      console.error('[HomeScreen] Saved events error:', e);
     }
   }, [user]);
 
@@ -71,7 +90,7 @@ export default function HomeScreen() {
       const { data, error } = await query;
 
       if (error) {
-        console.error('[HomeScreen] Error fetching events:', error);
+        console.error('[HomeScreen] Fetch events error:', error);
         return;
       }
 
@@ -88,8 +107,6 @@ export default function HomeScreen() {
             const isVirtual = ev.is_virtual === true;
             return matchesCity || matchesCategory || isVirtual;
           });
-
-          // If personalized subset is found, use it; otherwise fallback smoothly to all approved
           setEvents(personalized.length > 0 ? personalized : allApproved);
         } else {
           setEvents(allApproved);
@@ -98,12 +115,12 @@ export default function HomeScreen() {
         setEvents(allApproved);
       }
     } catch (err) {
-      console.error('[HomeScreen] Fetch events exception:', err);
+      console.error('[HomeScreen] Fetch error:', err);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [activeTab, profile, selectedCategory, selectedCity]);
+  }, [selectedCategory, selectedCity, activeTab, profile]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -117,339 +134,555 @@ export default function HomeScreen() {
     fetchSavedEventIds();
   };
 
-  const handleSaveToggle = (eventId: string, isSaved: boolean) => {
-    setSavedEventIds((prev) => {
-      const next = new Set(prev);
-      if (isSaved) next.add(eventId);
-      else next.delete(eventId);
-      return next;
-    });
-  };
-
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Top App Header */}
-      <View style={styles.topHeader}>
-        <View style={styles.brandRow}>
-          <View style={styles.brandLogo}>
-            <Sparkles size={20} color="#FFF" />
-          </View>
-          <View>
-            <Text style={styles.brandTitle}>EvenTime</Text>
-            <Text style={styles.brandSubtitle}>
-              {profile?.full_name ? `Hey, ${profile.full_name.split(' ')[0]} 👋` : 'Discover Campus & Tech Events'}
-            </Text>
-          </View>
+  const renderHeader = () => (
+    <View style={styles.headerContainer}>
+      {/* Top App Bar with Genuine EvenTime Logo */}
+      <View style={styles.topBar}>
+        <View style={styles.logoRow}>
+          <Image
+            source={APP_ASSETS.logo}
+            style={styles.brandLogo}
+            contentFit="contain"
+          />
         </View>
 
-        {/* Header Action Badges */}
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.leaderboardBadge}
-            onPress={() => navigation.navigate('Leaderboard')}
-            activeOpacity={0.8}
-          >
-            <Trophy size={16} color="#F59E0B" />
-            <Text style={styles.etScoreText}>
-              {profile?.et_score ? `${profile.et_score} ET` : 'Leaderboard'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Segment Tabs: For You vs Around You */}
-      <View style={styles.tabsContainer}>
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'forYou' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('forYou')}
+          style={styles.searchIconBtn}
+          onPress={() => (navigation as any).navigate('SearchTab')}
           activeOpacity={0.8}
         >
-          <Sparkles size={15} color={activeTab === 'forYou' ? theme.colors.brand : theme.colors.textSecondary} />
-          <Text style={[styles.tabText, activeTab === 'forYou' && styles.tabTextActive]}>
-            For You
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'aroundYou' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('aroundYou')}
-          activeOpacity={0.8}
-        >
-          <Compass size={15} color={activeTab === 'aroundYou' ? theme.colors.brand : theme.colors.textSecondary} />
-          <Text style={[styles.tabText, activeTab === 'aroundYou' && styles.tabTextActive]}>
-            Around You
-          </Text>
+          <Search size={20} color="#0F172A" />
         </TouchableOpacity>
       </View>
 
-      {/* Quick Horizontal Filter Strip */}
-      <View style={styles.filtersWrapper}>
+      {/* Hero Section Matching Website */}
+      <View style={styles.heroCard}>
+        <View style={styles.heroTextContainer}>
+          <Text style={styles.heroTitle}>
+            The Dictionary{'\n'}
+            for <Text style={styles.heroHighlight}>Events.</Text>
+          </Text>
+          <Text style={styles.heroSubtitle}>
+            Discover verified tech, college, networking & cultural events across India.
+          </Text>
+        </View>
+
+        <Image
+          source={APP_ASSETS.heroBanner}
+          style={styles.heroImage}
+          contentFit="contain"
+        />
+      </View>
+
+      {/* Filter Chips Bar (Category & City Pickers) */}
+      <View style={styles.filterBar}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersScroll}
+          contentContainerStyle={styles.filterScrollContent}
         >
-          {/* Reset Chip */}
+          {/* Feed Tabs: All vs For You */}
+          <TouchableOpacity
+            style={[styles.feedPill, activeTab === 'all' && styles.feedPillActive]}
+            onPress={() => setActiveTab('all')}
+          >
+            <Compass size={14} color={activeTab === 'all' ? '#FFF' : '#64748B'} />
+            <Text style={[styles.feedPillText, activeTab === 'all' && styles.feedPillTextActive]}>
+              Explore All
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.feedPill, activeTab === 'forYou' && styles.feedPillActive]}
+            onPress={() => setActiveTab('forYou')}
+          >
+            <Sparkles size={14} color={activeTab === 'forYou' ? '#FFF' : '#64748B'} />
+            <Text style={[styles.feedPillText, activeTab === 'forYou' && styles.feedPillTextActive]}>
+              For You
+            </Text>
+          </TouchableOpacity>
+
+          {/* Category Dropdown Filter */}
+          <TouchableOpacity
+            style={[styles.filterPill, Boolean(selectedCategory) && styles.filterPillSelected]}
+            onPress={() => setShowCategoryModal(true)}
+          >
+            <Text style={[styles.filterPillText, Boolean(selectedCategory) && styles.filterPillTextSelected]}>
+              {selectedCategory || 'All Categories'}
+            </Text>
+            <ChevronDown size={14} color={selectedCategory ? '#6C47FF' : '#64748B'} />
+          </TouchableOpacity>
+
+          {/* City Dropdown Filter */}
+          <TouchableOpacity
+            style={[styles.filterPill, Boolean(selectedCity) && styles.filterPillSelected]}
+            onPress={() => setShowCityModal(true)}
+          >
+            <MapPin size={13} color={selectedCity ? '#6C47FF' : '#64748B'} />
+            <Text style={[styles.filterPillText, Boolean(selectedCity) && styles.filterPillTextSelected]}>
+              {selectedCity || 'All Cities'}
+            </Text>
+            <ChevronDown size={14} color={selectedCity ? '#6C47FF' : '#64748B'} />
+          </TouchableOpacity>
+
+          {/* Clear Filter Button if active */}
           {(selectedCategory || selectedCity) && (
             <TouchableOpacity
-              style={styles.clearChip}
+              style={styles.clearPill}
               onPress={() => {
                 setSelectedCategory(null);
                 setSelectedCity(null);
               }}
             >
-              <Text style={styles.clearChipText}>Clear Filters ✕</Text>
+              <X size={13} color="#EF4444" />
+              <Text style={styles.clearPillText}>Reset</Text>
             </TouchableOpacity>
           )}
-
-          {/* Categories */}
-          {CATEGORIES_LIST.slice(0, 10).map((cat) => {
-            const isSelected = selectedCategory === cat;
-            return (
-              <TouchableOpacity
-                key={cat}
-                style={[styles.filterChip, isSelected && styles.filterChipActive]}
-                onPress={() => setSelectedCategory(isSelected ? null : cat)}
-              >
-                <Text style={[styles.filterChipText, isSelected && styles.filterChipTextActive]}>
-                  {cat}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
         </ScrollView>
       </View>
 
-      {/* Events Feed */}
+      {/* Section Title */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>
+          {activeTab === 'forYou' ? 'Recommended For You' : 'Upcoming Events'}
+        </Text>
+        <Text style={styles.sectionCount}>
+          {events.length} {events.length === 1 ? 'event' : 'events'}
+        </Text>
+      </View>
+    </View>
+  );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Image
+        source={APP_ASSETS.illustrations.empty}
+        style={styles.emptyIllustration}
+        contentFit="contain"
+      />
+      <Text style={styles.emptyTitle}>The stage is waiting!</Text>
+      <Text style={styles.emptySubtitle}>
+        {selectedCategory || selectedCity
+          ? 'No events match the selected filters right now. Try resetting filters or exploring other categories.'
+          : 'No upcoming events found. Be the first to host an event on EvenTime!'}
+      </Text>
+      <TouchableOpacity
+        style={styles.createEventBtn}
+        onPress={() => (navigation as any).navigate('CreateTab')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.createEventBtnText}>Host An Event</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       {isLoading ? (
-        <View style={styles.centerLoading}>
-          <ActivityIndicator size="large" color={theme.colors.brand} />
-          <Text style={styles.loadingText}>Curating verified events...</Text>
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#6C47FF" />
+          <Text style={styles.loaderText}>Loading live events...</Text>
         </View>
       ) : (
         <FlatList
           data={events}
           keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.cardWrapper}>
+              <EventCard
+                event={item}
+                isSaved={savedEventIds.has(item.id)}
+                onPress={() => navigation.navigate('EventDetail', { eventId: item.id })}
+                onSaveToggle={(id, saved) => {
+                  setSavedEventIds((prev) => {
+                    const next = new Set(prev);
+                    if (saved) next.add(id);
+                    else next.delete(id);
+                    return next;
+                  });
+                }}
+              />
+            </View>
+          )}
+          ListHeaderComponent={renderHeader}
+          ListEmptyComponent={renderEmptyState}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={onRefresh}
-              tintColor={theme.colors.brand}
-              colors={[theme.colors.brand]}
+              colors={['#6C47FF']}
+              tintColor="#6C47FF"
             />
-          }
-          renderItem={({ item }) => (
-            <EventCard
-              event={item}
-              isSaved={savedEventIds.has(item.id)}
-              onPress={() => navigation.navigate('EventDetail', { slug: item.slug || item.id, id: item.id })}
-              onSaveToggle={handleSaveToggle}
-            />
-          )}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Compass size={48} color={theme.colors.textMuted} />
-              <Text style={styles.emptyTitle}>No Approved Events Found</Text>
-              <Text style={styles.emptySubtitle}>
-                {selectedCategory || selectedCity
-                  ? 'Try clearing active filters to see all available events.'
-                  : 'Check back soon as curators post new tech and campus events!'}
-              </Text>
-              {(selectedCategory || selectedCity) && (
-                <TouchableOpacity
-                  style={styles.emptyActionBtn}
-                  onPress={() => {
-                    setSelectedCategory(null);
-                    setSelectedCity(null);
-                  }}
-                >
-                  <Text style={styles.emptyActionText}>Show All Events</Text>
-                </TouchableOpacity>
-              )}
-            </View>
           }
         />
+      )}
+
+      {/* Category Selection Modal */}
+      {showCategoryModal && (
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            onPress={() => setShowCategoryModal(false)}
+          />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Category</Text>
+              <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
+                <X size={22} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalList}>
+              <TouchableOpacity
+                style={[styles.modalItem, !selectedCategory && styles.modalItemActive]}
+                onPress={() => {
+                  setSelectedCategory(null);
+                  setShowCategoryModal(false);
+                }}
+              >
+                <Text style={[styles.modalItemText, !selectedCategory && styles.modalItemTextActive]}>
+                  All Categories
+                </Text>
+              </TouchableOpacity>
+              {CATEGORIES_LIST.map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.modalItem, selectedCategory === cat && styles.modalItemActive]}
+                  onPress={() => {
+                    setSelectedCategory(cat);
+                    setShowCategoryModal(false);
+                  }}
+                >
+                  <Text style={[styles.modalItemText, selectedCategory === cat && styles.modalItemTextActive]}>
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      )}
+
+      {/* City Selection Modal */}
+      {showCityModal && (
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            onPress={() => setShowCityModal(false)}
+          />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select City</Text>
+              <TouchableOpacity onPress={() => setShowCityModal(false)}>
+                <X size={22} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalList}>
+              <TouchableOpacity
+                style={[styles.modalItem, !selectedCity && styles.modalItemActive]}
+                onPress={() => {
+                  setSelectedCity(null);
+                  setShowCityModal(false);
+                }}
+              >
+                <Text style={[styles.modalItemText, !selectedCity && styles.modalItemTextActive]}>
+                  All Cities
+                </Text>
+              </TouchableOpacity>
+              {CITIES.map((c) => (
+                <TouchableOpacity
+                  key={c}
+                  style={[styles.modalItem, selectedCity === c && styles.modalItemActive]}
+                  onPress={() => {
+                    setSelectedCity(c);
+                    setShowCityModal(false);
+                  }}
+                >
+                  <Text style={[styles.modalItemText, selectedCity === c && styles.modalItemTextActive]}>
+                    {c}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
       )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#F8FAFC',
   },
-  topHeader: {
+  listContent: {
+    paddingBottom: 40,
+  },
+  cardWrapper: {
+    paddingHorizontal: 16,
+  },
+  headerContainer: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    marginBottom: 16,
+  },
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: '#F8FAFC',
   },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  logoRow: {
+    height: 38,
+    width: 140,
   },
   brandLogo: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: theme.colors.brand,
+    width: '100%',
+    height: '100%',
+  },
+  searchIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brandTitle: {
-    fontSize: 18,
+  heroCard: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  heroTextContainer: {
+    marginBottom: 12,
+  },
+  heroTitle: {
+    fontSize: 32,
     fontWeight: '900',
-    color: theme.colors.textPrimary,
-    letterSpacing: -0.3,
+    color: '#0F172A',
+    lineHeight: 38,
+    letterSpacing: -0.5,
   },
-  brandSubtitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
+  heroHighlight: {
+    color: '#6C47FF',
   },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  heroSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  heroImage: {
+    width: '100%',
+    height: 140,
+    marginTop: 4,
+  },
+  filterBar: {
+    paddingVertical: 12,
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  filterScrollContent: {
+    paddingHorizontal: 16,
     gap: 8,
+    alignItems: 'center',
   },
-  leaderboardBadge: {
+  feedPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: theme.borderRadius.full,
-    gap: 5,
-  },
-  etScoreText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#B45309',
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.sm,
-    backgroundColor: theme.colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.borderLight,
-    gap: 8,
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: theme.borderRadius.lg,
-    backgroundColor: theme.colors.surfaceSecondary,
     gap: 6,
-  },
-  tabButtonActive: {
-    backgroundColor: theme.colors.brandLight,
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.colors.textSecondary,
-  },
-  tabTextActive: {
-    color: theme.colors.brand,
-  },
-  filtersWrapper: {
-    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.borderLight,
-  },
-  filtersScroll: {
-    paddingHorizontal: theme.spacing.xl,
-    gap: 8,
-  },
-  clearChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.dangerBg,
-  },
-  clearChipText: {
-    color: theme.colors.danger,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.surfaceSecondary,
+    borderRadius: 100,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: '#E2E8F0',
   },
-  filterChipActive: {
-    backgroundColor: theme.colors.brand,
-    borderColor: theme.colors.brand,
+  feedPillActive: {
+    backgroundColor: '#6C47FF',
+    borderColor: '#6C47FF',
   },
-  filterChipText: {
-    fontSize: 12,
+  feedPillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  feedPillTextActive: {
+    color: '#FFFFFF',
+  },
+  filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 100,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  filterPillSelected: {
+    borderColor: '#6C47FF',
+    backgroundColor: '#EEF2FF',
+  },
+  filterPillText: {
+    fontSize: 13,
     fontWeight: '600',
-    color: theme.colors.textSecondary,
+    color: '#475569',
   },
-  filterChipTextActive: {
-    color: '#FFF',
+  filterPillTextSelected: {
+    color: '#6C47FF',
     fontWeight: '700',
   },
-  listContent: {
-    padding: theme.spacing.xl,
-    paddingBottom: 40,
-  },
-  centerLoading: {
-    flex: 1,
-    justifyContent: 'center',
+  clearPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 100,
+    backgroundColor: '#FEE2E2',
   },
-  loadingText: {
+  clearPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  sectionCount: {
     fontSize: 13,
-    color: theme.colors.textSecondary,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  loaderContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 100,
+  },
+  loaderText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#64748B',
     fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 20,
-    gap: 12,
+    paddingHorizontal: 32,
+    paddingTop: 30,
+    paddingBottom: 60,
+  },
+  emptyIllustration: {
+    width: 220,
+    height: 160,
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
-    color: theme.colors.textPrimary,
+    color: '#0F172A',
+    marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 13,
-    color: theme.colors.textSecondary,
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500',
     textAlign: 'center',
-    lineHeight: 18,
-    maxWidth: 280,
+    lineHeight: 21,
+    marginBottom: 20,
   },
-  emptyActionBtn: {
-    marginTop: 8,
-    backgroundColor: theme.colors.brand,
-    paddingHorizontal: 16,
+  createEventBtn: {
+    backgroundColor: '#6C47FF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 100,
+  },
+  createEventBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+  },
+  modalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '70%',
+    paddingBottom: 30,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  modalList: {
+    paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: theme.borderRadius.md,
   },
-  emptyActionText: {
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: '700',
+  modalItem: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  modalItemActive: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  modalItemText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  modalItemTextActive: {
+    color: '#6C47FF',
+    fontWeight: '800',
   },
 });
