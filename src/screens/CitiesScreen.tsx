@@ -8,12 +8,14 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Search, CalendarDays } from 'lucide-react-native';
+import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { CITIES } from '../lib/constants/cities';
@@ -26,6 +28,7 @@ const CARD_WIDTH = (width - 44) / 2;
 
 export default function CitiesScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [cityCounts, setCityCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -70,20 +73,22 @@ export default function CitiesScreen() {
     })();
   }, []);
 
-  // Display all cities, prioritizing cities with active upcoming events
+  // Display ONLY cities that currently have active upcoming events
   const activeCityList = useMemo(() => {
     return CITIES.map((name) => ({
       name,
       count: cityCounts[name] || 0,
-    })).sort((a, b) => {
-      // Online first if has events
-      if (a.name.toLowerCase() === 'online' && a.count > 0) return -1;
-      if (b.name.toLowerCase() === 'online' && b.count > 0) return 1;
+    }))
+      .filter((c) => c.count > 0)
+      .sort((a, b) => {
+        // Online first if has events
+        if (a.name.toLowerCase() === 'online' && a.count > 0) return -1;
+        if (b.name.toLowerCase() === 'online' && b.count > 0) return 1;
 
-      // Higher event count first
-      if (b.count !== a.count) return b.count - a.count;
-      return a.name.localeCompare(b.name);
-    });
+        // Higher event count first
+        if (b.count !== a.count) return b.count - a.count;
+        return a.name.localeCompare(b.name);
+      });
   }, [cityCounts]);
 
   const filteredCities = useMemo(() => {
@@ -92,6 +97,21 @@ export default function CitiesScreen() {
       c.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
     );
   }, [activeCityList, searchQuery]);
+
+  const handleHostEvent = () => {
+    if (!user) {
+      Alert.alert(
+        'Sign In Required',
+        'Please sign in or create an account to host an event.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+        ]
+      );
+      return;
+    }
+    navigation.navigate('CreateEvent', {});
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -145,7 +165,7 @@ export default function CitiesScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.hostBtn}
-                onPress={() => (navigation as any).navigate('CreateTab')}
+                onPress={handleHostEvent}
               >
                 <Text style={styles.hostBtnText}>Host An Event in Your City</Text>
               </TouchableOpacity>

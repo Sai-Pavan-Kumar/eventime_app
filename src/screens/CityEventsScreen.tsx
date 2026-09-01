@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -13,6 +14,7 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ArrowLeft } from 'lucide-react-native';
+import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
@@ -23,6 +25,7 @@ import type { EventRow, RootStackParamList } from '../types';
 export default function CityEventsScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'CityEvents'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
   const { city } = route.params;
 
   const [events, setEvents] = useState<EventRow[]>([]);
@@ -61,6 +64,23 @@ export default function CityEventsScreen() {
       }
     })();
   }, [city]);
+
+  const handleHostEvent = () => {
+    if (!user) {
+      Alert.alert(
+        'Sign In Required',
+        'Please sign in or create an account to host an event.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+        ]
+      );
+      return;
+    }
+    navigation.navigate('CreateEvent', {
+      event: { city },
+    });
+  };
 
   const cityCover = getCityCover(city);
 
@@ -117,7 +137,7 @@ export default function CityEventsScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.hostBtn}
-                onPress={() => (navigation as any).navigate('CreateTab')}
+                onPress={handleHostEvent}
               >
                 <Text style={styles.hostBtnText}>Host An Event in {city}</Text>
               </TouchableOpacity>
