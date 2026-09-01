@@ -32,6 +32,7 @@ export interface EventCardProps {
   onPress?: () => void;
   onSaveToggle?: (eventId: string, isSaved: boolean) => void;
   onOrganizerPress?: () => void;
+  onCityPress?: (city: string) => void;
 }
 
 export const EventCard: React.FC<EventCardProps> = (props) => {
@@ -104,6 +105,15 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
         username: organizerUsername,
         name: organizerName,
       });
+    }
+  };
+
+  const handleCityPress = () => {
+    const targetCity = city || 'Online';
+    if (props.onCityPress) {
+      props.onCityPress(targetCity);
+    } else {
+      navigation.navigate('CityEvents', { city: targetCity });
     }
   };
 
@@ -243,7 +253,24 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
         <View style={styles.infoRow}>
           <MapPin size={13} color="#94A3B8" />
           <Text style={styles.infoText} numberOfLines={1}>
-            {collegeName ? `${collegeName}, ${city || 'Online'}` : (city || 'Online')}
+            {collegeName ? (
+              <>
+                <Text>{collegeName}, </Text>
+                <Text
+                  style={[styles.cityHighlight, styles.cityLink]}
+                  onPress={handleCityPress}
+                >
+                  {city || 'Online'}
+                </Text>
+              </>
+            ) : (
+              <Text
+                style={[styles.cityHighlight, styles.cityLink]}
+                onPress={handleCityPress}
+              >
+                {city || 'Online'}
+              </Text>
+            )}
           </Text>
         </View>
 
@@ -443,6 +470,14 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontWeight: '500',
     flexShrink: 1,
+  },
+  cityHighlight: {
+    color: '#475569',
+    fontWeight: '600',
+  },
+  cityLink: {
+    color: theme.colors.brand,
+    textDecorationLine: 'underline',
   },
   bottomRow: {
     flexDirection: 'row',

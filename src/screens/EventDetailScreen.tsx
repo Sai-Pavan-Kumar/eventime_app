@@ -527,7 +527,11 @@ export default function EventDetailScreen() {
             )}
 
             {/* Location */}
-            <View style={styles.detailRow}>
+            <TouchableOpacity
+              style={styles.detailRow}
+              onPress={() => event.city && navigation.navigate('CityEvents', { city: event.city })}
+              activeOpacity={0.7}
+            >
               <View style={styles.detailIconWrapper}>
                 {event.is_virtual ? (
                   <Video size={18} color={theme.colors.brand} />
@@ -541,7 +545,7 @@ export default function EventDetailScreen() {
                   {event.is_virtual ? 'Virtual / Online Event' : event.location || event.city || 'India'}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
 
             {/* College Specific Details */}
             {(event.colleges?.name || event.college_only) && (
