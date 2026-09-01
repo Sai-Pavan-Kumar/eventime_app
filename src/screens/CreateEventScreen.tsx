@@ -27,12 +27,15 @@ import {
   AlertCircle,
   IndianRupee,
   Link2,
+  GraduationCap,
+  Building,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { CATEGORIES_LIST } from '../lib/category-config';
 import { CITIES } from '../lib/constants/cities';
+import { INDIAN_COLLEGE_BRANCHES } from '../lib/constants/branches';
 import { uploadEventPoster } from '../lib/storage';
 import type { RootStackParamList } from '../types';
 
@@ -63,6 +66,17 @@ export default function CreateEventScreen() {
   const [posterUri, setPosterUri] = useState<string | null>(null);
   const [isFeatured, setIsFeatured] = useState(false);
 
+  // College & Campus event settings
+  const [collegeOnly, setCollegeOnly] = useState(false);
+  const [collegeName, setCollegeName] = useState(profile?.college || '');
+  const [collegeId, setCollegeId] = useState<string | null>(profile?.college_id || null);
+  const [collegeBranch, setCollegeBranch] = useState(profile?.branch || '');
+  const [collegeYear, setCollegeYear] = useState(profile?.graduation_year || '');
+  const [collegeSearchQuery, setCollegeSearchQuery] = useState('');
+  const [collegesList, setCollegesList] = useState<any[]>([]);
+  const [showCollegeDropdown, setShowCollegeDropdown] = useState(false);
+  const [isSearchingColleges, setIsSearchingColleges] = useState(false);
+
   // Trust check state
   const [isTrusted, setIsTrusted] = useState(false);
   const [isCheckingDomain, setIsCheckingDomain] = useState(false);
@@ -70,6 +84,31 @@ export default function CreateEventScreen() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState(!!editId);
+
+  // Search colleges when query changes
+  useEffect(() => {
+    const q = collegeSearchQuery.trim();
+    if (!q) {
+      setCollegesList([]);
+      return;
+    }
+    setIsSearchingColleges(true);
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await supabase
+          .from('colleges')
+          .select('id, name')
+          .ilike('name', `%${q}%`)
+          .limit(6);
+        setCollegesList(data || []);
+      } catch (err) {
+        console.error('Colleges search error:', err);
+      } finally {
+        setIsSearchingColleges(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [collegeSearchQuery]);
 
   // Load existing event data if in edit mode
   useEffect(() => {
@@ -97,6 +136,11 @@ export default function CreateEventScreen() {
           setTeamSize(data.team_size || 'Solo');
           setPosterUri(data.poster_url);
           setIsFeatured(data.is_featured || false);
+          setCollegeOnly(data.college_only || false);
+          setCollegeId(data.college_id || null);
+          setCollegeName((data as any).college_name || '');
+          setCollegeBranch(data.college_branch || '');
+          setCollegeYear(data.college_year || '');
         }
       } catch (err) {
         console.error('Fetch edit event error:', err);
@@ -218,6 +262,7 @@ export default function CreateEventScreen() {
       const uniqueSlug = editId ? undefined : generateSlug(title, effectiveCity, dateString);
 
       const status = isAdmin || isTrusted ? 'approved' : 'pending';
+      const isCollegeCategory = category === 'Campus' || category === 'College Fests' || category === 'Hackathons';
 
       const payload: any = {
         title: title.trim(),
@@ -238,6 +283,13 @@ export default function CreateEventScreen() {
         team_size: teamSize,
         poster_url: finalPosterUrl,
         is_featured: isAdmin ? isFeatured : false,
+        college_only: isCollegeCategory && collegeId ? collegeOnly : false,
+        college_id: isCollegeCategory ? collegeId : null,
+        college_name: isCollegeCategory ? collegeName : null,
+        college_branch: isCollegeCategory ? collegeBranch : null,
+        branch_tags: isCollegeCategory && collegeBranch ? [collegeBranch] : null,
+        college_year: isCollegeCategory ? collegeYear : null,
+        target_audience: isCollegeCategory && collegeOnly ? ['College Students'] : ['Everyone'],
       };
 
       if (editId) {
@@ -258,9 +310,21 @@ export default function CreateEventScreen() {
         const { error } = await supabase.from('events').insert(payload);
         if (error) throw error;
 
+        // If approved right away, award +100 ET points
+        if (status === 'approved') {
+          try {
+            await supabase.rpc('increment_et_score', {
+              user_id: user.id,
+              delta: 100,
+            } as any);
+          } catch (scoreErr) {
+            console.warn('Could not increment ET score for event post:', scoreErr);
+          }
+        }
+
         const successMessage =
           status === 'approved'
-            ? 'Event posted live!'
+            ? 'Event posted live! (+100 ET Score earned)'
             : "Event submitted! It'll go live once approved.";
 
         Alert.alert('Success', successMessage, [
@@ -398,6 +462,97 @@ export default function CreateEventScreen() {
             })}
           </ScrollView>
         </View>
+
+        {/* College & Campus Event Section (When Campus, College Fests, or Hackathons is picked) */}
+        {(category === 'Campus' || category === 'College Fests' || category === 'Hackathons' || collegeId) && (
+          <View style={styles.collegeCard}>
+            <View style={styles.collegeHeaderRow}>
+              <View style={styles.collegeIconCircle}>
+                <GraduationCap size={18} color={theme.colors.brand} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.collegeCardTitle}>College / Campus Event</Text>
+                <Text style={styles.collegeCardSubtitle}>
+                  Associate with a college and manage campus student visibility.
+                </Text>
+              </View>
+            </View>
+
+            {/* College Search / Select */}
+            <View style={{ marginTop: 12 }}>
+              <Text style={styles.subLabel}>College / Institute Name</Text>
+              <TextInput
+                style={styles.inputPlain}
+                placeholder="Search college (e.g. IIT, BITS, CBIT...)"
+                placeholderTextColor={theme.colors.textMuted}
+                value={collegeName}
+                onChangeText={(text) => {
+                  setCollegeName(text);
+                  setCollegeSearchQuery(text);
+                  setShowCollegeDropdown(true);
+                }}
+                onFocus={() => setShowCollegeDropdown(true)}
+              />
+
+              {showCollegeDropdown && collegesList.length > 0 && (
+                <View style={styles.collegeDropdown}>
+                  {collegesList.map((col) => (
+                    <TouchableOpacity
+                      key={col.id}
+                      style={styles.collegeDropdownItem}
+                      onPress={() => {
+                        setCollegeId(col.id);
+                        setCollegeName(col.name);
+                        setShowCollegeDropdown(false);
+                      }}
+                    >
+                      <Building size={14} color={theme.colors.brand} />
+                      <Text style={styles.collegeDropdownText} numberOfLines={1}>
+                        {col.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* Restrict to College Only Toggle */}
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={styles.switchTitle}>Restrict to my college only</Text>
+                <Text style={styles.switchSubtitle}>
+                  Only students registered with this college can view this event.
+                </Text>
+              </View>
+              <Switch
+                value={collegeOnly}
+                onValueChange={setCollegeOnly}
+                trackColor={{ false: theme.colors.border, true: theme.colors.brand }}
+              />
+            </View>
+
+            {/* Branch Tags (Optional) */}
+            <View style={{ marginTop: 12 }}>
+              <Text style={styles.subLabel}>Target Branch / Department (Optional)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalChips}>
+                {INDIAN_COLLEGE_BRANCHES.slice(0, 10).map((br) => {
+                  const isSelected = collegeBranch === br;
+                  return (
+                    <TouchableOpacity
+                      key={br}
+                      style={[styles.smallChip, isSelected && styles.smallChipActive]}
+                      onPress={() => setCollegeBranch(isSelected ? '' : br)}
+                    >
+                      <Text style={[styles.smallChipText, isSelected && styles.smallChipTextActive]}>
+                        {br}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </View>
+        )}
 
         {/* Date & Times */}
         <View style={styles.inputGroup}>
@@ -923,5 +1078,103 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 15,
     fontWeight: '800',
+  },
+  collegeCard: {
+    backgroundColor: '#F5F3FF',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    marginBottom: theme.spacing.lg,
+  },
+  collegeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  collegeIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EDE9FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  collegeCardTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#4C1D95',
+  },
+  collegeCardSubtitle: {
+    fontSize: 11,
+    color: '#6D28D9',
+    marginTop: 2,
+  },
+  subLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#4C1D95',
+    marginBottom: 6,
+  },
+  collegeDropdown: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 4,
+    overflow: 'hidden',
+    ...theme.shadows.sm,
+  },
+  collegeDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  collegeDropdownText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0F172A',
+    flex: 1,
+  },
+  smallChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#EDE9FE',
+    marginRight: 6,
+  },
+  smallChipActive: {
+    backgroundColor: theme.colors.brand,
+  },
+  smallChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6D28D9',
+  },
+  smallChipTextActive: {
+    color: '#FFF',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#DDD6FE',
+  },
+  switchTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4C1D95',
+  },
+  switchSubtitle: {
+    fontSize: 11,
+    color: '#6D28D9',
+    marginTop: 2,
   },
 });
