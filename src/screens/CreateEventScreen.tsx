@@ -286,6 +286,36 @@ export default function CreateEventScreen() {
     );
   }
 
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <ArrowLeft size={20} color={theme.colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Host an Event</Text>
+          <View style={{ width: 36 }} />
+        </View>
+        <View style={styles.guestContainer}>
+          <View style={styles.guestIconCircle}>
+            <UploadCloud size={36} color={theme.colors.brand} />
+          </View>
+          <Text style={styles.guestTitle}>Sign in to Post Events</Text>
+          <Text style={styles.guestSubtitle}>
+            Join India's curator community. Post events, earn ET score points, and climb the curator leaderboard.
+          </Text>
+          <TouchableOpacity
+            style={styles.signInBtn}
+            onPress={() => navigation.navigate('Login')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.signInBtnText}>Sign In / Register</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
@@ -852,6 +882,46 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: '#FFF',
     fontSize: 16,
+    fontWeight: '800',
+  },
+  guestContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  guestIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#EDE9FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  guestTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  guestSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  signInBtn: {
+    backgroundColor: theme.colors.brand,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 16,
+  },
+  signInBtnText: {
+    color: '#FFF',
+    fontSize: 15,
     fontWeight: '800',
   },
 });

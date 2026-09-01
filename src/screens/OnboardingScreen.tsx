@@ -175,6 +175,16 @@ export default function OnboardingScreen() {
 
       if (error) throw error;
 
+      // Award +50 ET Score for completing profile onboarding
+      try {
+        await supabase.rpc('increment_et_score', {
+          user_id: user.id,
+          delta: 50,
+        } as any);
+      } catch (scoreErr) {
+        console.warn('Could not increment ET score:', scoreErr);
+      }
+
       await refreshProfile();
     } catch (err: any) {
       console.error('[Onboarding] Error:', err);
