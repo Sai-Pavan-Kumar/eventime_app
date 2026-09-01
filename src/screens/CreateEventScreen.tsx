@@ -84,9 +84,10 @@ export default function CreateEventScreen() {
   const [showCollegeDropdown, setShowCollegeDropdown] = useState(false);
   const [isSearchingColleges, setIsSearchingColleges] = useState(false);
 
-  // Trust check state
+  // Trust check & extraction state
   const [isTrusted, setIsTrusted] = useState(false);
   const [isCheckingDomain, setIsCheckingDomain] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
   const [duplicateError, setDuplicateError] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -120,19 +121,22 @@ export default function CreateEventScreen() {
   // Load existing event data if in edit mode and initialEvent not provided
   useEffect(() => {
     if (!editId || initialEvent) return;
+
     (async () => {
       try {
+        setIsLoadingInitial(true);
         const { data, error } = await supabase
           .from('events')
           .select('*, colleges(name)')
           .eq('id', editId)
           .single();
+
         if (error) throw error;
         if (data) {
-          setTitle(data.title);
+          setTitle(data.title || '');
           setRegLink(data.registration_link || '');
-          setCategory(data.category);
-          setDateString(data.date_string);
+          setCategory(data.category || CATEGORIES_LIST[0]);
+          setDateString(data.date_string || '');
           setEndDateString(data.end_date_string || '');
           setRegistrationDeadline(data.registration_deadline || '');
           setStartTime(data.start_time || '');
@@ -142,17 +146,17 @@ export default function CreateEventScreen() {
           setLocation(data.location || '');
           setIsFree(data.is_free !== false);
           setPrice(data.price ? String(data.price) : '');
-          setOrganizerName(data.organizer_name);
+          setOrganizerName(data.organizer_name || '');
           setWebsite(data.website || '');
           setDescription(data.description || '');
           setPrizes(data.prizes || '');
           setTeamSize(data.team_size || 'Solo');
-          setPosterUri(data.poster_url);
+          setPosterUri(data.poster_url || null);
           setIsFeatured(data.is_featured || false);
           setGoalTags(data.goal_tags || []);
           setCollegeOnly(data.college_only || false);
-          setCollegeId(data.college_id || null);
           setCollegeName((data as any).colleges?.name || '');
+          setCollegeId(data.college_id || null);
           setCollegeBranch(data.college_branch || '');
           setCollegeYear(data.college_year || '');
         }
@@ -164,7 +168,7 @@ export default function CreateEventScreen() {
     })();
   }, [editId, initialEvent]);
 
-  // Verified domain & duplicate check when registration link changes
+  // Verified domain & duplicate check & auto-extraction when registration link changes
   const checkLink = async (url: string) => {
     setRegLink(url);
     setDuplicateError('');
@@ -175,7 +179,7 @@ export default function CreateEventScreen() {
 
     setIsCheckingDomain(true);
     try {
-      // 1. Duplicate check
+      // 1. Duplicate check (ILIKE last path segment pattern)
       let dupQuery = supabase.from('events').select('id, title').eq('registration_link', url.trim());
       if (editId) dupQuery = dupQuery.neq('id', editId);
       const { data: duplicate } = await dupQuery.maybeSingle();
@@ -202,6 +206,41 @@ export default function CreateEventScreen() {
       });
 
       setIsTrusted(trusted);
+
+      // 3. Auto-extract event details (Luma, Devfolio, Unstop, etc.)
+      if (!editId) {
+        try {
+          setIsExtracting(true);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+          const res = await fetch('https://eventime.thesurfboard.in/api/extract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: url.trim() }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          if (res.ok) {
+            const extracted = await res.json();
+            if (extracted.title && !title) setTitle(extracted.title);
+            if (extracted.description && !description) setDescription(extracted.description);
+            if (extracted.location && !location) setLocation(extracted.location);
+            if (extracted.date && !dateString) {
+              const parsed = new Date(extracted.date);
+              if (!isNaN(parsed.getTime())) {
+                setDateString(parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }));
+              }
+            }
+            if (extracted.isTrusted !== undefined) setIsTrusted(Boolean(extracted.isTrusted));
+          }
+        } catch {
+          // Extraction fallback to manual input
+        } finally {
+          setIsExtracting(false);
+        }
+      }
     } catch (e) {
       console.error('Domain check error:', e);
     } finally {
@@ -228,7 +267,7 @@ export default function CreateEventScreen() {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [16, 9],
-      quality: 0.8,
+      quality: 0.7,
     });
 
     if (!result.canceled && result.assets[0]) {
@@ -452,8 +491,16 @@ export default function CreateEventScreen() {
             {isCheckingDomain && <ActivityIndicator size="small" color={theme.colors.brand} />}
           </View>
 
+          {/* Extracting Indicator */}
+          {isExtracting && (
+            <View style={styles.extractingBox}>
+              <ActivityIndicator size="small" color="#6C47FF" />
+              <Text style={styles.extractingText}>Auto-extracting event details from link...</Text>
+            </View>
+          )}
+
           {/* Domain Trust Feedback */}
-          {!isAdmin && !isTrusted && regLink.length > 5 && !isCheckingDomain && (
+          {!isAdmin && !isTrusted && regLink.length > 5 && !isCheckingDomain && !isExtracting && (
             <View style={styles.trustWarningBox}>
               <AlertCircle size={15} color="#D97706" />
               <Text style={styles.trustWarningText}>
@@ -463,7 +510,7 @@ export default function CreateEventScreen() {
             </View>
           )}
 
-          {(isAdmin || isTrusted) && regLink.length > 5 && !isCheckingDomain && (
+          {(isAdmin || isTrusted) && regLink.length > 5 && !isCheckingDomain && !isExtracting && (
             <View style={styles.trustSuccessBox}>
               <CheckCircle2 size={15} color={theme.colors.success} />
               <Text style={styles.trustSuccessText}>
@@ -1228,6 +1275,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#B45309',
     marginTop: 2,
+  },
+  extractingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    padding: 10,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  extractingText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#6C47FF',
+    fontWeight: '600',
   },
   trustWarningBox: {
     flexDirection: 'row',
