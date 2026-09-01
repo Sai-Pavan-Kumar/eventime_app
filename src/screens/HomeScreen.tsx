@@ -196,15 +196,6 @@ export default function HomeScreen() {
     fetchSavedEventIds();
   };
 
-  const isViewingPastDate = useMemo(() => {
-    if (!selectedDate) return false;
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const sel = new Date(selectedDate);
-    sel.setHours(0, 0, 0, 0);
-    return sel.getTime() < now.getTime();
-  }, [selectedDate]);
-
   // Calendar calculations
   const calendarDays = useMemo(() => {
     const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
@@ -307,22 +298,6 @@ export default function HomeScreen() {
           contentFit="contain"
         />
       </View>
-
-      {/* Archive Warning Banner if viewing past date */}
-      {isViewingPastDate && (
-        <View style={styles.archiveBanner}>
-          <Clock size={16} color="#B45309" />
-          <Text style={styles.archiveBannerText}>
-            Viewing Archive for {selectedDate}
-          </Text>
-          <TouchableOpacity
-            style={styles.resetArchiveBtn}
-            onPress={() => setSelectedDate(null)}
-          >
-            <Text style={styles.resetArchiveBtnText}>Back to Live</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* Filter Chips Bar (Category, City & Date Pickers) */}
       <View style={styles.filterBar}>
@@ -809,37 +784,6 @@ const styles = StyleSheet.create({
     width: width - 32,
     height: 170,
     borderRadius: 16,
-  },
-  archiveBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FEF3C7',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  archiveBannerText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#92400E',
-    flex: 1,
-    marginLeft: 8,
-  },
-  resetArchiveBtn: {
-    backgroundColor: '#92400E',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  resetArchiveBtnText: {
-    color: '#FFF',
-    fontSize: 11,
-    fontWeight: '700',
   },
   filterBar: {
     paddingVertical: 12,
