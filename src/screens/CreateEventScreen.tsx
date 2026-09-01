@@ -330,6 +330,18 @@ export default function CreateEventScreen() {
 
         const { error } = await updateQuery;
         if (error) throw error;
+
+        // Auto-resolve any pending reports on this event once updated
+        try {
+          await supabase
+            .from('event_reports')
+            .update({ status: 'resolved' })
+            .eq('event_id', editId)
+            .eq('status', 'pending');
+        } catch (repErr) {
+          console.warn('Could not auto-resolve pending reports on update:', repErr);
+        }
+
         Alert.alert('Success', 'Event updated successfully!', [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);

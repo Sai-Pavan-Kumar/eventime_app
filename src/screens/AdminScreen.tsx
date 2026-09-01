@@ -195,15 +195,23 @@ export default function AdminScreen() {
 
       if (error) throw error;
 
-      // Award +100 ET points to creator
+      // Award +100 ET points to creator (using idempotent award_event_approval_score RPC)
       if (eventItem.creator_id) {
         try {
-          await supabase.rpc('increment_et_score', {
-            user_id: eventItem.creator_id,
-            delta: 100,
+          const { error: rpcError } = await supabase.rpc('award_event_approval_score', {
+            p_user_id: eventItem.creator_id,
+            p_event_id: eventItem.id,
           } as any);
+
+          if (rpcError) {
+            // Fallback for environments with standard increment_et_score RPC
+            await supabase.rpc('increment_et_score', {
+              user_id: eventItem.creator_id,
+              delta: 100,
+            } as any);
+          }
         } catch (scoreErr) {
-          console.warn('Could not increment score:', scoreErr);
+          console.warn('Could not award approval score:', scoreErr);
         }
       }
 

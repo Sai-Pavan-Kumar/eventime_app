@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, Alert } from 'react-native';
 import { Image } from 'expo-image';
-import { Bookmark, Share2, MapPin, Clock, Users, IndianRupee, Check } from 'lucide-react-native';
+import { Bookmark, Share2, MapPin, Clock, Users, IndianRupee, Check, Sparkles } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '../config/theme';
 import { getCategoryConfig } from '../lib/category-config';
@@ -9,6 +9,7 @@ import { getCategoryPoster } from '../lib/asset-registry';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { parseEventDateString, formatEventTime } from '../lib/utils/date';
+import { getMatchLabel } from '../lib/events/match';
 import type { EventRow } from '../types';
 
 export interface EventCardProps {
@@ -37,7 +38,7 @@ export interface EventCardProps {
 
 export const EventCard: React.FC<EventCardProps> = (props) => {
   const navigation = useNavigation<any>();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const id = props.event?.id || props.id || '';
   const slug = props.event?.slug || props.slug || id;
@@ -61,6 +62,8 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const matchLabel = getMatchLabel(props.event || { category, city }, profile);
+
   const categoryConfig = getCategoryConfig(category);
   const isCustomPoster = Boolean(isFeatured && posterUrl && posterUrl.startsWith('http'));
   const posterSource = isCustomPoster ? { uri: posterUrl! } : getCategoryPoster(category);
@@ -79,12 +82,16 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
     const evDate = new Date(parsedDate);
     evDate.setHours(0, 0, 0, 0);
 
-    const diffDays = Math.floor((evDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDays < 0) {
-      return { label: 'Past Event', bg: '#1E293B', color: '#F1F5F9' };
-    }
+    const diffDays = Math.ceil((evDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
     if (diffDays === 0) {
-      return { label: 'Live Today', bg: '#059669', color: '#FFFFFF' };
+      return { label: 'Live Today', bg: '#DCFCE7', color: '#15803D' };
+    }
+    if (diffDays > 0 && diffDays <= 2) {
+      return { label: 'This Week', bg: '#FEF3C7', color: '#B45309' };
+    }
+    if (diffDays < 0) {
+      return { label: 'Event Over', bg: '#F1F5F9', color: '#64748B' };
     }
     return null;
   })();
@@ -130,56 +137,56 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
     try {
       if (nextState) {
         await supabase.from('saved_events').insert({
-          event_id: id,
           user_id: user.id,
+          event_id: id,
         });
       } else {
         await supabase
           .from('saved_events')
           .delete()
-          .eq('event_id', id)
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .eq('event_id', id);
       }
-      props.onSaveToggle?.(id, nextState);
+      if (props.onSaveToggle) {
+        props.onSaveToggle(id, nextState);
+      }
     } catch (err) {
-      console.error('[EventCard] Save error:', err);
       setIsSaved(!nextState);
+      console.error('[EventCard] Save error:', err);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleSharePress = async () => {
+    const eventUrl = `https://eventime.thesurfboard.in/events/${slug || id}`;
     try {
-      const shareUrl = `https://eventime.thesurfboard.in/events/${slug || id}`;
       await Share.share({
         title: title,
-        message: `${title} on ${dateString || 'Soon'} in ${city || 'Online'}\nExplore on EvenTime 🎉\n${shareUrl}`,
-        url: shareUrl,
+        message: `Check out "${title}" on EvenTime!\n${eventUrl}`,
+        url: eventUrl,
       });
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
-      console.error('Share error:', e);
+    } catch (err) {
+      console.error('[EventCard] Share error:', err);
     }
   };
 
   return (
     <TouchableOpacity
       style={styles.card}
-      activeOpacity={0.92}
       onPress={handlePress}
+      activeOpacity={0.92}
     >
-      {/* 16:9 Image Layer */}
+      {/* Poster Media Header */}
       <View style={styles.imageContainer}>
         <Image
           source={posterSource}
           style={styles.posterImage}
           contentFit="cover"
-          transition={250}
+          transition={200}
         />
 
-        {/* Top Overlay: Date Left & Brand Name Right */}
+        {/* Top Floating Badge Bar */}
         <View style={styles.topOverlayRow}>
           <Text
             style={[
@@ -221,6 +228,16 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
 
       {/* Content Details */}
       <View style={styles.content}>
+        {/* Match Label (Personalized for User) */}
+        {Boolean(matchLabel) && (
+          <View style={styles.matchBadge}>
+            <Sparkles size={10} color="#6C47FF" />
+            <Text style={styles.matchBadgeText} numberOfLines={1}>
+              {matchLabel}
+            </Text>
+          </View>
+        )}
+
         {/* Title */}
         <Text style={styles.title} numberOfLines={2}>
           {title}
@@ -508,5 +525,23 @@ const styles = StyleSheet.create({
   },
   actionBtnSaved: {
     backgroundColor: '#EEF2FF',
+  },
+  matchBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+  },
+  matchBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6C47FF',
   },
 });
