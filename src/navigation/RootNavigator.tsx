@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -18,14 +18,22 @@ import CuratorProfileScreen from '../screens/CuratorProfileScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsScreen from '../screens/TermsScreen';
 import { theme } from '../config/theme';
+import { getHasCompletedOnboarding } from '../lib/guest-preferences';
 import type { RootStackParamList } from '../types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
   const { user, profile, isLoading, isOnboarded } = useAuth();
+  const [hasCompletedLocalOnboarding, setHasCompletedLocalOnboarding] = useState<boolean | null>(null);
 
-  if (isLoading) {
+  useEffect(() => {
+    getHasCompletedOnboarding().then((completed) => {
+      setHasCompletedLocalOnboarding(completed);
+    });
+  }, []);
+
+  if (isLoading || hasCompletedLocalOnboarding === null) {
     return (
       <View style={styles.splash}>
         <ActivityIndicator size="large" color={theme.colors.brand} />
@@ -33,8 +41,9 @@ export function RootNavigator() {
     );
   }
 
-  // If user is logged in but hasn't completed onboarding, show onboarding
-  const requiresOnboarding = !!user && !isOnboarded;
+  // If user is logged in but hasn't completed onboarding in profile,
+  // OR if fresh install on device and hasn't seen onboarding yet
+  const requiresOnboarding = (!!user && !isOnboarded) || (!user && !hasCompletedLocalOnboarding);
 
   return (
     <NavigationContainer>
@@ -45,7 +54,15 @@ export function RootNavigator() {
         }}
       >
         {requiresOnboarding ? (
-          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          <>
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+              options={{ animation: 'slide_from_bottom' }}
+            />
+          </>
         ) : (
           <>
             <Stack.Screen name="MainTabs" component={MainTabNavigator} />
