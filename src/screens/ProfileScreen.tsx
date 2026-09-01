@@ -25,10 +25,13 @@ import {
   GraduationCap,
   Heart,
   CheckCircle,
+  MessageSquare,
+  Sparkles,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
+import { FeedbackModal } from '../components/FeedbackModal';
 import type { RootStackParamList } from '../types';
 
 export default function ProfileScreen() {
@@ -39,6 +42,7 @@ export default function ProfileScreen() {
   const [totalSavesCount, setTotalSavesCount] = useState(0);
   const [savedCount, setSavedCount] = useState(0);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
   const fetchStats = useCallback(async () => {
     if (!user) {
@@ -79,7 +83,7 @@ export default function ProfileScreen() {
     fetchStats();
   }, [fetchStats]);
 
-  // Profile completion calculation matching website
+  // Profile completion calculation
   const calculateCompletion = () => {
     if (!profile) return 0;
     let score = 0;
@@ -181,7 +185,7 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Academic / Role metadata */}
+          {/* Academic metadata */}
           {profile?.user_type === 'student' && profile?.college && (
             <View style={styles.academicRow}>
               <GraduationCap size={14} color={theme.colors.textSecondary} />
@@ -189,6 +193,20 @@ export default function ProfileScreen() {
                 {profile.college} {profile.branch ? `• ${profile.branch}` : ''}{' '}
                 {profile.graduation_year ? `('${profile.graduation_year.slice(-2)})` : ''}
               </Text>
+            </View>
+          )}
+
+          {/* Goals / Interests */}
+          {profile?.goals && profile.goals.length > 0 && (
+            <View style={styles.goalsRow}>
+              {profile.goals.slice(0, 3).map((g, idx) => (
+                <View key={idx} style={styles.goalChip}>
+                  <Text style={styles.goalChipText}>{g}</Text>
+                </View>
+              ))}
+              {profile.goals.length > 3 && (
+                <Text style={styles.moreGoalsText}>+{profile.goals.length - 3} more</Text>
+              )}
             </View>
           )}
 
@@ -289,8 +307,8 @@ export default function ProfileScreen() {
                   <Shield size={18} color="#FFF" />
                 </View>
                 <View>
-                  <Text style={styles.adminMenuItemText}>Admin Management Panel</Text>
-                  <Text style={styles.adminMenuSubtext}>Approvals, Reports & College Controls</Text>
+                  <Text style={styles.adminMenuItemText}>Admin Management Console</Text>
+                  <Text style={styles.adminMenuSubtext}>Approvals, Reports, Users & Settings</Text>
                 </View>
               </View>
               <ChevronRight size={18} color={theme.colors.textMuted} />
@@ -298,9 +316,27 @@ export default function ProfileScreen() {
           </View>
         )}
 
+        {/* Feedback & Support */}
+        <View style={styles.menuSection}>
+          <Text style={styles.menuSectionTitle}>Support & Feedback</Text>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => setShowFeedbackModal(true)}
+          >
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuIconBg, { backgroundColor: '#F5F3FF' }]}>
+                <MessageSquare size={18} color="#6C47FF" />
+              </View>
+              <Text style={styles.menuItemText}>Share Feedback / Bug Report</Text>
+            </View>
+            <ChevronRight size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
         {/* Settings & Preferences */}
         <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>Account & Preferences</Text>
+          <Text style={styles.menuSectionTitle}>Account & Legal</Text>
 
           <TouchableOpacity
             style={styles.menuItem}
@@ -354,6 +390,12 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* In-App Feedback Modal */}
+      <FeedbackModal
+        visible={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -449,38 +491,39 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   fullName: {
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: 17,
+    fontWeight: '800',
     color: theme.colors.textPrimary,
   },
   adminBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 3,
     backgroundColor: '#DC2626',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
-    gap: 3,
+    borderRadius: 6,
   },
   adminBadgeText: {
     color: '#FFF',
     fontSize: 9,
     fontWeight: '900',
+    letterSpacing: 0.5,
   },
   username: {
     fontSize: 13,
     color: theme.colors.textSecondary,
-    marginTop: 1,
+    marginTop: 2,
   },
   tierPill: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
+    gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: 8,
     marginTop: 6,
-    gap: 4,
   },
   tierText: {
     fontSize: 11,
@@ -493,23 +536,46 @@ const styles = StyleSheet.create({
   academicRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.borderLight,
     gap: 6,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
   },
   academicText: {
-    flex: 1,
     fontSize: 12,
     color: theme.colors.textSecondary,
     fontWeight: '500',
+    flex: 1,
+  },
+  goalsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+  },
+  goalChip: {
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  goalChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6C47FF',
+  },
+  moreGoalsText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '500',
   },
   completionCard: {
-    marginTop: 12,
+    marginTop: 14,
     backgroundColor: theme.colors.surfaceSecondary,
-    borderRadius: theme.borderRadius.md,
     padding: 10,
+    borderRadius: theme.borderRadius.md,
   },
   completionHeader: {
     flexDirection: 'row',
@@ -530,9 +596,10 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: theme.colors.border,
     borderRadius: 2,
+    overflow: 'hidden',
   },
   completionBarFill: {
-    height: 4,
+    height: '100%',
     backgroundColor: theme.colors.brand,
     borderRadius: 2,
   },
@@ -544,13 +611,13 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     backgroundColor: theme.colors.surface,
+    padding: 14,
     borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: theme.colors.border,
-    ...theme.shadows.sm,
     gap: 4,
+    ...theme.shadows.sm,
   },
   statNumber: {
     fontSize: 18,
@@ -558,46 +625,49 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
   },
   statLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
+    fontSize: 10,
+    fontWeight: '700',
+    color: theme.colors.textMuted,
+    textTransform: 'uppercase',
   },
   menuSection: {
     marginBottom: theme.spacing.lg,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.sm,
   },
   menuSectionTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: theme.colors.textSecondary,
+    color: theme.colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 8,
-    marginLeft: 4,
+    marginBottom: 10,
+    marginLeft: 6,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.colors.surface,
-    padding: 14,
-    borderRadius: theme.borderRadius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: 8,
-    ...theme.shadows.sm,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: theme.borderRadius.md,
   },
   adminMenuItem: {
-    borderColor: '#FCA5A5',
-    backgroundColor: '#FFF5F5',
+    backgroundColor: '#FEF2F2',
   },
   menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
   },
   menuIconBg: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -615,5 +685,6 @@ const styles = StyleSheet.create({
   adminMenuSubtext: {
     fontSize: 11,
     color: '#B91C1C',
+    marginTop: 2,
   },
 });

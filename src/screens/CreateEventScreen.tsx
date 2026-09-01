@@ -29,6 +29,8 @@ import {
   Link2,
   GraduationCap,
   Building,
+  Hourglass,
+  Sparkles,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -36,6 +38,7 @@ import { theme } from '../config/theme';
 import { CATEGORIES_LIST } from '../lib/category-config';
 import { CITIES } from '../lib/constants/cities';
 import { INDIAN_COLLEGE_BRANCHES } from '../lib/constants/branches';
+import { CAREER_GOALS } from '../lib/constants/goals';
 import { uploadEventPoster } from '../lib/storage';
 import type { RootStackParamList } from '../types';
 
@@ -45,33 +48,37 @@ export default function CreateEventScreen() {
   const { user, profile, isAdmin } = useAuth();
 
   const editId = route.params?.editId;
+  const initialEvent = route.params?.event;
 
   // Form Fields
-  const [title, setTitle] = useState('');
-  const [regLink, setRegLink] = useState('');
-  const [category, setCategory] = useState<string>(CATEGORIES_LIST[0]);
-  const [dateString, setDateString] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
-  const [isVirtual, setIsVirtual] = useState(false);
-  const [city, setCity] = useState<string>(CITIES[0]);
-  const [location, setLocation] = useState('');
-  const [isFree, setIsFree] = useState(true);
-  const [price, setPrice] = useState('');
-  const [organizerName, setOrganizerName] = useState(profile?.full_name || '');
-  const [website, setWebsite] = useState('');
-  const [description, setDescription] = useState('');
-  const [prizes, setPrizes] = useState('');
-  const [teamSize, setTeamSize] = useState('Solo');
-  const [posterUri, setPosterUri] = useState<string | null>(null);
-  const [isFeatured, setIsFeatured] = useState(false);
+  const [title, setTitle] = useState(initialEvent?.title || '');
+  const [regLink, setRegLink] = useState(initialEvent?.registration_link || '');
+  const [category, setCategory] = useState<string>(initialEvent?.category || CATEGORIES_LIST[0]);
+  const [dateString, setDateString] = useState(initialEvent?.date_string || '');
+  const [endDateString, setEndDateString] = useState(initialEvent?.end_date_string || '');
+  const [registrationDeadline, setRegistrationDeadline] = useState(initialEvent?.registration_deadline || '');
+  const [startTime, setStartTime] = useState(initialEvent?.start_time || '');
+  const [endTime, setEndTime] = useState(initialEvent?.end_time || '');
+  const [isVirtual, setIsVirtual] = useState(initialEvent?.is_virtual || false);
+  const [city, setCity] = useState<string>(initialEvent?.city || CITIES[0]);
+  const [location, setLocation] = useState(initialEvent?.location || '');
+  const [isFree, setIsFree] = useState(initialEvent?.is_free !== false);
+  const [price, setPrice] = useState(initialEvent?.price ? String(initialEvent.price) : '');
+  const [organizerName, setOrganizerName] = useState(initialEvent?.organizer_name || profile?.full_name || '');
+  const [website, setWebsite] = useState(initialEvent?.website || '');
+  const [description, setDescription] = useState(initialEvent?.description || '');
+  const [prizes, setPrizes] = useState(initialEvent?.prizes || '');
+  const [teamSize, setTeamSize] = useState(initialEvent?.team_size || 'Solo');
+  const [posterUri, setPosterUri] = useState<string | null>(initialEvent?.poster_url || null);
+  const [isFeatured, setIsFeatured] = useState(initialEvent?.is_featured || false);
+  const [goalTags, setGoalTags] = useState<string[]>(initialEvent?.goal_tags || []);
 
   // College & Campus event settings
-  const [collegeOnly, setCollegeOnly] = useState(false);
-  const [collegeName, setCollegeName] = useState(profile?.college || '');
-  const [collegeId, setCollegeId] = useState<string | null>(profile?.college_id || null);
-  const [collegeBranch, setCollegeBranch] = useState(profile?.branch || '');
-  const [collegeYear, setCollegeYear] = useState(profile?.graduation_year || '');
+  const [collegeOnly, setCollegeOnly] = useState(initialEvent?.college_only || false);
+  const [collegeName, setCollegeName] = useState(initialEvent?.colleges?.name || profile?.college || '');
+  const [collegeId, setCollegeId] = useState<string | null>(initialEvent?.college_id || profile?.college_id || null);
+  const [collegeBranch, setCollegeBranch] = useState(initialEvent?.college_branch || profile?.branch || '');
+  const [collegeYear, setCollegeYear] = useState(initialEvent?.college_year || profile?.graduation_year || '');
   const [collegeSearchQuery, setCollegeSearchQuery] = useState('');
   const [collegesList, setCollegesList] = useState<any[]>([]);
   const [showCollegeDropdown, setShowCollegeDropdown] = useState(false);
@@ -83,7 +90,7 @@ export default function CreateEventScreen() {
   const [duplicateError, setDuplicateError] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoadingInitial, setIsLoadingInitial] = useState(!!editId);
+  const [isLoadingInitial, setIsLoadingInitial] = useState(Boolean(editId && !initialEvent));
 
   // Search colleges when query changes
   useEffect(() => {
@@ -110,18 +117,24 @@ export default function CreateEventScreen() {
     return () => clearTimeout(timer);
   }, [collegeSearchQuery]);
 
-  // Load existing event data if in edit mode
+  // Load existing event data if in edit mode and initialEvent not provided
   useEffect(() => {
-    if (!editId) return;
+    if (!editId || initialEvent) return;
     (async () => {
       try {
-        const { data, error } = await supabase.from('events').select('*').eq('id', editId).single();
+        const { data, error } = await supabase
+          .from('events')
+          .select('*, colleges(name)')
+          .eq('id', editId)
+          .single();
         if (error) throw error;
         if (data) {
           setTitle(data.title);
           setRegLink(data.registration_link || '');
           setCategory(data.category);
           setDateString(data.date_string);
+          setEndDateString(data.end_date_string || '');
+          setRegistrationDeadline(data.registration_deadline || '');
           setStartTime(data.start_time || '');
           setEndTime(data.end_time || '');
           setIsVirtual(data.is_virtual || false);
@@ -136,9 +149,10 @@ export default function CreateEventScreen() {
           setTeamSize(data.team_size || 'Solo');
           setPosterUri(data.poster_url);
           setIsFeatured(data.is_featured || false);
+          setGoalTags(data.goal_tags || []);
           setCollegeOnly(data.college_only || false);
           setCollegeId(data.college_id || null);
-          setCollegeName((data as any).college_name || '');
+          setCollegeName((data as any).colleges?.name || '');
           setCollegeBranch(data.college_branch || '');
           setCollegeYear(data.college_year || '');
         }
@@ -148,7 +162,7 @@ export default function CreateEventScreen() {
         setIsLoadingInitial(false);
       }
     })();
-  }, [editId]);
+  }, [editId, initialEvent]);
 
   // Verified domain & duplicate check when registration link changes
   const checkLink = async (url: string) => {
@@ -192,6 +206,14 @@ export default function CreateEventScreen() {
       console.error('Domain check error:', e);
     } finally {
       setIsCheckingDomain(false);
+    }
+  };
+
+  const toggleGoalTag = (goal: string) => {
+    if (goalTags.includes(goal)) {
+      setGoalTags(goalTags.filter((g) => g !== goal));
+    } else {
+      setGoalTags([...goalTags, goal]);
     }
   };
 
@@ -268,10 +290,12 @@ export default function CreateEventScreen() {
         title: title.trim(),
         category,
         date_string: dateString.trim(),
+        end_date_string: endDateString.trim() || null,
+        registration_deadline: registrationDeadline.trim() || null,
         start_time: startTime.trim() || null,
         end_time: endTime.trim() || null,
         is_virtual: isVirtual,
-        city: isVirtual ? null : city,
+        city: isVirtual ? 'online' : city,
         location: isVirtual ? 'Online' : location.trim() || city,
         is_free: isFree,
         price: !isFree && price ? parseFloat(price) : null,
@@ -283,6 +307,7 @@ export default function CreateEventScreen() {
         team_size: teamSize,
         poster_url: finalPosterUrl,
         is_featured: isAdmin ? isFeatured : false,
+        goal_tags: goalTags.length > 0 ? goalTags : null,
         college_only: isCollegeCategory && collegeId ? collegeOnly : false,
         college_id: isCollegeCategory ? collegeId : null,
         college_name: isCollegeCategory ? collegeName : null,
@@ -293,11 +318,17 @@ export default function CreateEventScreen() {
       };
 
       if (editId) {
-        const { error } = await supabase
+        let updateQuery = supabase
           .from('events')
           .update(payload)
-          .eq('id', editId)
-          .eq('creator_id', user.id);
+          .eq('id', editId);
+
+        // If not admin, restrict update to own event
+        if (!isAdmin) {
+          updateQuery = updateQuery.eq('creator_id', user.id);
+        }
+
+        const { error } = await updateQuery;
         if (error) throw error;
         Alert.alert('Success', 'Event updated successfully!', [
           { text: 'OK', onPress: () => navigation.goBack() },
@@ -392,7 +423,7 @@ export default function CreateEventScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Registration Link Input (Smart autofill & verified domain check) */}
+        {/* Registration Link Input */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Registration / Ticket Link</Text>
           <View style={styles.inputWrapper}>
@@ -463,7 +494,29 @@ export default function CreateEventScreen() {
           </ScrollView>
         </View>
 
-        {/* College & Campus Event Section (When Campus, College Fests, or Hackathons is picked) */}
+        {/* Goal / Interest Tags Picker */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Event Goals & Topics (Select multiple)</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalChips}>
+            {CAREER_GOALS.map((goal) => {
+              const isSelected = goalTags.includes(goal);
+              return (
+                <TouchableOpacity
+                  key={goal}
+                  style={[styles.goalChip, isSelected && styles.goalChipActive]}
+                  onPress={() => toggleGoalTag(goal)}
+                >
+                  <Sparkles size={12} color={isSelected ? '#FFFFFF' : '#6C47FF'} />
+                  <Text style={[styles.goalChipText, isSelected && styles.goalChipTextActive]}>
+                    {goal}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* College & Campus Event Section */}
         {(category === 'Campus' || category === 'College Fests' || category === 'Hackathons' || collegeId) && (
           <View style={styles.collegeCard}>
             <View style={styles.collegeHeaderRow}>
@@ -531,11 +584,11 @@ export default function CreateEventScreen() {
               />
             </View>
 
-            {/* Branch Tags (Optional) */}
+            {/* Branch Tags */}
             <View style={{ marginTop: 12 }}>
               <Text style={styles.subLabel}>Target Branch / Department (Optional)</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalChips}>
-                {INDIAN_COLLEGE_BRANCHES.slice(0, 10).map((br) => {
+                {INDIAN_COLLEGE_BRANCHES.slice(0, 16).map((br) => {
                   const isSelected = collegeBranch === br;
                   return (
                     <TouchableOpacity
@@ -556,7 +609,7 @@ export default function CreateEventScreen() {
 
         {/* Date & Times */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Date *</Text>
+          <Text style={styles.label}>Event Start Date *</Text>
           <View style={styles.inputWrapper}>
             <Calendar size={18} color={theme.colors.brand} style={{ marginRight: 8 }} />
             <TextInput
@@ -565,6 +618,36 @@ export default function CreateEventScreen() {
               placeholderTextColor={theme.colors.textMuted}
               value={dateString}
               onChangeText={setDateString}
+            />
+          </View>
+        </View>
+
+        {/* End Date (Optional) */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Event End Date (Optional, for multi-day events)</Text>
+          <View style={styles.inputWrapper}>
+            <Calendar size={18} color={theme.colors.textSecondary} style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 26 Oct 2026"
+              placeholderTextColor={theme.colors.textMuted}
+              value={endDateString}
+              onChangeText={setEndDateString}
+            />
+          </View>
+        </View>
+
+        {/* Registration Deadline */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Registration Deadline (Optional)</Text>
+          <View style={styles.inputWrapper}>
+            <Hourglass size={18} color="#EF4444" style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 22 Oct 2026, 11:59 PM"
+              placeholderTextColor={theme.colors.textMuted}
+              value={registrationDeadline}
+              onChangeText={setRegistrationDeadline}
             />
           </View>
         </View>
@@ -705,6 +788,20 @@ export default function CreateEventScreen() {
           />
         </View>
 
+        {/* Website Link */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Website (Optional)</Text>
+          <TextInput
+            style={styles.inputPlain}
+            placeholder="https://eventwebsite.com"
+            placeholderTextColor={theme.colors.textMuted}
+            value={website}
+            onChangeText={setWebsite}
+            autoCapitalize="none"
+            keyboardType="url"
+          />
+        </View>
+
         {/* Description */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Description</Text>
@@ -731,6 +828,18 @@ export default function CreateEventScreen() {
           />
         </View>
 
+        {/* Team Size */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Team Size</Text>
+          <TextInput
+            style={styles.inputPlain}
+            placeholder="e.g. Solo / 2-4 Members / Unlimited"
+            placeholderTextColor={theme.colors.textMuted}
+            value={teamSize}
+            onChangeText={setTeamSize}
+          />
+        </View>
+
         {/* Admin Feature Toggle */}
         {isAdmin && (
           <View style={styles.adminFeatureCard}>
@@ -748,9 +857,9 @@ export default function CreateEventScreen() {
           </View>
         )}
 
-        {/* Submit Button */}
+        {/* Submit Action Button */}
         <TouchableOpacity
-          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+          style={[styles.submitBtn, isSubmitting && { opacity: 0.7 }]}
           onPress={handleSubmit}
           disabled={isSubmitting}
           activeOpacity={0.85}
@@ -758,12 +867,13 @@ export default function CreateEventScreen() {
           {isSubmitting ? (
             <ActivityIndicator color="#FFF" />
           ) : (
-            <View style={styles.submitBtnContent}>
-              <Text style={styles.submitButtonText}>
-                {editId ? 'Save Changes' : isTrusted || isAdmin ? 'Post Event Live' : 'Submit for Approval'}
-              </Text>
-              <CheckCircle2 size={18} color="#FFF" />
-            </View>
+            <Text style={styles.submitBtnText}>
+              {editId
+                ? 'Update Event'
+                : isAdmin || isTrusted
+                ? 'Publish Instantly'
+                : 'Submit for Approval'}
+            </Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -774,7 +884,7 @@ export default function CreateEventScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#F8FAFC',
   },
   center: {
     flex: 1,
@@ -785,151 +895,163 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: '#E2E8F0',
   },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.colors.surfaceSecondary,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: theme.colors.textPrimary,
+    color: '#0F172A',
   },
   scrollContent: {
-    padding: theme.spacing.xl,
+    padding: 16,
     paddingBottom: 60,
   },
   inputGroup: {
-    marginBottom: theme.spacing.lg,
+    marginBottom: 16,
   },
   label: {
     fontSize: 13,
     fontWeight: '700',
-    color: theme.colors.textPrimary,
+    color: '#334155',
     marginBottom: 6,
   },
+  subLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 4,
+  },
   inputPlain: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: theme.colors.textPrimary,
+    color: '#0F172A',
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   input: {
     flex: 1,
     fontSize: 14,
-    color: theme.colors.textPrimary,
+    color: '#0F172A',
+    padding: 0,
   },
-  trustWarningBox: {
+  row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFBEB',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    borderRadius: theme.borderRadius.md,
-    padding: 10,
-    marginTop: 8,
-    gap: 8,
-  },
-  trustWarningText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#92400E',
-    lineHeight: 16,
-  },
-  trustSuccessBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.successBg,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    borderRadius: theme.borderRadius.md,
-    padding: 10,
-    marginTop: 8,
-    gap: 8,
-  },
-  trustSuccessText: {
-    flex: 1,
-    fontSize: 12,
-    color: theme.colors.success,
-    fontWeight: '600',
-  },
-  errorText: {
-    color: theme.colors.danger,
-    fontSize: 12,
-    marginTop: 6,
-    fontWeight: '600',
   },
   horizontalChips: {
     flexDirection: 'row',
-    marginBottom: 4,
+    marginTop: 4,
   },
   chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginRight: 6,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
   },
   chipActive: {
     backgroundColor: theme.colors.brand,
     borderColor: theme.colors.brand,
   },
   chipText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    color: theme.colors.textSecondary,
+    color: '#475569',
   },
   chipTextActive: {
-    color: '#FFF',
+    color: '#FFFFFF',
     fontWeight: '700',
   },
-  row: {
+  goalChip: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  goalChipActive: {
+    backgroundColor: '#6C47FF',
+    borderColor: '#6C47FF',
+  },
+  goalChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6C47FF',
+  },
+  goalChipTextActive: {
+    color: '#FFFFFF',
+  },
+  smallChip: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    marginRight: 6,
+  },
+  smallChipActive: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
+  },
+  smallChipText: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  smallChipTextActive: {
+    color: '#FFFFFF',
   },
   toggleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.lg,
-    borderRadius: theme.borderRadius.md,
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: theme.spacing.lg,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
   },
   toggleLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: theme.colors.textPrimary,
+    color: '#0F172A',
   },
   toggleSubtitle: {
     fontSize: 12,
-    color: theme.colors.textSecondary,
+    color: '#64748B',
     marginTop: 2,
   },
   pricingRow: {
@@ -939,104 +1061,214 @@ const styles = StyleSheet.create({
   pricingOption: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
   },
   pricingOptionActive: {
     borderColor: theme.colors.brand,
-    backgroundColor: theme.colors.brandLight,
+    backgroundColor: '#EEF2FF',
   },
   pricingText: {
     fontSize: 13,
     fontWeight: '700',
-    color: theme.colors.textPrimary,
+    color: '#64748B',
   },
   pricingTextActive: {
     color: theme.colors.brand,
   },
   uploadArea: {
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
     borderStyle: 'dashed',
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: 16,
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
   },
   uploadTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: theme.colors.brand,
+    color: '#0F172A',
+    marginTop: 8,
   },
   uploadSubtitle: {
-    fontSize: 11,
-    color: theme.colors.textSecondary,
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
   },
   posterPreviewContainer: {
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: '#E2E8F0',
+    position: 'relative',
   },
   posterPreview: {
     width: '100%',
-    height: 180,
+    aspectRatio: 16 / 9,
   },
   changePosterBtn: {
-    paddingVertical: 10,
-    backgroundColor: theme.colors.surfaceSecondary,
-    alignItems: 'center',
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   changePosterText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  collegeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+  },
+  collegeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  collegeIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  collegeCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  collegeCardSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  collegeDropdown: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  collegeDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  collegeDropdownText: {
+    fontSize: 13,
+    color: '#0F172A',
+    fontWeight: '600',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  switchTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: theme.colors.brand,
+    color: '#0F172A',
+  },
+  switchSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
   },
   adminFeatureCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFBEB',
     borderWidth: 1,
     borderColor: '#FDE68A',
-    borderRadius: theme.borderRadius.lg,
-    padding: 14,
-    marginBottom: theme.spacing.xl,
-    gap: 12,
+    padding: 16,
+    borderRadius: 18,
+    marginBottom: 16,
   },
   adminFeatureTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#92400E',
   },
   adminFeatureSubtitle: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#B45309',
     marginTop: 2,
   },
-  submitButton: {
-    backgroundColor: theme.colors.brand,
-    paddingVertical: 16,
-    borderRadius: theme.borderRadius.lg,
-    alignItems: 'center',
-    marginTop: 10,
-    ...theme.shadows.brand,
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitBtnContent: {
+  trustWarningBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    backgroundColor: '#FFFBEB',
+    padding: 10,
+    borderRadius: 12,
+    marginTop: 8,
   },
-  submitButtonText: {
+  trustWarningText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#B45309',
+    fontWeight: '500',
+  },
+  trustSuccessBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#ECFDF5',
+    padding: 10,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  trustSuccessText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#047857',
+    fontWeight: '600',
+  },
+  errorText: {
+    fontSize: 12,
+    color: theme.colors.danger,
+    marginTop: 6,
+    fontWeight: '600',
+  },
+  submitBtn: {
+    backgroundColor: theme.colors.brand,
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    shadowColor: theme.colors.brand,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitBtnText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
   },
   guestContainer: {
@@ -1046,10 +1278,10 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   guestIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#EDE9FE',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#EEF2FF',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -1065,116 +1297,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748B',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 22,
     marginBottom: 24,
   },
   signInBtn: {
     backgroundColor: theme.colors.brand,
-    paddingHorizontal: 28,
     paddingVertical: 14,
-    borderRadius: 16,
+    paddingHorizontal: 28,
+    borderRadius: 14,
   },
   signInBtnText: {
     color: '#FFF',
     fontSize: 15,
-    fontWeight: '800',
-  },
-  collegeCard: {
-    backgroundColor: '#F5F3FF',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#DDD6FE',
-    marginBottom: theme.spacing.lg,
-  },
-  collegeHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  collegeIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#EDE9FE',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  collegeCardTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#4C1D95',
-  },
-  collegeCardSubtitle: {
-    fontSize: 11,
-    color: '#6D28D9',
-    marginTop: 2,
-  },
-  subLabel: {
-    fontSize: 12,
     fontWeight: '700',
-    color: '#4C1D95',
-    marginBottom: 6,
-  },
-  collegeDropdown: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginTop: 4,
-    overflow: 'hidden',
-    ...theme.shadows.sm,
-  },
-  collegeDropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  collegeDropdownText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0F172A',
-    flex: 1,
-  },
-  smallChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#EDE9FE',
-    marginRight: 6,
-  },
-  smallChipActive: {
-    backgroundColor: theme.colors.brand,
-  },
-  smallChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#6D28D9',
-  },
-  smallChipTextActive: {
-    color: '#FFF',
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#DDD6FE',
-  },
-  switchTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#4C1D95',
-  },
-  switchSubtitle: {
-    fontSize: 11,
-    color: '#6D28D9',
-    marginTop: 2,
   },
 });

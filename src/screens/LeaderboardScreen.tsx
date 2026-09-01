@@ -8,11 +8,12 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Image } from 'expo-image';
-import { ArrowLeft, Trophy, Award, Medal, Crown, AlertCircle } from 'lucide-react-native';
+import { ArrowLeft, Trophy, Award, Medal, Crown, AlertCircle, Info, X } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { APP_ASSETS } from '../lib/asset-registry';
@@ -31,6 +32,7 @@ export default function LeaderboardScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [myRank, setMyRank] = useState<number | null>(null);
+  const [showScoreInfo, setShowScoreInfo] = useState(false);
 
   const fetchLeaderboard = useCallback(async () => {
     try {
@@ -107,6 +109,9 @@ export default function LeaderboardScreen() {
               avatar_url: p.avatar_url,
               college: p.college,
               et_score: p.et_score ?? 100,
+              base_score: 100,
+              events_posted: 0,
+              impact_saves: 0,
               rank: idx + 1,
             }));
         }
@@ -157,7 +162,13 @@ export default function LeaderboardScreen() {
           <Trophy size={18} color="#F59E0B" />
           <Text style={styles.headerTitle}>Top Curators</Text>
         </View>
-        <View style={{ width: 36 }} />
+        <TouchableOpacity
+          style={styles.infoBtn}
+          onPress={() => setShowScoreInfo(true)}
+          activeOpacity={0.7}
+        >
+          <Info size={18} color={theme.colors.brand} />
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (
@@ -407,6 +418,43 @@ export default function LeaderboardScreen() {
           <Text style={styles.myScoreText}>{profile?.et_score || 100} ET</Text>
         </View>
       )}
+
+      {/* How ET Score Works Modal */}
+      <Modal visible={showScoreInfo} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.scoreModalCard}>
+            <View style={styles.scoreModalHeader}>
+              <Text style={styles.scoreModalTitle}>How ET Score Works</Text>
+              <TouchableOpacity style={styles.scoreModalClose} onPress={() => setShowScoreInfo(false)}>
+                <X size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.scoreRowsList}>
+              <View style={styles.scoreRow}>
+                <Text style={styles.scoreRowLabel}>Base score</Text>
+                <Text style={styles.scoreRowValue}>+100</Text>
+              </View>
+              <View style={styles.scoreRow}>
+                <Text style={styles.scoreRowLabel}>Completing your profile</Text>
+                <Text style={styles.scoreRowValue}>+50 (one-time)</Text>
+              </View>
+              <View style={styles.scoreRow}>
+                <Text style={styles.scoreRowLabel}>Each approved event</Text>
+                <Text style={styles.scoreRowValue}>+20</Text>
+              </View>
+              <View style={styles.scoreRow}>
+                <Text style={styles.scoreRowLabel}>Each unique save/interest</Text>
+                <Text style={styles.scoreRowValue}>+10</Text>
+              </View>
+              <View style={[styles.scoreRow, { borderBottomWidth: 0 }]}>
+                <Text style={styles.scoreRowLabel}>Confirmed spam report</Text>
+                <Text style={[styles.scoreRowValue, { color: '#EF4444' }]}>−25</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -698,5 +746,63 @@ const styles = StyleSheet.create({
     color: '#F59E0B',
     fontSize: 15,
     fontWeight: '900',
+  },
+  infoBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  scoreModalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+  },
+  scoreModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  scoreModalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  scoreModalClose: {
+    padding: 4,
+  },
+  scoreRowsList: {
+    gap: 12,
+  },
+  scoreRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  scoreRowLabel: {
+    fontSize: 13,
+    color: '#475569',
+    fontWeight: '600',
+    flex: 1,
+  },
+  scoreRowValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
   },
 });

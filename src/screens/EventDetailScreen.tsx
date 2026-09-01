@@ -10,6 +10,7 @@ import {
   Share,
   Modal,
   TextInput,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -30,23 +31,32 @@ import {
   Award,
   CalendarPlus,
   Heart,
-  CheckCircle2,
+  Edit3,
+  Building,
+  GraduationCap,
+  Sparkles,
+  Hourglass,
+  Tag,
 } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { getCategoryConfig } from '../lib/category-config';
 import { getCategoryPoster } from '../lib/asset-registry';
 import { useAuth } from '../context/AuthContext';
+import { EventCard } from '../components/EventCard';
 import type { EventRow, RootStackParamList } from '../types';
+
+const { width } = Dimensions.get('window');
 
 export default function EventDetailScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'EventDetail'>>();
   const navigation = useNavigation<any>();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const { slug, id, eventId } = (route.params || {}) as any;
 
-  const [event, setEvent] = useState<(EventRow & { profiles?: { username?: string; full_name?: string } }) | null>(null);
+  const [event, setEvent] = useState<(EventRow & { colleges?: { name: string }; profiles?: { username?: string; full_name?: string } }) | null>(null);
+  const [similarEvents, setSimilarEvents] = useState<EventRow[]>([]);
   const [isSaved, setIsSaved] = useState(false);
   const [isInterested, setIsInterested] = useState(false);
   const [interestCount, setInterestCount] = useState<number>(0);
@@ -58,6 +68,30 @@ export default function EventDetailScreen() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+
+  const fetchSimilarEvents = useCallback(async (currentEvent: EventRow) => {
+    try {
+      let query = supabase
+        .from('events')
+        .select('*, colleges(name)')
+        .eq('status', 'approved')
+        .neq('id', currentEvent.id)
+        .limit(6);
+
+      if (currentEvent.city && currentEvent.city !== 'Online') {
+        query = query.eq('city', currentEvent.city);
+      } else if (currentEvent.category) {
+        query = query.eq('category', currentEvent.category);
+      }
+
+      const { data } = await query;
+      if (data) {
+        setSimilarEvents(data as EventRow[]);
+      }
+    } catch (e) {
+      console.warn('[EventDetail] Failed to load similar events', e);
+    }
+  }, []);
 
   const fetchEvent = useCallback(async () => {
     try {
@@ -77,6 +111,9 @@ export default function EventDetailScreen() {
       if (data) {
         const initialCount = (data as any).interested_events?.[0]?.count ?? (data as any).interested_count ?? 0;
         setInterestCount(initialCount);
+
+        // Fetch related/similar events
+        fetchSimilarEvents(data as EventRow);
 
         if (user) {
           const [{ data: savedRow }, { data: interestRow }] = await Promise.all([
@@ -103,11 +140,25 @@ export default function EventDetailScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [id, slug, eventId, user]);
+  }, [id, slug, eventId, user, fetchSimilarEvents]);
 
   useEffect(() => {
     fetchEvent();
   }, [fetchEvent]);
+
+  const canEdit = Boolean(
+    user &&
+    event &&
+    (user.id === event.creator_id || profile?.role === 'admin' || profile?.user_type === 'admin')
+  );
+
+  const handleEditEvent = () => {
+    if (!event) return;
+    navigation.navigate('CreateEvent', {
+      editId: event.id,
+      event,
+    });
+  };
 
   const handleShare = async () => {
     if (!event) return;
@@ -171,7 +222,6 @@ export default function EventDetailScreen() {
 
     try {
       if (nextState) {
-        // Upsert with ignoreDuplicates to prevent duplicate rows
         const { data: inserted, error } = await supabase
           .from('interested_events')
           .upsert(
@@ -182,7 +232,6 @@ export default function EventDetailScreen() {
 
         if (error) throw error;
 
-        // Award +10 ET score to creator if a new interest was recorded
         if (event.creator_id && inserted && inserted.length > 0) {
           await supabase.rpc('increment_et_score', {
             user_id: event.creator_id,
@@ -200,7 +249,6 @@ export default function EventDetailScreen() {
       }
     } catch (err) {
       console.error('[EventDetail] Interested error:', err);
-      // Revert optimistic update
       setIsInterested(previousState);
       setInterestCount((prev) => (previousState ? prev + 1 : Math.max(0, prev - 1)));
       Alert.alert('Error', 'Could not update interest status.');
@@ -310,6 +358,18 @@ export default function EventDetailScreen() {
         </TouchableOpacity>
 
         <View style={styles.topNavActions}>
+          {/* Edit Event Button (Visible to Creator / Admin) */}
+          {canEdit && (
+            <TouchableOpacity
+              style={styles.editHeaderBtn}
+              onPress={handleEditEvent}
+              activeOpacity={0.8}
+            >
+              <Edit3 size={15} color="#6C47FF" />
+              <Text style={styles.editHeaderText}>Edit</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Interested Button in Header */}
           <TouchableOpacity
             style={[styles.interestedHeaderBtn, isInterested && styles.interestedHeaderBtnActive]}
@@ -354,7 +414,7 @@ export default function EventDetailScreen() {
             transition={300}
           />
 
-          <View style={styles.categoryBadge}>
+          <View style={[styles.categoryBadge, { backgroundColor: categoryConfig.accentColor }]}>
             <Text style={styles.categoryBadgeText}>
               {event.category || 'Event'}
             </Text>
@@ -383,6 +443,18 @@ export default function EventDetailScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Goal Tags (If present) */}
+          {event.goal_tags && event.goal_tags.length > 0 && (
+            <View style={styles.goalTagsContainer}>
+              {event.goal_tags.map((goal, idx) => (
+                <View key={idx} style={styles.goalChip}>
+                  <Sparkles size={12} color="#6C47FF" />
+                  <Text style={styles.goalChipText}>{goal}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           {/* Quick Action Strip: Add to Calendar */}
           <View style={styles.actionStrip}>
             <TouchableOpacity
@@ -391,7 +463,7 @@ export default function EventDetailScreen() {
               activeOpacity={0.8}
             >
               <CalendarPlus size={16} color={theme.colors.brand} />
-              <Text style={styles.calendarActionText}>Add to Google Calendar</Text>
+              <Text style={styles.calendarActionText}>Add to Calendar</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -419,9 +491,25 @@ export default function EventDetailScreen() {
               </View>
               <View style={styles.detailTextWrapper}>
                 <Text style={styles.detailLabel}>Date</Text>
-                <Text style={styles.detailValue}>{event.date_string || 'TBA'}</Text>
+                <Text style={styles.detailValue}>
+                  {event.date_string || 'TBA'}
+                  {event.end_date_string && event.end_date_string !== event.date_string ? ` - ${event.end_date_string}` : ''}
+                </Text>
               </View>
             </View>
+
+            {/* Registration Deadline (If present) */}
+            {event.registration_deadline && (
+              <View style={styles.detailRow}>
+                <View style={[styles.detailIconWrapper, { backgroundColor: '#FEF2F2' }]}>
+                  <Hourglass size={18} color="#EF4444" />
+                </View>
+                <View style={styles.detailTextWrapper}>
+                  <Text style={[styles.detailLabel, { color: '#EF4444' }]}>Registration Deadline</Text>
+                  <Text style={[styles.detailValue, { color: '#B91C1C' }]}>{event.registration_deadline}</Text>
+                </View>
+              </View>
+            )}
 
             {/* Time */}
             {(event.start_time || event.end_time) && (
@@ -454,6 +542,37 @@ export default function EventDetailScreen() {
                 </Text>
               </View>
             </View>
+
+            {/* College Specific Details */}
+            {(event.colleges?.name || event.college_only) && (
+              <View style={styles.detailRow}>
+                <View style={styles.detailIconWrapper}>
+                  <Building size={18} color="#3B82F6" />
+                </View>
+                <View style={styles.detailTextWrapper}>
+                  <Text style={styles.detailLabel}>College Hosted</Text>
+                  <Text style={styles.detailValue}>
+                    {event.colleges?.name || 'College Specific Event'}
+                    {event.college_only ? ' (Exclusive to Students)' : ''}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Eligible Branches */}
+            {(event.college_branch || (event.branch_tags && event.branch_tags.length > 0)) && (
+              <View style={styles.detailRow}>
+                <View style={styles.detailIconWrapper}>
+                  <GraduationCap size={18} color="#8B5CF6" />
+                </View>
+                <View style={styles.detailTextWrapper}>
+                  <Text style={styles.detailLabel}>Eligible Branches</Text>
+                  <Text style={styles.detailValue}>
+                    {event.college_branch || event.branch_tags?.join(', ')}
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* Team Size / Audience */}
             {(event.team_size || (event.target_audience && event.target_audience.length > 0)) && (
@@ -490,6 +609,33 @@ export default function EventDetailScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>About This Event</Text>
               <Text style={styles.descriptionText}>{event.description}</Text>
+            </View>
+          )}
+
+          {/* Similar Events / More in this City Carousel */}
+          {similarEvents.length > 0 && (
+            <View style={styles.similarSection}>
+              <View style={styles.similarHeader}>
+                <Text style={styles.similarTitle}>
+                  More Events in {event.city || event.category}
+                </Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.similarScrollContainer}
+              >
+                {similarEvents.map((simEvent) => (
+                  <View key={simEvent.id} style={styles.similarCardWrapper}>
+                    <EventCard
+                      event={simEvent}
+                      onPress={() => {
+                        navigation.push('EventDetail', { id: simEvent.id, slug: simEvent.slug ?? undefined });
+                      }}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
             </View>
           )}
 
@@ -605,6 +751,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  editHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  editHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6C47FF',
+  },
   iconBtn: {
     width: 36,
     height: 36,
@@ -681,7 +843,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   pricePill: {
     backgroundColor: '#ECFDF5',
@@ -708,6 +870,28 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.brand,
     textDecorationLine: 'underline',
+  },
+  goalTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 16,
+  },
+  goalChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  goalChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6C47FF',
   },
   actionStrip: {
     flexDirection: 'row',
@@ -810,6 +994,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#334155',
     lineHeight: 22,
+  },
+  similarSection: {
+    marginBottom: 20,
+  },
+  similarHeader: {
+    marginBottom: 12,
+  },
+  similarTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  similarScrollContainer: {
+    paddingRight: 16,
+    gap: 12,
+  },
+  similarCardWrapper: {
+    width: width * 0.78,
   },
   reportRow: {
     flexDirection: 'row',

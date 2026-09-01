@@ -15,6 +15,9 @@ export type InterestedEventRow = Database['public']['Tables']['interested_events
 export type CollegeRow = Database['public']['Tables']['colleges']['Row'];
 export type VerifiedDomainRow = Database['public']['Tables']['verified_domains']['Row'];
 export type AppSettingsRow = Database['public']['Tables']['app_settings']['Row'];
+export type FeedbackRow = Database['public']['Tables']['platform_feedback']['Row'];
+export type FollowerRow = Database['public']['Tables']['followers']['Row'];
+export type RateLimitRow = Database['public']['Tables']['rate_limits']['Row'];
 export type LeaderboardViewRow = Database['public']['Views']['leaderboard_view']['Row'] & {
   rank?: number | null;
 };
@@ -28,7 +31,7 @@ export type RootStackParamList = {
   Login: undefined;
   Onboarding: undefined;
   EventDetail: { slug?: string; id?: string; eventId?: string };
-  CreateEvent: { editId?: string };
+  CreateEvent: { editId?: string; event?: any };
   SavedEvents: undefined;
   MyPostedEvents: undefined;
   Leaderboard: undefined;

@@ -70,26 +70,20 @@ export default function CitiesScreen() {
     })();
   }, []);
 
-  // Filter out cities with 0 upcoming events
+  // Display all cities, prioritizing cities with active upcoming events
   const activeCityList = useMemo(() => {
-    // Collect all cities that have active counts
-    const withEvents = Object.keys(cityCounts)
-      .filter((cityName) => cityCounts[cityName] > 0)
-      .map((name) => ({
-        name,
-        count: cityCounts[name],
-      }));
+    return CITIES.map((name) => ({
+      name,
+      count: cityCounts[name] || 0,
+    })).sort((a, b) => {
+      // Online first if has events
+      if (a.name.toLowerCase() === 'online' && a.count > 0) return -1;
+      if (b.name.toLowerCase() === 'online' && b.count > 0) return 1;
 
-    // If Online has events or exists, put it first
-    const onlineItem = withEvents.find((c) => c.name.toLowerCase() === 'online');
-    const otherCities = withEvents
-      .filter((c) => c.name.toLowerCase() !== 'online')
-      .sort((a, b) => {
-        if (b.count !== a.count) return b.count - a.count;
-        return a.name.localeCompare(b.name);
-      });
-
-    return onlineItem ? [onlineItem, ...otherCities] : otherCities;
+      // Higher event count first
+      if (b.count !== a.count) return b.count - a.count;
+      return a.name.localeCompare(b.name);
+    });
   }, [cityCounts]);
 
   const filteredCities = useMemo(() => {

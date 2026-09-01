@@ -216,31 +216,26 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
           {title}
         </Text>
 
-        {/* Organizer & Price */}
+        {/* Organizer & Paid Rupee Indicator */}
         <View style={styles.metaRow}>
           {!hideOrganizer && (
-            <>
-              <Text style={styles.organizerText} numberOfLines={1}>
-                Curated by{' '}
-                <Text
-                  style={[styles.organizerHighlight, Boolean(organizerUsername) && styles.organizerLink]}
-                  onPress={organizerUsername ? handleOrganizerPress : undefined}
-                >
-                  {organizerName}
-                </Text>
+            <Text style={styles.organizerText} numberOfLines={1}>
+              Curated by{' '}
+              <Text
+                style={[styles.organizerHighlight, Boolean(organizerUsername) && styles.organizerLink]}
+                onPress={organizerUsername ? handleOrganizerPress : undefined}
+              >
+                {organizerName}
               </Text>
-              <View style={styles.dotSeparator} />
-            </>
+            </Text>
           )}
-          {isFree ? (
-            <View style={styles.freeBadge}>
-              <Text style={styles.freeText}>FREE</Text>
-            </View>
-          ) : (
-            <View style={styles.paidBadge}>
-              <IndianRupee size={11} color="#059669" />
-              <Text style={styles.paidText}>PAID</Text>
-            </View>
+          {!isFree && (
+            <>
+              {!hideOrganizer && <View style={styles.dotSeparator} />}
+              <View style={styles.paidRupeeBadge}>
+                <IndianRupee size={10} color="#FFFFFF" strokeWidth={2.5} />
+              </View>
+            </>
           )}
         </View>
 
@@ -429,30 +424,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#CBD5E1',
     marginHorizontal: 6,
   },
-  freeBadge: {
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  freeText: {
-    color: '#059669',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  paidBadge: {
-    flexDirection: 'row',
+  paidRupeeBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#10B981',
     alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  paidText: {
-    color: '#059669',
-    fontSize: 10,
-    fontWeight: '700',
+    justifyContent: 'center',
   },
   infoRow: {
     flexDirection: 'row',
