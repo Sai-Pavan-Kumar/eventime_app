@@ -24,7 +24,6 @@ import {
   Video,
   UploadCloud,
   CheckCircle2,
-  Sparkles,
   AlertCircle,
   IndianRupee,
   Link2,
@@ -551,10 +550,7 @@ export default function CreateEventScreen() {
         {isAdmin && (
           <View style={styles.adminFeatureCard}>
             <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Sparkles size={16} color="#B45309" />
-                <Text style={styles.adminFeatureTitle}>Feature this Event</Text>
-              </View>
+              <Text style={styles.adminFeatureTitle}>Feature this Event</Text>
               <Text style={styles.adminFeatureSubtitle}>
                 Displays on the featured carousel & highlights on home feed.
               </Text>

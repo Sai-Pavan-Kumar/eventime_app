@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CheckCircle2, ArrowRight, ArrowLeft, MapPin, Sparkles, Building, GraduationCap, Compass } from 'lucide-react-native';
+import { CheckCircle2, ArrowRight, ArrowLeft, MapPin, Building, GraduationCap, Compass } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
@@ -394,7 +394,6 @@ export default function OnboardingScreen() {
         {step === 3 && (
           <View style={styles.stepContainer}>
             <View style={styles.countBadgeRow}>
-              <Sparkles size={16} color={theme.colors.brand} />
               <Text style={styles.countBadgeText}>
                 Selected: {selectedCategories.length} {isAdmin ? '(Unlimited)' : '/ 6 Max'}
               </Text>

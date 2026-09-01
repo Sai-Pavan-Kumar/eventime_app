@@ -21,7 +21,6 @@ import {
   Shield,
   LogOut,
   ChevronRight,
-  Sparkles,
   MapPin,
   GraduationCap,
   Heart,
@@ -176,7 +175,6 @@ export default function ProfileScreen() {
 
               {/* Tier Pill */}
               <View style={[styles.tierPill, { backgroundColor: tier.bg }]}>
-                <Sparkles size={11} color={tier.color} />
                 <Text style={[styles.tierText, { color: tier.color }]}>{tier.label}</Text>
                 <Text style={[styles.scoreText, { color: tier.color }]}>• {profile?.et_score || 100} ET</Text>
               </View>

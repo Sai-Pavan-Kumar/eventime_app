@@ -20,7 +20,6 @@ import {
   CheckCircle2,
   XCircle,
   Trash2,
-  Sparkles,
   AlertTriangle,
   Building,
   Plus,
@@ -320,10 +319,6 @@ export default function AdminScreen() {
                       style={[styles.actionPill, item.is_featured && styles.featuredPill]}
                       onPress={() => handleToggleFeatured(item.id, item.is_featured)}
                     >
-                      <Sparkles
-                        size={12}
-                        color={item.is_featured ? '#D97706' : theme.colors.textSecondary}
-                      />
                       <Text
                         style={[
                           styles.actionPillText,

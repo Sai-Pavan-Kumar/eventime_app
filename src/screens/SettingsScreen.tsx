@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, CheckCircle2, Save, MapPin, Sparkles, User, Building, GraduationCap } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Save, MapPin, User, Building, GraduationCap } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';

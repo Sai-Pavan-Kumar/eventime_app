@@ -15,7 +15,6 @@ import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  Sparkles,
   MapPin,
   Compass,
   Search,
@@ -32,6 +31,7 @@ import { EventCard } from '../components/EventCard';
 import { APP_ASSETS, getCityImage } from '../lib/asset-registry';
 import { CATEGORIES_LIST } from '../lib/category-config';
 import { CITIES } from '../lib/constants/cities';
+import { parseEventDateString } from '../lib/utils/date';
 import type { EventRow, RootStackParamList } from '../types';
 
 const { width } = Dimensions.get('window');
@@ -94,7 +94,17 @@ export default function HomeScreen() {
         return;
       }
 
-      const allApproved = data || [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Exclude past events so only upcoming / today's events appear in active feed
+      const allApproved = (data || []).filter((ev) => {
+        const parsed = parseEventDateString(ev.date_string || '');
+        if (!parsed) return true;
+        const evDate = new Date(parsed);
+        evDate.setHours(0, 0, 0, 0);
+        return evDate.getTime() >= today.getTime();
+      });
 
       if (activeTab === 'forYou') {
         const preferredCities = profile?.preferred_cities || [];
@@ -196,7 +206,6 @@ export default function HomeScreen() {
             style={[styles.feedPill, activeTab === 'forYou' && styles.feedPillActive]}
             onPress={() => setActiveTab('forYou')}
           >
-            <Sparkles size={14} color={activeTab === 'forYou' ? '#FFF' : '#64748B'} />
             <Text style={[styles.feedPillText, activeTab === 'forYou' && styles.feedPillTextActive]}>
               For You
             </Text>

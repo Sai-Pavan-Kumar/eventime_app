@@ -28,7 +28,6 @@ import {
   Flag,
   Users,
   Award,
-  Sparkles,
   CheckCircle2,
 } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';

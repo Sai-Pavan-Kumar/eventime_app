@@ -20,6 +20,7 @@ import { EventCard } from '../components/EventCard';
 import { CATEGORIES_LIST } from '../lib/category-config';
 import { CITIES } from '../lib/constants/cities';
 import { APP_ASSETS } from '../lib/asset-registry';
+import { parseEventDateString } from '../lib/utils/date';
 import { useAuth } from '../context/AuthContext';
 import type { EventRow, RootStackParamList } from '../types';
 
@@ -78,14 +79,26 @@ export default function SearchScreen() {
       }
 
       if (priceFilter === 'free') {
-        query = query.eq('entry_type', 'free');
+        query = query.eq('is_free', true);
       } else if (priceFilter === 'paid') {
-        query = query.eq('entry_type', 'paid');
+        query = query.eq('is_free', false);
       }
 
       const { data, error } = await query;
       if (error) throw error;
-      setEvents(data || []);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const activeEvents = (data || []).filter((ev) => {
+        const parsed = parseEventDateString(ev.date_string || '');
+        if (!parsed) return true;
+        const evDate = new Date(parsed);
+        evDate.setHours(0, 0, 0, 0);
+        return evDate.getTime() >= today.getTime();
+      });
+
+      setEvents(activeEvents);
     } catch (err) {
       console.error('[SearchScreen] Search error:', err);
     } finally {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, Alert } from 'react-native';
 import { Image } from 'expo-image';
-import { Bookmark, Share2, MapPin, Clock, Users, IndianRupee, Sparkles, Check } from 'lucide-react-native';
+import { Bookmark, Share2, MapPin, Clock, Users, IndianRupee, Check } from 'lucide-react-native';
 import { theme } from '../config/theme';
 import { getCategoryConfig } from '../lib/category-config';
 import { getCategoryPoster } from '../lib/asset-registry';
@@ -15,7 +15,6 @@ interface EventCardProps {
   isSaved?: boolean;
   onPress: () => void;
   onSaveToggle?: (eventId: string, isSaved: boolean) => void;
-  layout?: 'grid' | 'full';
 }
 
 export const EventCard: React.FC<EventCardProps> = ({
@@ -33,19 +32,28 @@ export const EventCard: React.FC<EventCardProps> = ({
   const isCustomPoster = Boolean(event.is_featured && event.poster_url && event.poster_url.startsWith('http'));
   const posterSource = isCustomPoster ? { uri: event.poster_url! } : getCategoryPoster(event.category);
 
-  // Date parsing & FOMO Status
+  // Short Date Overlay e.g. "22 MAY" or "SOON"
   const parsedDate = parseEventDateString(event.date_string || '');
   const shortDateOverlay = parsedDate
     ? parsedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }).toUpperCase()
     : 'SOON';
 
-  const isPastEvent = (() => {
-    if (!parsedDate) return false;
+  // Status calculation
+  const statusInfo = (() => {
+    if (!parsedDate) return null;
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const evDate = new Date(parsedDate);
     evDate.setHours(0, 0, 0, 0);
-    return evDate.getTime() < now.getTime();
+
+    const diffDays = Math.floor((evDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) {
+      return { label: 'Past Event', bg: '#1E293B', color: '#F1F5F9' };
+    }
+    if (diffDays === 0) {
+      return { label: 'Live Today', bg: '#059669', color: '#FFFFFF' };
+    }
+    return null;
   })();
 
   const isFree = event.is_free !== false;
@@ -100,10 +108,10 @@ export const EventCard: React.FC<EventCardProps> = ({
   return (
     <TouchableOpacity
       style={styles.card}
-      activeOpacity={0.93}
+      activeOpacity={0.92}
       onPress={onPress}
     >
-      {/* Visual Image Banner with 100% genuine WebP */}
+      {/* 16:9 Image Layer */}
       <View style={styles.imageContainer}>
         <Image
           source={posterSource}
@@ -112,37 +120,47 @@ export const EventCard: React.FC<EventCardProps> = ({
           transition={250}
         />
 
-        {/* Short Date Badge Overlay */}
-        <View style={styles.dateOverlay}>
-          <Text style={[styles.dateOverlayText, { color: categoryConfig.dateColor || '#6C47FF' }]}>
+        {/* Top Overlay: Date Left & Brand Name Right */}
+        <View style={styles.topOverlayRow}>
+          <Text
+            style={[
+              styles.dateOverlayText,
+              { color: categoryConfig.dateColor || '#6C47FF' },
+            ]}
+          >
             {shortDateOverlay}
           </Text>
-        </View>
 
-        {/* Category Pill Over Image */}
-        <View style={styles.categoryPill}>
-          <Text style={styles.categoryPillText} numberOfLines={1}>
-            {event.category || 'Event'}
+          <Text
+            style={[
+              styles.brandOverlayText,
+              { color: categoryConfig.dateColor || '#6C47FF' },
+            ]}
+          >
+            EVENTIME
           </Text>
         </View>
 
-        {/* Featured Badge */}
-        {event.is_featured && (
-          <View style={styles.featuredBadge}>
-            <Sparkles size={10} color="#FFF" />
-            <Text style={styles.featuredText}>FEATURED</Text>
-          </View>
-        )}
+        {/* Bottom Left Status & Featured Badges */}
+        <View style={styles.bottomOverlayCol}>
+          {event.is_featured && (
+            <View style={styles.featuredBadge}>
+              <Text style={styles.featuredText}>Featured</Text>
+            </View>
+          )}
 
-        {/* Past Event Badge */}
-        {isPastEvent && (
-          <View style={styles.pastBadge}>
-            <Text style={styles.pastText}>Past Event</Text>
-          </View>
-        )}
+          {statusInfo && (
+            <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
+              {statusInfo.label === 'Live Today' && <View style={styles.liveDot} />}
+              <Text style={[styles.statusText, { color: statusInfo.color }]}>
+                {statusInfo.label}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      {/* Card Content Matching Website Details */}
+      {/* Content Details */}
       <View style={styles.content}>
         {/* Title */}
         <Text style={styles.title} numberOfLines={2}>
@@ -171,7 +189,7 @@ export const EventCard: React.FC<EventCardProps> = ({
         <View style={styles.infoRow}>
           <MapPin size={13} color="#94A3B8" />
           <Text style={styles.infoText} numberOfLines={1}>
-            {event.college_name ? `${event.college_name}, ${event.city || 'Online'}` : (event.city || 'Online / Virtual')}
+            {event.college_name ? `${event.college_name}, ${event.city || 'Online'}` : (event.city || 'Online')}
           </Text>
         </View>
 
@@ -229,11 +247,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     marginBottom: 16,
-    overflow: 'hidden',
+    padding: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
     elevation: 3,
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.04)',
@@ -242,92 +260,94 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 16 / 9,
     backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    overflow: 'hidden',
     position: 'relative',
   },
   posterImage: {
     width: '100%',
     height: '100%',
   },
-  dateOverlay: {
+  topOverlayRow: {
     position: 'absolute',
-    top: 12,
+    top: 10,
+    left: 12,
     right: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 10,
   },
   dateOverlayText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
+    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  categoryPill: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 100,
-    maxWidth: '55%',
-  },
-  categoryPillText: {
-    color: '#FFFFFF',
+  brandOverlayText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    opacity: 0.85,
+  },
+  bottomOverlayCol: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    flexDirection: 'column',
+    gap: 6,
+    alignItems: 'flex-start',
+    zIndex: 10,
   },
   featuredBadge: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    backgroundColor: '#6C47FF',
+    backgroundColor: '#F59E0B',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
   },
   featuredText: {
     color: '#FFF',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
-  pastBadge: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: 'rgba(30, 41, 59, 0.9)',
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
-  pastText: {
-    color: '#F1F5F9',
+  liveDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#FFF',
+  },
+  statusText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   content: {
-    padding: 16,
+    paddingTop: 12,
+    paddingHorizontal: 4,
   },
   title: {
     fontSize: 17,
     fontWeight: '800',
     color: '#0F172A',
     lineHeight: 23,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   organizerText: {
     fontSize: 12,
@@ -375,7 +395,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   infoText: {
     fontSize: 12,

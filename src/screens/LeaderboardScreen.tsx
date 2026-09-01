@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Image } from 'expo-image';
-import { ArrowLeft, Trophy, Sparkles, Award, Medal, Crown } from 'lucide-react-native';
+import { ArrowLeft, Trophy, Award, Medal, Crown } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { APP_ASSETS } from '../lib/asset-registry';
