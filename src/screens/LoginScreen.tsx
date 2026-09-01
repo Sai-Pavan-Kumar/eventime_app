@@ -1,0 +1,542 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Mail, Lock, Eye, EyeOff, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react-native';
+import { useAuth } from '../context/AuthContext';
+import { theme } from '../config/theme';
+
+export default function LoginScreen() {
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset } = useAuth();
+
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [hasConsented, setHasConsented] = useState(true);
+  const [isLoading, setIsLoading] = useState<string | null>(null);
+
+  // Rate limiting attempts
+  const [attempts, setAttempts] = useState(0);
+  const [isLockedOut, setIsLockedOut] = useState(false);
+
+  const handleGoogleLogin = async () => {
+    if (!hasConsented) {
+      Alert.alert('Consent Required', 'Please agree to the Data Collection Policy to continue.');
+      return;
+    }
+    setIsLoading('google');
+    const { error } = await signInWithGoogle();
+    setIsLoading(null);
+    if (error) {
+      Alert.alert('Sign-In Error', error.message || 'Could not complete Google Sign-In.');
+    }
+  };
+
+  const handleEmailAuth = async () => {
+    if (!hasConsented) {
+      Alert.alert('Consent Required', 'Please agree to the Data Collection Policy to continue.');
+      return;
+    }
+    if (isLockedOut) {
+      Alert.alert('Temporary Lockout', 'Too many failed attempts. Please wait before trying again.');
+      return;
+    }
+    if (!email.trim() || !password) {
+      Alert.alert('Validation Error', 'Please fill in both email and password.');
+      return;
+    }
+
+    setIsLoading('email');
+
+    if (isSignUp) {
+      const { error, unconfirmed } = await signUpWithEmail(email.trim(), password);
+      setIsLoading(null);
+      if (error) {
+        Alert.alert('Sign Up Failed', error.message);
+      } else if (unconfirmed) {
+        Alert.alert(
+          'Email Already Registered',
+          "You've already signed up with this email. Check your inbox for the latest confirmation link."
+        );
+      } else {
+        Alert.alert('Account Created', 'Please check your email inbox to verify your account, then sign in.');
+        setIsSignUp(false);
+      }
+    } else {
+      const { error } = await signInWithEmail(email.trim(), password);
+      setIsLoading(null);
+      if (error) {
+        const newAttempts = attempts + 1;
+        setAttempts(newAttempts);
+
+        if (newAttempts >= 3) {
+          const penaltyMultiplier = Math.pow(2, newAttempts - 3);
+          const cooldownSeconds = 30 * penaltyMultiplier;
+          setIsLockedOut(true);
+          Alert.alert(
+            'Too Many Attempts',
+            `Too many failed attempts. Please wait ${cooldownSeconds} seconds before trying again.`
+          );
+          setTimeout(() => {
+            setIsLockedOut(false);
+          }, cooldownSeconds * 1000);
+        } else {
+          Alert.alert(
+            'Login Failed',
+            error.message === 'Email not confirmed'
+              ? 'Please confirm your email first — check your inbox for the verification link.'
+              : 'Invalid email or password.'
+          );
+        }
+      } else {
+        setAttempts(0);
+      }
+    }
+  };
+
+  const handleForgotPassword = () => {
+    if (!email.trim()) {
+      Alert.alert('Email Required', 'Enter your email address in the input above first.');
+      return;
+    }
+    Alert.alert(
+      'Reset Password',
+      `Send password reset link to ${email.trim()}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send Link',
+          onPress: async () => {
+            setIsLoading('reset');
+            const { error } = await sendPasswordReset(email.trim());
+            setIsLoading(null);
+            if (error) {
+              Alert.alert('Error', error.message);
+            } else {
+              Alert.alert('Email Sent', 'Check your inbox for the password reset instructions.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Brand Header */}
+          <View style={styles.header}>
+            <View style={styles.logoBadge}>
+              <Sparkles size={28} color={theme.colors.surface} />
+            </View>
+            <Text style={styles.appName}>EvenTime</Text>
+            <Text style={styles.tagline}>Stop Searching. Start Attending.</Text>
+            <Text style={styles.subtagline}>
+              India's cleanest directory for tech, college, and professional events.
+            </Text>
+          </View>
+
+          {/* Card */}
+          <View style={styles.card}>
+            {/* Google Sign In Button */}
+            <TouchableOpacity
+              style={styles.googleButton}
+              activeOpacity={0.85}
+              onPress={handleGoogleLogin}
+              disabled={isLoading !== null}
+            >
+              {isLoading === 'google' ? (
+                <ActivityIndicator color={theme.colors.textPrimary} />
+              ) : (
+                <View style={styles.googleContent}>
+                  <View style={styles.googleIconContainer}>
+                    <Text style={styles.googleG}>G</Text>
+                  </View>
+                  <Text style={styles.googleButtonText}>Continue with Google</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.dividerContainer}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or continue with email</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Email Form Toggle / Form */}
+            {!showEmailForm ? (
+              <TouchableOpacity
+                style={styles.emailToggleBtn}
+                onPress={() => setShowEmailForm(true)}
+              >
+                <Mail size={18} color={theme.colors.brand} />
+                <Text style={styles.emailToggleText}>Sign in with Email & Password</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.formContainer}>
+                {/* Email Input */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Email Address</Text>
+                  <View style={styles.inputWrapper}>
+                    <Mail size={18} color={theme.colors.textSecondary} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="you@example.com"
+                      placeholderTextColor={theme.colors.textMuted}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={email}
+                      onChangeText={setEmail}
+                    />
+                  </View>
+                </View>
+
+                {/* Password Input */}
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>Password</Text>
+                    {!isSignUp && (
+                      <TouchableOpacity onPress={handleForgotPassword}>
+                        <Text style={styles.forgotText}>Forgot?</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <View style={styles.inputWrapper}>
+                    <Lock size={18} color={theme.colors.textSecondary} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="••••••••"
+                      placeholderTextColor={theme.colors.textMuted}
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      value={password}
+                      onChangeText={setPassword}
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowPassword(!showPassword)}
+                      style={styles.eyeBtn}
+                    >
+                      {showPassword ? (
+                        <EyeOff size={18} color={theme.colors.textSecondary} />
+                      ) : (
+                        <Eye size={18} color={theme.colors.textSecondary} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Email Submit Button */}
+                <TouchableOpacity
+                  style={[styles.primaryButton, isLockedOut && styles.disabledButton]}
+                  onPress={handleEmailAuth}
+                  disabled={isLoading !== null || isLockedOut}
+                  activeOpacity={0.85}
+                >
+                  {isLoading === 'email' ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>
+                      {isSignUp ? 'Create Free Account' : 'Sign In'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                {/* Switch between Sign In / Sign Up */}
+                <TouchableOpacity
+                  style={styles.switchAuthBtn}
+                  onPress={() => setIsSignUp(!isSignUp)}
+                >
+                  <Text style={styles.switchAuthText}>
+                    {isSignUp
+                      ? 'Already have an account? Sign In'
+                      : "Don't have an account? Create one"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Consent Policy Toggle */}
+            <TouchableOpacity
+              style={styles.consentRow}
+              activeOpacity={0.8}
+              onPress={() => setHasConsented(!hasConsented)}
+            >
+              <View style={[styles.checkbox, hasConsented && styles.checkboxChecked]}>
+                {hasConsented && <CheckCircle2 size={16} color="#FFF" />}
+              </View>
+              <Text style={styles.consentText}>
+                I agree to the <Text style={styles.consentLink}>Data Collection Policy</Text> and{' '}
+                <Text style={styles.consentLink}>Terms of Service</Text>.
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Trust Footer */}
+          <View style={styles.trustFooter}>
+            <ShieldCheck size={16} color={theme.colors.textSecondary} />
+            <Text style={styles.trustText}>Official Supabase Encrypted & RLS Protected</Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.xxl,
+    justifyContent: 'center',
+    minHeight: '100%',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: theme.spacing.xxl,
+  },
+  logoBadge: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    backgroundColor: theme.colors.brand,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+    ...theme.shadows.brand,
+  },
+  appName: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: theme.colors.textPrimary,
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  tagline: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.brand,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  subtagline: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    maxWidth: 280,
+    lineHeight: 18,
+  },
+  card: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.md,
+  },
+  googleButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#4285F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  googleG: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  googleButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 18,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.border,
+  },
+  dividerText: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    paddingHorizontal: 10,
+    fontWeight: '500',
+  },
+  emailToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: theme.colors.brandLight,
+    borderRadius: theme.borderRadius.lg,
+    gap: 8,
+  },
+  emailToggleText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.brand,
+  },
+  formContainer: {
+    marginTop: 4,
+  },
+  inputGroup: {
+    marginBottom: 14,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    marginBottom: 6,
+  },
+  forgotText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.brand,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: 12,
+  },
+  inputIcon: {
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: theme.colors.textPrimary,
+  },
+  eyeBtn: {
+    padding: 6,
+  },
+  primaryButton: {
+    backgroundColor: theme.colors.brand,
+    paddingVertical: 14,
+    borderRadius: theme.borderRadius.lg,
+    alignItems: 'center',
+    marginTop: 8,
+    ...theme.shadows.brand,
+  },
+  disabledButton: {
+    backgroundColor: theme.colors.textMuted,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  primaryButtonText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  switchAuthBtn: {
+    alignItems: 'center',
+    marginTop: 14,
+    paddingVertical: 4,
+  },
+  switchAuthText: {
+    fontSize: 13,
+    color: theme.colors.brand,
+    fontWeight: '600',
+  },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 18,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.borderLight,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    marginTop: 1,
+    backgroundColor: theme.colors.surface,
+  },
+  checkboxChecked: {
+    backgroundColor: theme.colors.brand,
+    borderColor: theme.colors.brand,
+  },
+  consentText: {
+    flex: 1,
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    lineHeight: 16,
+  },
+  consentLink: {
+    color: theme.colors.textPrimary,
+    fontWeight: '600',
+  },
+  trustFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+    gap: 6,
+  },
+  trustText: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
+  },
+});

@@ -1,0 +1,26 @@
+# Dependencies
+node_modules
+.next
+.git
+dist
+build
+
+# Environment & Keys
+.env
+.env.local
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Generated files
+repomix-output.xml
+project_context.txt
+*.png
+*.jpg
+*.webp
+
+# OS files
+.DS_Store
+Thumbs.db

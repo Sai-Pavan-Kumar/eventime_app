@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "EvenTime",
+    "slug": "eventime",
+    "scheme": "eventime",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6C47FF"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.eventime.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6C47FF"
+      },
+      "package": "com.eventime.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-image-picker"
+    ]
+  }
+}

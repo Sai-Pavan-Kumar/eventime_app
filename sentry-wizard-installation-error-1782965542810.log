@@ -1,0 +1,29 @@
+npm error code ERESOLVE
+npm error ERESOLVE unable to resolve dependency tree
+npm error
+npm error While resolving: eventime@0.1.0
+npm error Found: react@19.2.6
+npm error node_modules/react
+npm error   react@"19.2.6" from the root project
+npm error   peer react@"^18.2.0 || 19.0.0-rc-de68d2f4-20241204 || ^19.0.0" from next@16.2.6
+npm error   node_modules/next
+npm error     next@"16.2.6" from the root project
+npm error     peer next@"^13.2.0 || ^14.0 || ^15.0.0-rc.0 || ^16.0.0-0" from @sentry/nextjs@10.63.0
+npm error     node_modules/@sentry/nextjs
+npm error       @sentry/nextjs@"10" from the root project
+npm error
+npm error Could not resolve dependency:
+npm error peer react@"^19.2.7" from react-dom@19.2.7
+npm error node_modules/react-dom
+npm error   react-dom@"^19.2.6" from the root project
+npm error   peer react-dom@"^18.2.0 || 19.0.0-rc-de68d2f4-20241204 || ^19.0.0" from next@16.2.6
+npm error   node_modules/next
+npm error     next@"16.2.6" from the root project
+npm error     1 more (@sentry/nextjs)
+npm error
+npm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.
+npm error
+npm error
+npm error For a full report see:
+npm error C:\Users\DMSD\AppData\Local\npm-cache\_logs\2026-07-02T04_12_16_087Z-eresolve-report.txt
+npm error A complete log of this run can be found in: C:\Users\DMSD\AppData\Local\npm-cache\_logs\2026-07-02T04_12_16_087Z-debug-0.log

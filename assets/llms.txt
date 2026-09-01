@@ -1,0 +1,16 @@
+# EvenTime
+
+EvenTime is India's student-first event discovery platform. Curators submit events. Students discover hackathons, fests, workshops, and more.
+
+## Key Pages
+- / : Homepage with personalized event feed
+- /events/[slug] : Individual event details
+- /leaderboard : Top event curators
+- /cities/[city] : Events filtered by city (e.g. Hyderabad, Bangalore)
+- /categories/[category] : Events filtered by category
+
+## Categories
+Hackathon, Workshop, College Fest, Startup Event, Networking Event, Webinar, and 15 more.
+
+## Target Audience
+College students and young professionals in India.
