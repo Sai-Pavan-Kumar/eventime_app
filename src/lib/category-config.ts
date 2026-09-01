@@ -1,9 +1,3 @@
-export interface CategoryMeta {
-  accentColor: string;
-  bgLight: string;
-  dateColor?: string;
-}
-
 export const CATEGORIES_LIST = [
   'AI Event',
   'Alumni Event',

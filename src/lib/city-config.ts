@@ -164,19 +164,4 @@ export const CITY_CONFIG: Record<string, {
     accentColor: '#6366F1',
   },
 };
-
-export const getCityConfig = (city: string) => {
-  const fallback = { 
-    backgroundImage: '/cities/default1.webp', 
-    coverImage: '/cities/covers/default1.webp', 
-    accentColor: '#6C47FF' 
-  };
-  
-  if (!city) return fallback;
-  
-  const key = city.toLowerCase().trim().replace(/\s+/g, '-');
-  const config = CITY_CONFIG[key];
-  
-if (!config) return fallback;
-return config;
-};
+

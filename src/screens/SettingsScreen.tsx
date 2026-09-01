@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, CheckCircle2, Save, MapPin, User, Building, GraduationCap } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Save, MapPin, User, Building, GraduationCap, Lock } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
@@ -141,6 +141,14 @@ export default function SettingsScreen() {
     );
   };
 
+  const isStudentNow = userType === 'student';
+  const missingItems: string[] = [];
+  if (!profile?.avatar_url) missingItems.push("Profile photo");
+  if (!username) missingItems.push("Username");
+  if (preferredCities.length === 0) missingItems.push("Preferred cities");
+  if (goals.length === 0) missingItems.push("Interest categories");
+  if (isStudentNow && (!college || !graduationYear || !branch)) missingItems.push("College, graduation year & branch");
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
@@ -159,6 +167,17 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Missing Items Banner */}
+        {missingItems.length > 0 && (
+          <View style={styles.missingBanner}>
+            <Lock size={16} color="#D97706" style={{ marginTop: 2 }} />
+            <View style={styles.missingBannerTextContainer}>
+              <Text style={styles.missingBannerTitle}>Still missing to reach 100%:</Text>
+              <Text style={styles.missingBannerList}>{missingItems.join(" • ")}</Text>
+            </View>
+          </View>
+        )}
+
         {/* Basic Identity */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Basic Info</Text>
@@ -429,6 +448,32 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: theme.colors.textPrimary,
     marginBottom: 12,
+  },
+  missingBanner: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: theme.spacing.lg,
+  },
+  missingBannerTextContainer: {
+    flex: 1,
+  },
+  missingBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#B45309',
+  },
+  missingBannerList: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#D97706',
+    marginTop: 4,
+    lineHeight: 18,
   },
   limitBadge: {
     fontSize: 12,
