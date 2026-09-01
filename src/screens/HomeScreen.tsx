@@ -289,15 +289,6 @@ export default function HomeScreen() {
           >
             <Trophy size={18} color="#D97706" />
           </TouchableOpacity>
-
-          {/* Search Icon */}
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => (navigation as any).navigate('SearchTab')}
-            activeOpacity={0.8}
-          >
-            <Search size={18} color="#0F172A" />
-          </TouchableOpacity>
         </View>
       </View>
 
