@@ -209,9 +209,17 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
 
         {/* Bottom Left Status & Featured Badges */}
         <View style={styles.bottomOverlayCol}>
-          {isFeatured && (
+          {isFeatured && !matchLabel && (
             <View style={styles.featuredBadge}>
               <Text style={styles.featuredText}>Featured</Text>
+            </View>
+          )}
+
+          {Boolean(matchLabel) && (
+            <View style={styles.matchBadgeOverlay}>
+              <Text style={styles.matchBadgeOverlayText} numberOfLines={1}>
+                🎯 {matchLabel}
+              </Text>
             </View>
           )}
 
@@ -228,15 +236,7 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
 
       {/* Content Details */}
       <View style={styles.content}>
-        {/* Match Label (Personalized for User) */}
-        {Boolean(matchLabel) && (
-          <View style={styles.matchBadge}>
-            <Sparkles size={10} color="#6C47FF" />
-            <Text style={styles.matchBadgeText} numberOfLines={1}>
-              {matchLabel}
-            </Text>
-          </View>
-        )}
+
 
         {/* Title */}
         <Text style={styles.title} numberOfLines={2}>
@@ -526,22 +526,24 @@ const styles = StyleSheet.create({
   actionBtnSaved: {
     backgroundColor: '#EEF2FF',
   },
-  matchBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F5F3FF',
-    borderWidth: 1,
-    borderColor: '#DDD6FE',
-    borderRadius: 8,
+  matchBadgeOverlay: {
+    backgroundColor: '#F59E0B',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    alignSelf: 'flex-start',
-    marginBottom: 6,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  matchBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#6C47FF',
+  matchBadgeOverlayText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });

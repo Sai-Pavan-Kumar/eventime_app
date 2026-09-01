@@ -6,6 +6,7 @@ export interface CategoryMeta {
 
 export const CATEGORIES_LIST = [
   'AI Event',
+  'Alumni Event',
   'Auto & EV Expo',
   'Awards Night',
   'Career Event',
@@ -18,7 +19,9 @@ export const CATEGORIES_LIST = [
   'Conference',
   'Creator Meetup',
   'Developer Event',
+  'Educational Fair',
   'Exhibition',
+  'Expo',
   'Film Festival',
   'Fitness Event',
   'Food Festival',
@@ -27,6 +30,7 @@ export const CATEGORIES_LIST = [
   'Hackathon',
   'Investor Event',
   'Music Festival',
+  'Networking Event',
   'Open Mic',
   'Pet Event',
   'Running Event',
@@ -41,6 +45,7 @@ export const CATEGORIES_LIST = [
 
 export const CATEGORY_CONFIG: Record<string, { accentColor: string; bgLight: string; dateColor: string }> = {
   'ai-event': { accentColor: '#7C3AED', bgLight: '#F5F3FF', dateColor: '#7C3AED' },
+  'alumni-event': { accentColor: '#4F46E5', bgLight: '#EEF2FF', dateColor: '#4F46E5' },
   'auto-ev-expo': { accentColor: '#06B6D4', bgLight: '#ECFEFF', dateColor: '#06B6D4' },
   'awards-night': { accentColor: '#EAB308', bgLight: '#FEFCE8', dateColor: '#EAB308' },
   'career-event': { accentColor: '#0EA5E9', bgLight: '#F0F9FF', dateColor: '#0EA5E9' },
@@ -54,7 +59,9 @@ export const CATEGORY_CONFIG: Record<string, { accentColor: string; bgLight: str
   'creator-meetup': { accentColor: '#F97316', bgLight: '#FFF7ED', dateColor: '#F97316' },
   'default-event': { accentColor: '#6C47FF', bgLight: '#EEF0FF', dateColor: '#6C47FF' },
   'developer-event': { accentColor: '#2563EB', bgLight: '#EFF6FF', dateColor: '#2563EB' },
+  'educational-fair': { accentColor: '#0EA5E9', bgLight: '#F0F9FF', dateColor: '#0EA5E9' },
   'exhibition': { accentColor: '#EC4899', bgLight: '#FDF2F8', dateColor: '#EC4899' },
+  'expo': { accentColor: '#06B6D4', bgLight: '#ECFEFF', dateColor: '#06B6D4' },
   'film-festival': { accentColor: '#DC2626', bgLight: '#FEF2F2', dateColor: '#DC2626' },
   'fitness-event': { accentColor: '#16A34A', bgLight: '#F0FDF4', dateColor: '#22C55E' },
   'food-festival': { accentColor: '#EA580C', bgLight: '#FFF7ED', dateColor: '#F59E0B' },
@@ -63,6 +70,7 @@ export const CATEGORY_CONFIG: Record<string, { accentColor: string; bgLight: str
   'hackathon': { accentColor: '#4F46E5', bgLight: '#EEF2FF', dateColor: '#3B82F6' },
   'investor-event': { accentColor: '#059669', bgLight: '#ECFDF5', dateColor: '#10B981' },
   'music-festival': { accentColor: '#C026D3', bgLight: '#FDF4FF', dateColor: '#8B5CF6' },
+  'networking-event': { accentColor: '#14B8A6', bgLight: '#F0FDFA', dateColor: '#14B8A6' },
   'open-mic': { accentColor: '#D97706', bgLight: '#FFFBEB', dateColor: '#FB923C' },
   'pet-event': { accentColor: '#0D9488', bgLight: '#F0FDFA', dateColor: '#10B981' },
   'running-event': { accentColor: '#16A34A', bgLight: '#F0FDF4', dateColor: '#F97316' },

@@ -55,6 +55,7 @@ export default function AdminScreen() {
 
   // Settings
   const [leaderboardEnabled, setLeaderboardEnabled] = useState(true);
+  const [featuredEnabled, setFeaturedEnabled] = useState(true);
 
   // Data lists
   const [events, setEvents] = useState<EventRow[]>([]);
@@ -93,7 +94,7 @@ export default function AdminScreen() {
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
         supabase.from('event_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('platform_feedback').select('id', { count: 'exact', head: true }),
-        supabase.from('app_settings').select('leaderboard_enabled').eq('id', 1).maybeSingle(),
+        supabase.from('app_settings').select('leaderboard_enabled, featured_enabled').eq('id', 1).maybeSingle(),
       ]);
 
       setStats({
@@ -104,8 +105,13 @@ export default function AdminScreen() {
         feedbackCount: feedbackCount || 0,
       });
 
-      if (settings?.leaderboard_enabled !== undefined) {
-        setLeaderboardEnabled(settings.leaderboard_enabled);
+      if (settings) {
+        if (settings.leaderboard_enabled !== undefined) {
+          setLeaderboardEnabled(settings.leaderboard_enabled);
+        }
+        if (settings.featured_enabled !== undefined) {
+          setFeaturedEnabled(settings.featured_enabled);
+        }
       }
     } catch (e) {
       console.error('[AdminScreen] Stats load error:', e);
@@ -291,6 +297,15 @@ export default function AdminScreen() {
     }
   };
 
+  const handleToggleFeaturedSetting = async (val: boolean) => {
+    try {
+      setFeaturedEnabled(val);
+      await supabase.from('app_settings').update({ featured_enabled: val }).eq('id', 1);
+    } catch (e) {
+      console.error('Toggle featured error:', e);
+    }
+  };
+
   const handleToggleUserRole = async (targetUser: ProfileRow) => {
     const newRole = targetUser.role === 'admin' ? 'user' : 'admin';
     Alert.alert(
@@ -339,9 +354,53 @@ export default function AdminScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
+            const { data: report } = await supabase
+              .from("event_reports")
+              .select("curator_id, event_id")
+              .eq("id", reportId)
+              .single();
+
+            if (!report?.curator_id || !report?.event_id) {
+              Alert.alert('Error', 'Report not found.');
+              return;
+            }
+
+            const { count: alreadyResolvedCount } = await supabase
+              .from("event_reports")
+              .select("id", { count: "exact", head: true })
+              .eq("event_id", report.event_id)
+              .eq("status", "resolved");
+
             await supabase.from('events').update({ status: 'rejected', admin_notes: 'Taken down due to user reports' }).eq('id', eventId);
             await supabase.from('event_reports').update({ status: 'resolved' }).eq('id', reportId);
-            Alert.alert('Resolved', 'Event taken down and report resolved.');
+
+            if ((alreadyResolvedCount ?? 0) > 0) {
+              Alert.alert('Resolved', 'Event taken down. Penalty already applied earlier.');
+              loadData();
+              return;
+            }
+
+            const { data: allReports } = await supabase
+              .from("event_reports")
+              .select("reporter_id, reporter:profiles!event_reports_reporter_id_fkey(et_score)")
+              .eq("event_id", report.event_id);
+
+            const trustedReporterIds = new Set(
+              (allReports || [])
+                .filter((r: any) => (r.reporter?.et_score ?? 0) >= 150 && r.reporter_id)
+                .map((r: any) => r.reporter_id)
+            );
+
+            if (trustedReporterIds.size < 5) {
+              Alert.alert('Resolved', `Event taken down, but penalty needs 5+ trusted reporters (currently ${trustedReporterIds.size}).`);
+            } else {
+              await supabase.rpc('apply_leaderboard_penalty', {
+                p_user_id: report.curator_id,
+                p_amount: 25
+              });
+              Alert.alert('Resolved', 'Event taken down and -25 penalty applied to curator.');
+            }
+            
             loadData();
           } catch (e: any) {
             Alert.alert('Error', e?.message || 'Failed to take down.');
@@ -521,6 +580,20 @@ export default function AdminScreen() {
                     <Switch
                       value={leaderboardEnabled}
                       onValueChange={handleToggleLeaderboardSetting}
+                      trackColor={{ false: theme.colors.border, true: theme.colors.brand }}
+                    />
+                  </View>
+
+                  <View style={[styles.controlRow, { marginTop: 16 }]}>
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <Text style={styles.controlTitle}>Featured Events Carousel</Text>
+                      <Text style={styles.controlSubtitle}>
+                        Show or hide the featured events carousel on the home screen.
+                      </Text>
+                    </View>
+                    <Switch
+                      value={featuredEnabled}
+                      onValueChange={handleToggleFeaturedSetting}
                       trackColor={{ false: theme.colors.border, true: theme.colors.brand }}
                     />
                   </View>

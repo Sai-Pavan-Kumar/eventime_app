@@ -32,6 +32,7 @@ export default function SearchScreen() {
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [priceFilter, setPriceFilter] = useState<'all' | 'free' | 'paid'>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'tomorrow' | 'weekend'>('all');
 
   const [events, setEvents] = useState<EventRow[]>([]);
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(new Set());
@@ -90,13 +91,28 @@ export default function SearchScreen() {
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
 
       const activeEvents = ((data as any[]) || []).filter((ev) => {
         const parsed = parseEventDateString(ev.date_string || '');
         if (!parsed) return true;
+        
         const evDate = new Date(parsed);
         evDate.setHours(0, 0, 0, 0);
-        return evDate.getTime() >= today.getTime();
+        
+        if (evDate.getTime() < today.getTime()) return false;
+
+        if (dateFilter === 'today') {
+          return evDate.getTime() === today.getTime();
+        } else if (dateFilter === 'tomorrow') {
+          return evDate.getTime() === tomorrow.getTime();
+        } else if (dateFilter === 'weekend') {
+          const day = evDate.getDay();
+          return day === 0 || day === 6;
+        }
+
+        return true;
       });
 
       setEvents(activeEvents);
@@ -105,7 +121,7 @@ export default function SearchScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [keyword, selectedCity, selectedCategory, priceFilter]);
+  }, [keyword, selectedCity, selectedCategory, priceFilter, dateFilter]);
 
   useEffect(() => {
     fetchSavedEventIds();
@@ -124,6 +140,7 @@ export default function SearchScreen() {
     setSelectedCity(null);
     setSelectedCategory(null);
     setPriceFilter('all');
+    setDateFilter('all');
   };
 
   return (
@@ -154,13 +171,27 @@ export default function SearchScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterScroll}
         >
-          {/* Price Filters */}
+          {/* Date Filters */}
           <TouchableOpacity
-            style={[styles.chip, priceFilter === 'all' && styles.chipActive]}
-            onPress={() => setPriceFilter('all')}
+            style={[styles.chip, dateFilter === 'today' && styles.chipActive]}
+            onPress={() => setDateFilter(dateFilter === 'today' ? 'all' : 'today')}
           >
-            <Text style={[styles.chipText, priceFilter === 'all' && styles.chipTextActive]}>All</Text>
+            <Text style={[styles.chipText, dateFilter === 'today' && styles.chipTextActive]}>Today</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.chip, dateFilter === 'tomorrow' && styles.chipActive]}
+            onPress={() => setDateFilter(dateFilter === 'tomorrow' ? 'all' : 'tomorrow')}
+          >
+            <Text style={[styles.chipText, dateFilter === 'tomorrow' && styles.chipTextActive]}>Tomorrow</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.chip, dateFilter === 'weekend' && styles.chipActive]}
+            onPress={() => setDateFilter(dateFilter === 'weekend' ? 'all' : 'weekend')}
+          >
+            <Text style={[styles.chipText, dateFilter === 'weekend' && styles.chipTextActive]}>Weekend</Text>
+          </TouchableOpacity>
+
+          {/* Price Filters */}
           <TouchableOpacity
             style={[styles.chip, priceFilter === 'free' && styles.chipActive]}
             onPress={() => setPriceFilter(priceFilter === 'free' ? 'all' : 'free')}
@@ -248,7 +279,7 @@ export default function SearchScreen() {
                   ? 'Try searching with different keywords, colleges, or reset your filters.'
                   : 'Find hackathons, summits, campus fests, comedy shows & workshops in seconds.'}
               </Text>
-              {(keyword || selectedCategory || selectedCity || priceFilter !== 'all') && (
+              {(keyword || selectedCategory || selectedCity || priceFilter !== 'all' || dateFilter !== 'all') && (
                 <TouchableOpacity style={styles.resetBtn} onPress={clearFilters}>
                   <Text style={styles.resetBtnText}>Clear All Filters</Text>
                 </TouchableOpacity>

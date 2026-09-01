@@ -38,7 +38,7 @@ import { theme } from '../config/theme';
 import { CATEGORIES_LIST } from '../lib/category-config';
 import { CITIES } from '../lib/constants/cities';
 import { INDIAN_COLLEGE_BRANCHES } from '../lib/constants/branches';
-import { CAREER_GOALS } from '../lib/constants/goals';
+import { CATEGORY_TEMPLATES, teamOptions } from '../lib/constants/event-options';
 import { uploadEventPoster } from '../lib/storage';
 import type { RootStackParamList } from '../types';
 
@@ -71,7 +71,6 @@ export default function CreateEventScreen() {
   const [teamSize, setTeamSize] = useState(initialEvent?.team_size || 'Solo');
   const [posterUri, setPosterUri] = useState<string | null>(initialEvent?.poster_url || null);
   const [isFeatured, setIsFeatured] = useState(initialEvent?.is_featured || false);
-  const [goalTags, setGoalTags] = useState<string[]>(initialEvent?.goal_tags || []);
 
   // College & Campus event settings
   const [collegeOnly, setCollegeOnly] = useState(initialEvent?.college_only || false);
@@ -153,7 +152,6 @@ export default function CreateEventScreen() {
           setTeamSize(data.team_size || 'Solo');
           setPosterUri(data.poster_url || null);
           setIsFeatured(data.is_featured || false);
-          setGoalTags(data.goal_tags || []);
           setCollegeOnly(data.college_only || false);
           setCollegeName((data as any).colleges?.name || '');
           setCollegeId(data.college_id || null);
@@ -248,13 +246,7 @@ export default function CreateEventScreen() {
     }
   };
 
-  const toggleGoalTag = (goal: string) => {
-    if (goalTags.includes(goal)) {
-      setGoalTags(goalTags.filter((g) => g !== goal));
-    } else {
-      setGoalTags([...goalTags, goal]);
-    }
-  };
+
 
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -346,7 +338,7 @@ export default function CreateEventScreen() {
         team_size: teamSize,
         poster_url: finalPosterUrl,
         is_featured: isAdmin ? isFeatured : false,
-        goal_tags: goalTags.length > 0 ? goalTags : null,
+        goal_tags: null,
         college_only: isCollegeCategory && collegeId ? collegeOnly : false,
         college_id: isCollegeCategory ? collegeId : null,
         college_name: isCollegeCategory ? collegeName : null,
@@ -544,7 +536,12 @@ export default function CreateEventScreen() {
                 <TouchableOpacity
                   key={cat}
                   style={[styles.chip, isSelected && styles.chipActive]}
-                  onPress={() => setCategory(cat)}
+                  onPress={() => {
+                    setCategory(cat);
+                    if (!description || Object.values(CATEGORY_TEMPLATES).includes(description)) {
+                      setDescription(CATEGORY_TEMPLATES[cat] || '');
+                    }
+                  }}
                 >
                   <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>{cat}</Text>
                 </TouchableOpacity>
@@ -553,27 +550,7 @@ export default function CreateEventScreen() {
           </ScrollView>
         </View>
 
-        {/* Goal / Interest Tags Picker */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Event Goals & Topics (Select multiple)</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalChips}>
-            {CAREER_GOALS.map((goal) => {
-              const isSelected = goalTags.includes(goal);
-              return (
-                <TouchableOpacity
-                  key={goal}
-                  style={[styles.goalChip, isSelected && styles.goalChipActive]}
-                  onPress={() => toggleGoalTag(goal)}
-                >
-                  <Sparkles size={12} color={isSelected ? '#FFFFFF' : '#6C47FF'} />
-                  <Text style={[styles.goalChipText, isSelected && styles.goalChipTextActive]}>
-                    {goal}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+
 
         {/* College & Campus Event Section */}
         {(category === 'Campus' || category === 'College Fests' || category === 'Hackathons' || collegeId) && (
@@ -890,13 +867,20 @@ export default function CreateEventScreen() {
         {/* Team Size */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Team Size</Text>
-          <TextInput
-            style={styles.inputPlain}
-            placeholder="e.g. Solo / 2-4 Members / Unlimited"
-            placeholderTextColor={theme.colors.textMuted}
-            value={teamSize}
-            onChangeText={setTeamSize}
-          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalChips}>
+            {teamOptions.map((opt) => {
+              const isSelected = teamSize === opt;
+              return (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.chip, isSelected && styles.chipActive]}
+                  onPress={() => setTeamSize(opt)}
+                >
+                  <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>{opt}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {/* Admin Feature Toggle */}

@@ -98,6 +98,12 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(!homeEventsCache);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Pagination states
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const PAGE_SIZE = 15;
+
   // Filter Modals
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showCityModal, setShowCityModal] = useState(false);
@@ -144,15 +150,21 @@ export default function HomeScreen() {
     }
   }, [user]);
 
-  const fetchEvents = useCallback(async (forceRefresh = false) => {
+  const fetchEvents = useCallback(async (pageIndex = 0, forceRefresh = false) => {
     try {
+      if (pageIndex === 0 && !forceRefresh) setIsLoading(true);
+
+      const from = pageIndex * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
       // 1. Fetch public approved events (strictly exclude college-only events)
       let query = supabase
         .from('events')
         .select('*, colleges(name), profiles(username, full_name), interested_events(count)')
         .eq('status', 'approved')
         .or('college_only.is.null,college_only.eq.false')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (selectedCategory) {
         query = query.eq('category', selectedCategory);
@@ -170,11 +182,21 @@ export default function HomeScreen() {
       }
 
       const rawEvents = (data as any[]) || [];
-      setEvents(rawEvents);
-      homeEventsCache = { allEvents: rawEvents, timestamp: Date.now() };
+      
+      if (rawEvents.length < PAGE_SIZE) {
+        setHasMore(false);
+      } else {
+        setHasMore(true);
+      }
 
-      // 2. If student, fetch their private campus events
-      if (user && profile?.user_type === 'student' && profile?.college_id) {
+      setEvents((prev) => {
+        const next = pageIndex === 0 ? rawEvents : [...prev, ...rawEvents];
+        homeEventsCache = { allEvents: next, timestamp: Date.now() };
+        return next;
+      });
+
+      // 2. If student, fetch their private campus events (only on first page load for simplicity, or handle similarly)
+      if (pageIndex === 0 && user && profile?.user_type === 'student' && profile?.college_id) {
         const todayStr = new Date().toISOString().substring(0, 10);
         const { data: cEvents } = await supabase
           .from('events')
@@ -193,20 +215,33 @@ export default function HomeScreen() {
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
+      setIsFetchingMore(false);
     }
   }, [selectedCategory, selectedCity, user, profile]);
+
+  const loadMoreEvents = () => {
+    if (!hasMore || isFetchingMore || isLoading || isRefreshing) return;
+    setIsFetchingMore(true);
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchEvents(nextPage);
+  };
 
   useEffect(() => {
     if (!homeEventsCache) {
       setIsLoading(true);
     }
-    fetchEvents();
+    setPage(0);
+    setHasMore(true);
+    fetchEvents(0);
     fetchSavedEventIds();
   }, [fetchEvents, fetchSavedEventIds]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
-    fetchEvents(true);
+    setPage(0);
+    setHasMore(true);
+    fetchEvents(0, true);
     fetchSavedEventIds();
   };
 
@@ -585,6 +620,15 @@ export default function HomeScreen() {
               colors={[theme.colors.brand]}
               tintColor={theme.colors.brand}
             />
+          }
+          onEndReached={loadMoreEvents}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            isFetchingMore ? (
+              <View style={{ paddingVertical: 20 }}>
+                <ActivityIndicator size="small" color={theme.colors.brand} />
+              </View>
+            ) : null
           }
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}

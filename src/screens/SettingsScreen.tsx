@@ -90,8 +90,8 @@ export default function SettingsScreen() {
         college: userType === 'student' ? college.trim() || null : null,
         branch: userType === 'student' ? branch : null,
         graduation_year: userType === 'student' ? graduationYear : null,
-        preferred_cities: preferredCities,
-        goals: goals,
+        preferred_cities: preferredCities.slice(0, 3),
+        goals: goals.slice(0, 6),
         updated_at: new Date().toISOString(),
       };
 
