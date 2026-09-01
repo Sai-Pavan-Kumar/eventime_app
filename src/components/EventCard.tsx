@@ -7,7 +7,7 @@ import { getCategoryConfig } from '../lib/category-config';
 import { getCategoryPoster } from '../lib/asset-registry';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { parseEventDateString } from '../lib/utils/date';
+import { parseEventDateString, formatEventTime } from '../lib/utils/date';
 import type { EventRow } from '../types';
 
 interface EventCardProps {
@@ -198,7 +198,7 @@ export const EventCard: React.FC<EventCardProps> = ({
           <View style={styles.timeSection}>
             <Clock size={13} color="#94A3B8" />
             <Text style={styles.infoText} numberOfLines={1}>
-              {event.date_string?.includes('·') ? event.date_string.split('·')[1].trim() : 'TBA'}
+              {formatEventTime(event.date_string, event.start_time)}
             </Text>
             {Boolean(event.interested_count && event.interested_count > 0) && (
               <>
