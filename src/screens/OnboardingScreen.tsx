@@ -404,7 +404,7 @@ export default function OnboardingScreen() {
           )}
 
           {/* =========================================================================
-              STEP 2: What can you explore?
+              STEP 2: Never Miss Out
              ========================================================================= */}
           {step === 2 && (
             <View style={styles.screenWrapper}>
@@ -418,15 +418,15 @@ export default function OnboardingScreen() {
                 <Text style={styles.placeholderLabel}>1:1 Image</Text>
               </View>
 
-              <Text style={styles.headlineText}>What can you explore?</Text>
+              <Text style={styles.headlineText}>Never Miss Out</Text>
               <Text style={styles.subheadlineText}>
-                Hackathons, campus fests, concerts, tech summits & meetups — all in one place.
+                Save events, track deadlines, and get instant updates so you're always in the loop.
               </Text>
             </View>
           )}
 
           {/* =========================================================================
-              STEP 3: Tell us who you are (ONLY 2 OPTIONS: Student or Non-Student)
+              STEP 3: Tell us who you are (Simple Chips: Student / Explorer)
              ========================================================================= */}
           {step === 3 && (
             <View style={styles.screenWrapper}>
@@ -442,53 +442,39 @@ export default function OnboardingScreen() {
 
               <Text style={styles.headlineText}>Tell us who you are</Text>
               <Text style={styles.subheadlineText}>
-                Choose your profile to unlock customized campus or city feeds.
+                Choose your profile to calibrate your feed.
               </Text>
 
-              {/* 2 Persona Cards */}
-              <View style={styles.personaContainer}>
+              {/* 2 Simple Persona Chips */}
+              <View style={styles.personaChipRow}>
                 <TouchableOpacity
-                  style={[styles.personaCard, userType === 'student' && styles.personaCardActive]}
+                  style={[styles.personaChip, userType === 'student' && styles.personaChipActive]}
                   onPress={() => setUserType('student')}
                   activeOpacity={0.85}
                 >
-                  <View style={[styles.personaIconContainer, userType === 'student' && styles.personaIconContainerActive]}>
-                    <GraduationCap size={22} color={userType === 'student' ? '#FFFFFF' : '#6C47FF'} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.personaCardTitle, userType === 'student' && styles.personaCardTitleActive]}>
-                      College Student
-                    </Text>
-                    <Text style={styles.personaCardSubtitle}>
-                      Unlocks Your Campus feed, inter-college fests & student perks
-                    </Text>
-                  </View>
+                  <GraduationCap size={20} color={userType === 'student' ? '#FFFFFF' : '#6C47FF'} />
+                  <Text style={[styles.personaChipText, userType === 'student' && styles.personaChipTextActive]}>
+                    Student
+                  </Text>
                   {userType === 'student' && (
-                    <View style={styles.checkBadge}>
-                      <Check size={13} color="#FFFFFF" />
+                    <View style={styles.chipCheckBadge}>
+                      <Check size={12} color="#FFFFFF" />
                     </View>
                   )}
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.personaCard, userType === 'professional' && styles.personaCardActive]}
+                  style={[styles.personaChip, userType === 'professional' && styles.personaChipActive]}
                   onPress={() => setUserType('professional')}
                   activeOpacity={0.85}
                 >
-                  <View style={[styles.personaIconContainer, userType === 'professional' && styles.personaIconContainerActive]}>
-                    <Briefcase size={22} color={userType === 'professional' ? '#FFFFFF' : '#6C47FF'} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.personaCardTitle, userType === 'professional' && styles.personaCardTitleActive]}>
-                      Working Professional & Explorer
-                    </Text>
-                    <Text style={styles.personaCardSubtitle}>
-                      Unlocks For You & Around You tech summits, conferences & meetups
-                    </Text>
-                  </View>
+                  <Briefcase size={20} color={userType === 'professional' ? '#FFFFFF' : '#6C47FF'} />
+                  <Text style={[styles.personaChipText, userType === 'professional' && styles.personaChipTextActive]}>
+                    Explorer
+                  </Text>
                   {userType === 'professional' && (
-                    <View style={styles.checkBadge}>
-                      <Check size={13} color="#FFFFFF" />
+                    <View style={styles.chipCheckBadge}>
+                      <Check size={12} color="#FFFFFF" />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -939,60 +925,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 18,
   },
-  personaContainer: {
+  personaChipRow: {
     width: '100%',
+    flexDirection: 'row',
     gap: 12,
-    marginTop: 6,
+    marginTop: 8,
   },
-  personaCard: {
+  personaChip: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 16,
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+    paddingVertical: 16,
     borderRadius: 18,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
   },
-  personaCardActive: {
+  personaChipActive: {
     borderColor: '#6C47FF',
-    backgroundColor: '#FAF8FF',
-  },
-  personaIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  personaIconContainerActive: {
     backgroundColor: '#6C47FF',
   },
-  personaCardTitle: {
+  personaChipText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#334155',
   },
-  personaCardTitleActive: {
-    color: '#6C47FF',
+  personaChipTextActive: {
+    color: '#FFFFFF',
   },
-  personaCardSubtitle: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 3,
-    lineHeight: 15,
-  },
-  checkBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#6C47FF',
+  chipCheckBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
