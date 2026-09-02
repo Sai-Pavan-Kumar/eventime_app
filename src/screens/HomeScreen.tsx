@@ -31,6 +31,8 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
+import { SmartRatingModal } from '../components/SmartRatingModal';
+import { shouldShowRatingPrompt } from '../lib/rating-prompt';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { parseEventDateString } from '../lib/utils/date';
 import type { EventRow, RootStackParamList } from '../types';
@@ -92,9 +94,22 @@ export default function HomeScreen() {
 
   // Calendar modal state
   const [showDateModal, setShowDateModal] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
   const [eventDates, setEventDates] = useState<Set<string>>(new Set());
+
+  // 5-Day Smart Rating Prompt Trigger
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      const shouldPrompt = await shouldShowRatingPrompt();
+      if (shouldPrompt) {
+        setShowRatingModal(true);
+      }
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const [events, setEvents] = useState<EventRow[]>(homeEventsCache?.allEvents || []);
   const [campusEvents, setCampusEvents] = useState<EventRow[]>([]);
@@ -739,6 +754,12 @@ export default function HomeScreen() {
           </View>
         </View>
       )}
+
+      {/* 5-Day Smart In-App Rating Gate */}
+      <SmartRatingModal
+        visible={showRatingModal}
+        onClose={() => setShowRatingModal(false)}
+      />
 
     </SafeAreaView>
   );
