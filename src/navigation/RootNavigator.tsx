@@ -4,7 +4,12 @@ import { NavigationContainer, createNavigationContainerRef } from '@react-naviga
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from '../context/AuthContext';
-import { registerForPushNotificationsAsync } from '../lib/notifications';
+import {
+  registerForPushNotificationsAsync,
+  handleNotificationResponse,
+  checkColdStartNotification,
+  setupPushTokenRefreshListener,
+} from '../lib/notifications';
 import { MainTabNavigator } from './MainTabNavigator';
 import LoginScreen from '../screens/LoginScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
@@ -36,19 +41,37 @@ export function RootNavigator() {
     });
   }, []);
 
-  // Register for push notifications and listen for responses/deep-links
+  // Register for push notifications, refresh listener, and listen for responses/deep-links
   useEffect(() => {
     registerForPushNotificationsAsync(user?.id);
+    const tokenRefreshSub = setupPushTokenRefreshListener(user?.id);
 
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data;
-      if (data?.eventId && navigationRef.isReady()) {
-        (navigationRef as any).navigate('EventDetail', { eventId: data.eventId });
+    // 1. Listen for notification taps when app is in foreground or background
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      if (navigationRef.isReady()) {
+        handleNotificationResponse(navigationRef, response);
       }
     });
 
+    // 2. Check if app was launched directly from a notification tap (Cold start)
+    if (navigationRef.isReady()) {
+      checkColdStartNotification(navigationRef);
+    } else {
+      const timer = setTimeout(() => {
+        if (navigationRef.isReady()) {
+          checkColdStartNotification(navigationRef);
+        }
+      }, 1000);
+      return () => {
+        clearTimeout(timer);
+        responseSub.remove();
+        tokenRefreshSub.remove();
+      };
+    }
+
     return () => {
-      subscription.remove();
+      responseSub.remove();
+      tokenRefreshSub.remove();
     };
   }, [user?.id]);
 

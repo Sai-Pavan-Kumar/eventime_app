@@ -5,6 +5,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 
 const PUSH_TOKEN_KEY = '@eventime_push_token';
+const NOTIF_PREFS_KEY = '@eventime_notif_prefs';
+
+export interface NotificationPreferences {
+  event_reminders: boolean;
+  campus_alerts: boolean;
+  city_updates: boolean;
+  weekly_digest: boolean;
+}
+
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  event_reminders: true,
+  campus_alerts: true,
+  city_updates: true,
+  weekly_digest: false,
+};
 
 // 1. Configure foreground notification behavior
 Notifications.setNotificationHandler({
@@ -45,6 +60,15 @@ export async function setupNotificationChannels(): Promise<void> {
       vibrationPattern: [0, 300, 200, 300],
       lightColor: '#3B82F6',
     });
+
+    await Notifications.setNotificationChannelAsync('city-updates', {
+      name: 'City Events',
+      description: 'New events trending in your preferred cities',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      sound: 'default',
+      vibrationPattern: [0, 200, 200, 200],
+      lightColor: '#10B981',
+    });
   }
 }
 
@@ -54,7 +78,7 @@ export async function registerForPushNotificationsAsync(userId?: string): Promis
     await setupNotificationChannels();
 
     if (!Device.isDevice) {
-      console.log('[Notifications] Must use physical device for Push Notifications');
+      console.log('[Notifications] Physical device required for remote push tokens.');
       return null;
     }
 
@@ -103,7 +127,119 @@ export async function registerForPushNotificationsAsync(userId?: string): Promis
   }
 }
 
-// 4. Schedule a local reminder for an event (e.g. 24h before event starts)
+// 4. Token Refresh Listener
+export function setupPushTokenRefreshListener(userId?: string) {
+  return Notifications.addPushTokenListener(async (tokenData) => {
+    const token = tokenData.data;
+    if (token) {
+      await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
+      if (userId) {
+        try {
+          await supabase
+            .from('profiles')
+            .update({ push_token: token } as any)
+            .eq('id', userId);
+        } catch (err) {
+          console.warn('[Notifications] Failed to update refreshed push token:', err);
+        }
+      }
+    }
+  });
+}
+
+// 5. Get Saved or Active Push Token
+export async function getCachedPushToken(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(PUSH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+// 6. Notification Preferences Management
+export async function getNotificationPreferences(userId?: string): Promise<NotificationPreferences> {
+  try {
+    // 1. Try local storage first
+    const local = await AsyncStorage.getItem(NOTIF_PREFS_KEY);
+    let prefs: NotificationPreferences = local ? JSON.parse(local) : DEFAULT_NOTIFICATION_PREFERENCES;
+
+    // 2. If logged in, sync with Supabase profile
+    if (userId) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('notification_preferences')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (data && (data as any).notification_preferences) {
+        prefs = { ...prefs, ...(data as any).notification_preferences };
+        await AsyncStorage.setItem(NOTIF_PREFS_KEY, JSON.stringify(prefs));
+      }
+    }
+
+    return prefs;
+  } catch (err) {
+    console.warn('[Notifications] Error fetching notification preferences:', err);
+    return DEFAULT_NOTIFICATION_PREFERENCES;
+  }
+}
+
+export async function saveNotificationPreferences(
+  preferences: NotificationPreferences,
+  userId?: string
+): Promise<boolean> {
+  try {
+    await AsyncStorage.setItem(NOTIF_PREFS_KEY, JSON.stringify(preferences));
+
+    if (userId) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ notification_preferences: preferences } as any)
+        .eq('id', userId);
+
+      if (error) {
+        console.warn('[Notifications] Supabase preferences update error:', error);
+      }
+    }
+
+    return true;
+  } catch (err) {
+    console.error('[Notifications] Error saving notification preferences:', err);
+    return false;
+  }
+}
+
+// 7. Universal Notification Navigation Handler (Deep Linking)
+export function handleNotificationResponse(navigation: any, response: Notifications.NotificationResponse) {
+  try {
+    const data = response.notification.request.content.data;
+    if (!data) return;
+
+    if (data.eventId) {
+      navigation.navigate('EventDetail', { eventId: data.eventId });
+    } else if (data.city) {
+      navigation.navigate('CityEvents', { city: data.city });
+    } else if (data.screen) {
+      navigation.navigate(data.screen, data.params || {});
+    }
+  } catch (err) {
+    console.warn('[Notifications] Error handling notification navigation:', err);
+  }
+}
+
+// 8. Cold-Start Notification Check (When app opened directly from killed state via notification tap)
+export async function checkColdStartNotification(navigation: any) {
+  try {
+    const lastResponse = await Notifications.getLastNotificationResponseAsync();
+    if (lastResponse) {
+      handleNotificationResponse(navigation, lastResponse);
+    }
+  } catch (err) {
+    console.warn('[Notifications] Error checking cold start notification:', err);
+  }
+}
+
+// 9. Schedule a local reminder for an event (e.g. 24h before event starts)
 export async function scheduleEventReminder(event: {
   id: string;
   title: string;
@@ -152,7 +288,7 @@ export async function scheduleEventReminder(event: {
   }
 }
 
-// 5. Cancel a scheduled notification
+// 10. Cancel a scheduled notification
 export async function cancelScheduledReminder(notificationId: string): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(notificationId);
@@ -160,3 +296,4 @@ export async function cancelScheduledReminder(notificationId: string): Promise<v
     console.warn('[Notifications] Error cancelling reminder:', err);
   }
 }
+

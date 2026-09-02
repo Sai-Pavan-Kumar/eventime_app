@@ -8,16 +8,23 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, CheckCircle2, Save, MapPin, User, Building, GraduationCap, Lock } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Save, MapPin, User, Building, GraduationCap, Lock, Bell, Sparkles } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { CITIES } from '../lib/constants/cities';
 import { CATEGORIES_LIST, getCategoryMeta } from '../lib/category-config';
 import { INDIAN_COLLEGE_BRANCHES } from '../lib/constants/branches';
+import {
+  getNotificationPreferences,
+  saveNotificationPreferences,
+  type NotificationPreferences,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+} from '../lib/notifications';
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
@@ -32,7 +39,16 @@ export default function SettingsScreen() {
 
   const [preferredCities, setPreferredCities] = useState<string[]>(profile?.preferred_cities || []);
   const [goals, setGoals] = useState<string[]>(profile?.goals || []);
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    getNotificationPreferences(user?.id).then(setNotifPrefs);
+  }, [user?.id]);
+
+  const toggleNotifPref = (key: keyof NotificationPreferences) => {
+    setNotifPrefs((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const toggleCity = (city: string) => {
     if (preferredCities.includes(city)) {
@@ -97,6 +113,8 @@ export default function SettingsScreen() {
 
       const { error } = await supabase.from('profiles').update(payload).eq('id', user.id);
       if (error) throw error;
+
+      await saveNotificationPreferences(notifPrefs, user.id);
 
       await refreshProfile();
       Alert.alert('Success', 'Profile settings updated successfully!', [
@@ -329,6 +347,69 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
               );
             })}
+          </View>
+        </View>
+
+        {/* Push Notification Preferences */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Push Notifications</Text>
+            <Bell size={18} color={theme.colors.brand} />
+          </View>
+          <Text style={styles.sectionSubtitle}>
+            Configure what alerts you receive on this device.
+          </Text>
+
+          <View style={styles.notifRow}>
+            <View style={styles.notifTextContainer}>
+              <Text style={styles.notifTitle}>24h Event Reminders</Text>
+              <Text style={styles.notifDescription}>Get reminded 24h before saved or attending events start.</Text>
+            </View>
+            <Switch
+              value={notifPrefs.event_reminders}
+              onValueChange={() => toggleNotifPref('event_reminders')}
+              trackColor={{ false: theme.colors.border, true: theme.colors.brand }}
+              thumbColor="#FFF"
+            />
+          </View>
+
+          <View style={styles.notifRow}>
+            <View style={styles.notifTextContainer}>
+              <Text style={styles.notifTitle}>Campus & College Alerts</Text>
+              <Text style={styles.notifDescription}>Exclusive notices, hackathons & fests for your college.</Text>
+            </View>
+            <Switch
+              value={notifPrefs.campus_alerts}
+              onValueChange={() => toggleNotifPref('campus_alerts')}
+              trackColor={{ false: theme.colors.border, true: theme.colors.brand }}
+              thumbColor="#FFF"
+            />
+          </View>
+
+          <View style={styles.notifRow}>
+            <View style={styles.notifTextContainer}>
+              <Text style={styles.notifTitle}>City & Local Updates</Text>
+              <Text style={styles.notifDescription}>Alerts when new events drop in your preferred cities.</Text>
+            </View>
+            <Switch
+              value={notifPrefs.city_updates}
+              onValueChange={() => toggleNotifPref('city_updates')}
+              trackColor={{ false: theme.colors.border, true: theme.colors.brand }}
+              thumbColor="#FFF"
+            />
+          </View>
+
+          <View style={[styles.notifRow, { borderBottomWidth: 0 }]}>
+            <View style={styles.notifTextContainer}>
+              <Text style={styles.notifTitle}>Weekly Digest</Text>
+              <Text style={styles.notifDescription}>Top curated events delivered once every Friday morning.</Text>
+            </View>
+            <Switch
+              value={notifPrefs.weekly_digest}
+              onValueChange={() => toggleNotifPref('weekly_digest')}
+              trackColor={{ false: theme.colors.border, true: theme.colors.brand }}
+              thumbColor="#FFF"
+            />
           </View>
         </View>
 
@@ -621,6 +702,35 @@ const styles = StyleSheet.create({
   legalArrow: {
     fontSize: 20,
     color: theme.colors.textMuted,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  notifRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.borderLight,
+    gap: 12,
+  },
+  notifTextContainer: {
+    flex: 1,
+  },
+  notifTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+    marginBottom: 3,
+  },
+  notifDescription: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    lineHeight: 16,
   },
   deleteAccountBtn: {
     alignItems: 'center',
