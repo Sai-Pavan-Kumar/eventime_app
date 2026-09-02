@@ -30,6 +30,7 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
+  Plus,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -518,7 +519,7 @@ export default function OnboardingScreen() {
                 <Text style={styles.formLabel}>College / University Name</Text>
                 <TextInput
                   style={styles.formInput}
-                  placeholder="e.g. CBIT, IIT Hyderabad, VIT..."
+                  placeholder="Type to search (e.g. CBIT, IIT, VIT...)"
                   placeholderTextColor="#94A3B8"
                   value={collegeName}
                   onChangeText={(txt) => {
@@ -527,8 +528,8 @@ export default function OnboardingScreen() {
                   }}
                 />
 
-                {/* College Suggestions */}
-                {collegeSuggestions.length > 0 && (
+                {/* College Suggestions + Notion-style Add Option */}
+                {collegeName.trim().length >= 2 && (
                   <View style={styles.suggestionsBox}>
                     {collegeSuggestions.map((item) => (
                       <TouchableOpacity
@@ -546,23 +547,41 @@ export default function OnboardingScreen() {
                         </Text>
                       </TouchableOpacity>
                     ))}
+
+                    {/* Notion-style Add Custom College */}
+                    {!collegeSuggestions.some(
+                      (c) => c.name.toLowerCase() === collegeName.trim().toLowerCase()
+                    ) && (
+                      <TouchableOpacity
+                        style={[styles.suggestionItem, styles.addNewSuggestionItem]}
+                        onPress={() => {
+                          setSelectedCollegeId(null);
+                          setCollegeSuggestions([]);
+                        }}
+                      >
+                        <Plus size={14} color="#6C47FF" style={{ marginRight: 6 }} />
+                        <Text style={styles.addNewSuggestionText} numberOfLines={1}>
+                          Use "{collegeName.trim()}" (Add as new college)
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
               </View>
 
-              {/* Branch Selection (Search & Type) */}
+              {/* Branch Selection (Search & Type Only) */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Branch / Major</Text>
                 <TextInput
                   style={styles.formInput}
-                  placeholder="Type or search branch (e.g. CSE, AI & ML, ECE...)"
+                  placeholder="Type to search branch (e.g. CSE, Biotech, BBA...)"
                   placeholderTextColor="#94A3B8"
                   value={branch}
                   onChangeText={setBranch}
                 />
 
-                {/* Branch Suggestions */}
-                {branchSuggestions.length > 0 && branch.trim().length >= 1 && (
+                {/* Branch Suggestions + Custom Branch Option */}
+                {branch.trim().length >= 1 && (
                   <View style={styles.suggestionsBox}>
                     {branchSuggestions.map((b) => (
                       <TouchableOpacity
@@ -577,23 +596,24 @@ export default function OnboardingScreen() {
                         </Text>
                       </TouchableOpacity>
                     ))}
+
+                    {!INDIAN_COLLEGE_BRANCHES.some(
+                      (b) => b.toLowerCase() === branch.trim().toLowerCase()
+                    ) && (
+                      <TouchableOpacity
+                        style={[styles.suggestionItem, styles.addNewSuggestionItem]}
+                        onPress={() => {
+                          // keep custom typed branch
+                        }}
+                      >
+                        <Plus size={14} color="#6C47FF" style={{ marginRight: 6 }} />
+                        <Text style={styles.addNewSuggestionText} numberOfLines={1}>
+                          Use "{branch.trim()}"
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
-
-                {/* Quick Selection Pills */}
-                <View style={[styles.branchWrap, { marginTop: 8 }]}>
-                  {COMMON_BRANCHES.slice(0, 6).map((b) => (
-                    <TouchableOpacity
-                      key={b}
-                      style={[styles.branchPill, branch === b && styles.branchPillActive]}
-                      onPress={() => setBranch(b)}
-                    >
-                      <Text style={[styles.branchText, branch === b && styles.branchTextActive]}>
-                        {b}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
               </View>
 
               {/* Graduation Year */}
@@ -1045,30 +1065,13 @@ const styles = StyleSheet.create({
     color: '#1E293B',
     fontWeight: '600',
   },
-  branchWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
+  addNewSuggestionItem: {
+    backgroundColor: '#FAF8FF',
   },
-  branchPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  branchPillActive: {
-    backgroundColor: '#6C47FF',
-    borderColor: '#6C47FF',
-  },
-  branchText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  branchTextActive: {
-    color: '#FFFFFF',
+  addNewSuggestionText: {
+    fontSize: 13,
+    color: '#6C47FF',
+    fontWeight: '800',
   },
   yearWrap: {
     flexDirection: 'row',
