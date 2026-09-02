@@ -205,13 +205,13 @@ export default function OnboardingScreen() {
 
   const currentOnboardingData: OnboardingData = {
     userType,
-    fullName,
-    college: userType === 'student' ? collegeName : undefined,
+    fullName: fullName ? fullName.trim().slice(0, 50) : undefined,
+    college: userType === 'student' ? collegeName.trim().slice(0, 100) : undefined,
     collegeId: userType === 'student' ? selectedCollegeId : undefined,
-    branch: userType === 'student' ? branch : undefined,
+    branch: userType === 'student' ? branch.trim().slice(0, 60) : undefined,
     graduationYear: userType === 'student' ? graduationYear : undefined,
-    preferredCities,
-    goals: selectedCategories,
+    preferredCities: preferredCities.slice(0, 3),
+    goals: selectedCategories.slice(0, 6),
   };
 
   const handleNext = () => {
@@ -236,8 +236,14 @@ export default function OnboardingScreen() {
     }
     // Step 4 (Campus) -> 5 (Cities)
     if (step === 4) {
-      if (!collegeName.trim()) {
-        Alert.alert('College Required', 'Please enter your college name.');
+      const trimmedCollege = collegeName.trim();
+      if (!trimmedCollege || trimmedCollege.length < 2) {
+        Alert.alert('Invalid College', 'Please enter a valid college name (at least 2 characters).');
+        return;
+      }
+      const trimmedBranch = branch.trim();
+      if (!trimmedBranch || trimmedBranch.length < 2) {
+        Alert.alert('Invalid Branch', 'Please enter your branch / major.');
         return;
       }
       setStep(5);
