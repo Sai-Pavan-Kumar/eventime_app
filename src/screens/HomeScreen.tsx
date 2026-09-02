@@ -491,29 +491,29 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Filter Chips Bar (Feed Pills, Category, City & Date Pickers) */}
+      {/* Filter Chips Bar (Feed Pills, Category & City Pickers) */}
       <View style={styles.filterBar}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterScrollContent}
         >
-          {/* Feed Pills: All / For You / Around You / Campus */}
-          <TouchableOpacity
-            style={[styles.feedPill, activeFeedPill === 'all' && !selectedDate && styles.feedPillActive]}
-            onPress={() => {
-              setActiveFeedPill('all');
-              setSelectedDate(null);
-            }}
-          >
-            <Compass size={14} color={activeFeedPill === 'all' && !selectedDate ? '#FFF' : '#64748B'} />
-            <Text style={[styles.feedPillText, activeFeedPill === 'all' && !selectedDate && styles.feedPillTextActive]}>
-              Explore All
-            </Text>
-          </TouchableOpacity>
-
           {showPersonalizedPills && (
             <>
+              {/* Feed Pills: All / For You / Around You / Campus */}
+              <TouchableOpacity
+                style={[styles.feedPill, activeFeedPill === 'all' && !selectedDate && styles.feedPillActive]}
+                onPress={() => {
+                  setActiveFeedPill('all');
+                  setSelectedDate(null);
+                }}
+              >
+                <Compass size={14} color={activeFeedPill === 'all' && !selectedDate ? '#FFF' : '#64748B'} />
+                <Text style={[styles.feedPillText, activeFeedPill === 'all' && !selectedDate && styles.feedPillTextActive]}>
+                  All
+                </Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={[styles.feedPill, activeFeedPill === 'for_you' && !selectedDate && styles.feedPillActive]}
                 onPress={() => {
@@ -554,20 +554,6 @@ export default function HomeScreen() {
               )}
             </>
           )}
-
-          {/* Calendar Date Filter */}
-          <TouchableOpacity
-            style={[styles.filterPill, Boolean(selectedDate) && styles.filterPillSelected]}
-            onPress={() => setShowDateModal(true)}
-          >
-            <CalendarIcon size={13} color={selectedDate ? '#6C47FF' : '#64748B'} />
-            <Text style={[styles.filterPillText, Boolean(selectedDate) && styles.filterPillTextSelected]}>
-              {selectedDate
-                ? new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
-                : 'Calendar'}
-            </Text>
-            <ChevronDown size={14} color={selectedDate ? '#6C47FF' : '#64748B'} />
-          </TouchableOpacity>
 
           {/* Category Dropdown Filter */}
           <TouchableOpacity
@@ -711,6 +697,11 @@ export default function HomeScreen() {
       {/* Calendar Month Grid Modal */}
       {showDateModal && (
         <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowDateModal(false)}
+          />
           <View style={styles.calendarModalContent}>
             {/* Modal Header */}
             <View style={styles.calendarModalHeader}>
@@ -807,6 +798,11 @@ export default function HomeScreen() {
       {/* Category Modal */}
       {showCategoryModal && (
         <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowCategoryModal(false)}
+          />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Category</Text>
@@ -853,6 +849,11 @@ export default function HomeScreen() {
       {/* City Modal */}
       {showCityModal && (
         <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowCityModal(false)}
+          />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select City</Text>
