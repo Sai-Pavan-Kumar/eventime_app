@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import type { Session } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { supabase } from '../lib/supabase';
 import type { AuthUser, ProfileRow } from '../types';
 
@@ -13,14 +12,22 @@ const GOOGLE_WEB_CLIENT_ID =
   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
   '503758339039-tn46mns1l75dhopjh6cut97gno6p5qmn.apps.googleusercontent.com';
 
+let GoogleSigninModule: any = null;
+let statusCodesEnum: any = null;
+
 try {
-  GoogleSignin.configure({
-    webClientId: GOOGLE_WEB_CLIENT_ID,
-    offlineAccess: true,
-    scopes: ['profile', 'email'],
-  });
+  const gSignin = require('@react-native-google-signin/google-signin');
+  GoogleSigninModule = gSignin.GoogleSignin;
+  statusCodesEnum = gSignin.statusCodes;
+  if (GoogleSigninModule && typeof GoogleSigninModule.configure === 'function') {
+    GoogleSigninModule.configure({
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+      offlineAccess: true,
+      scopes: ['profile', 'email'],
+    });
+  }
 } catch (e) {
-  console.warn('[AuthContext] GoogleSignin.configure error:', e);
+  // Gracefully bypassed when running in Expo Go
 }
 
 interface AuthContextType {
@@ -171,32 +178,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async (): Promise<{ error: Error | null }> => {
     try {
-      // 1. Try native Google Sign-In SDK (in-app bottom sheet)
-      try {
-        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-        const response = await GoogleSignin.signIn();
-        const idToken = (response as any)?.data?.idToken || (response as any)?.idToken;
+      // 1. Try native Google Sign-In SDK (in-app bottom sheet) if available
+      if (GoogleSigninModule && typeof GoogleSigninModule.signIn === 'function') {
+        try {
+          await GoogleSigninModule.hasPlayServices({ showPlayServicesUpdateDialog: true });
+          const response = await GoogleSigninModule.signIn();
+          const idToken = (response as any)?.data?.idToken || (response as any)?.idToken;
 
-        if (idToken) {
-          const { data, error } = await supabase.auth.signInWithIdToken({
-            provider: 'google',
-            token: idToken,
-          });
+          if (idToken) {
+            const { data, error } = await supabase.auth.signInWithIdToken({
+              provider: 'google',
+              token: idToken,
+            });
 
-          if (error) throw error;
-          if (data?.session?.user) {
-            setUser(data.session.user);
-            setSession(data.session);
-            await fetchProfile(data.session.user.id, data.session.user);
+            if (error) throw error;
+            if (data?.session?.user) {
+              setUser(data.session.user);
+              setSession(data.session);
+              await fetchProfile(data.session.user.id, data.session.user);
+            }
+            return { error: null };
           }
-          return { error: null };
+        } catch (nativeErr: any) {
+          if (statusCodesEnum && nativeErr.code === statusCodesEnum.SIGN_IN_CANCELLED) {
+            // User intentionally closed/cancelled the Google prompt
+            return { error: null };
+          }
+          console.warn('[AuthContext] Native Google sign-in failed, trying fallback:', nativeErr?.message);
         }
-      } catch (nativeErr: any) {
-        if (nativeErr.code === statusCodes.SIGN_IN_CANCELLED) {
-          // User intentionally closed/cancelled the Google prompt
-          return { error: null };
-        }
-        console.warn('[AuthContext] Native Google sign-in failed, trying fallback:', nativeErr?.message);
       }
 
       // 2. Fallback to WebBrowser OAuth if native SDK is not available (e.g. Expo Go)
@@ -375,9 +384,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      try {
-        await GoogleSignin.signOut();
-      } catch (_) {}
+      if (GoogleSigninModule && typeof GoogleSigninModule.signOut === 'function') {
+        try {
+          await GoogleSigninModule.signOut();
+        } catch (_) {}
+      }
       await supabase.auth.signOut();
       setSession(null);
       setUser(null);
