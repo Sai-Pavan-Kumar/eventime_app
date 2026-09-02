@@ -82,26 +82,20 @@ export function RootNavigator() {
     return (
       <View style={styles.splash}>
         <StatusBar style="light" />
-        
-        {/* Empty Spacer to balance layout */}
-        <View style={{ height: 40 }} />
 
-        {/* Center Brand Identity */}
+        {/* Empty Spacer */}
+        <View style={{ height: 20 }} />
+
+        {/* Center: Logo + EvenTime */}
         <View style={styles.splashCenter}>
-          <View style={styles.splashLogoCard}>
-            <Image source={APP_ASSETS.logo} style={styles.splashLogo} contentFit="contain" />
-          </View>
+          <Image source={APP_ASSETS.logo} style={styles.splashLogo} contentFit="contain" />
           <Text style={styles.splashBrandTitle}>EvenTime</Text>
-          <Text style={styles.splashBrandSubtitle}>Discover Events & Campus Life</Text>
         </View>
 
-        {/* Bottom "by The SurfBoard" Branding */}
+        {/* Bottom: by The SurfBoard */}
         <View style={styles.splashFooter}>
-          <Text style={styles.splashFooterBy}>BY</Text>
-          <View style={styles.splashSurfboardRow}>
-            <Image source={APP_ASSETS.sbLogo} style={styles.splashSbLogo} contentFit="contain" />
-            <Text style={styles.splashSurfboardText}>The SurfBoard</Text>
-          </View>
+          <Text style={styles.splashByText}>by</Text>
+          <Text style={styles.splashSurfboardText}>The SurfBoard</Text>
         </View>
       </View>
     );
@@ -170,71 +164,32 @@ const styles = StyleSheet.create({
   },
   splashCenter: {
     alignItems: 'center',
-  },
-  splashLogoCard: {
-    width: 96,
-    height: 96,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
+    gap: 12,
   },
   splashLogo: {
-    width: 62,
-    height: 62,
-    borderRadius: 14,
+    width: 72,
+    height: 72,
+    borderRadius: 16,
   },
   splashBrandTitle: {
     fontSize: 28,
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-  splashBrandSubtitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.82)',
-    letterSpacing: 0.2,
   },
   splashFooter: {
     alignItems: 'center',
-    gap: 6,
+    gap: 2,
   },
-  splashFooterBy: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: 'rgba(255, 255, 255, 0.65)',
-    letterSpacing: 2,
-  },
-  splashSurfboardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  splashSbLogo: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
+  splashByText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   splashSurfboardText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
 });
