@@ -420,7 +420,7 @@ export default function OnboardingScreen() {
 
               <Text style={styles.headlineText}>What can you explore?</Text>
               <Text style={styles.subheadlineText}>
-                From inter-college hackathons and esports to creator meetups and cultural nights — never miss out.
+                Hackathons, campus fests, concerts, tech summits & meetups — all in one place.
               </Text>
             </View>
           )}
