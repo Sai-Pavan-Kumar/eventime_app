@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
+import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
@@ -25,6 +27,7 @@ import CuratorProfileScreen from '../screens/CuratorProfileScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsScreen from '../screens/TermsScreen';
 import { theme } from '../config/theme';
+import { APP_ASSETS } from '../lib/asset-registry';
 import { getHasCompletedOnboarding } from '../lib/guest-preferences';
 import type { RootStackParamList } from '../types';
 
@@ -78,7 +81,28 @@ export function RootNavigator() {
   if (isLoading || hasCompletedLocalOnboarding === null) {
     return (
       <View style={styles.splash}>
-        <ActivityIndicator size="large" color={theme.colors.brand} />
+        <StatusBar style="light" />
+        
+        {/* Empty Spacer to balance layout */}
+        <View style={{ height: 40 }} />
+
+        {/* Center Brand Identity */}
+        <View style={styles.splashCenter}>
+          <View style={styles.splashLogoCard}>
+            <Image source={APP_ASSETS.logo} style={styles.splashLogo} contentFit="contain" />
+          </View>
+          <Text style={styles.splashBrandTitle}>EvenTime</Text>
+          <Text style={styles.splashBrandSubtitle}>Discover Events & Campus Life</Text>
+        </View>
+
+        {/* Bottom "by The SurfBoard" Branding */}
+        <View style={styles.splashFooter}>
+          <Text style={styles.splashFooterBy}>BY</Text>
+          <View style={styles.splashSurfboardRow}>
+            <Image source={APP_ASSETS.sbLogo} style={styles.splashSbLogo} contentFit="contain" />
+            <Text style={styles.splashSurfboardText}>The SurfBoard</Text>
+          </View>
+        </View>
       </View>
     );
   }
@@ -139,8 +163,78 @@ export function RootNavigator() {
 const styles = StyleSheet.create({
   splash: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#6C47FF',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 56,
+  },
+  splashCenter: {
+    alignItems: 'center',
+  },
+  splashLogoCard: {
+    width: 96,
+    height: 96,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  splashLogo: {
+    width: 62,
+    height: 62,
+    borderRadius: 14,
+  },
+  splashBrandTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  splashBrandSubtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.82)',
+    letterSpacing: 0.2,
+  },
+  splashFooter: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  splashFooterBy: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: 'rgba(255, 255, 255, 0.65)',
+    letterSpacing: 2,
+  },
+  splashSurfboardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  splashSbLogo: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+  },
+  splashSurfboardText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
 });
