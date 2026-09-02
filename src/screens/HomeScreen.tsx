@@ -27,7 +27,6 @@ import {
   Clock,
   Sparkles,
   GraduationCap,
-  Shield,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -82,7 +81,7 @@ const getTimeOfDayGreeting = (name?: string) => {
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile } = useAuth();
 
   const isStudent = Boolean(user && profile?.user_type === 'student' && profile?.college_id);
   const hasGoals = Boolean(profile?.goals && profile.goals.length > 0);
@@ -451,20 +450,6 @@ export default function HomeScreen() {
           >
             <Trophy size={18} color="#D97706" />
           </TouchableOpacity>
-
-          {/* Admin Management Console Button (If Admin) */}
-          {isAdmin && (
-            <TouchableOpacity
-              style={[
-                styles.iconButton,
-                { backgroundColor: '#FEE2E2', borderColor: '#FCA5A5', borderWidth: 1 },
-              ]}
-              onPress={() => navigation.navigate('Admin')}
-              activeOpacity={0.8}
-            >
-              <Shield size={17} color="#DC2626" />
-            </TouchableOpacity>
-          )}
         </View>
       </View>
 
