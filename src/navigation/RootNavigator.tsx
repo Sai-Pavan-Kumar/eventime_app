@@ -120,47 +120,34 @@ export function RootNavigator() {
   return (
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
+        initialRouteName={requiresOnboarding ? 'Onboarding' : 'MainTabs'}
         screenOptions={{
           headerShown: false,
           animation: 'slide_from_right',
         }}
       >
-        {requiresOnboarding ? (
-          <>
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-            <Stack.Screen name="MainTabs" component={MainTabNavigator} />
-            <Stack.Screen
-              name="Login"
-              component={LoginScreen}
-              options={{ animation: 'slide_from_bottom' }}
-            />
-          </>
-        ) : (
-          <>
-            <Stack.Screen name="MainTabs" component={MainTabNavigator} />
-            <Stack.Screen
-              name="Login"
-              component={LoginScreen}
-              options={{ animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-            <Stack.Screen name="EventDetail" component={EventDetailScreen} />
-            <Stack.Screen
-              name="CreateEvent"
-              component={CreateEventScreen}
-              options={{ animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />
-            <Stack.Screen name="MyPostedEvents" component={MyPostedEventsScreen} />
-            <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
-            <Stack.Screen name="Admin" component={AdminScreen} />
-            <Stack.Screen name="Settings" component={SettingsScreen} />
-            <Stack.Screen name="CityEvents" component={CityEventsScreen} />
-            <Stack.Screen name="CuratorProfile" component={CuratorProfileScreen} />
-            <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
-            <Stack.Screen name="Terms" component={TermsScreen} />
-          </>
-        )}
+        <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen name="EventDetail" component={EventDetailScreen} />
+        <Stack.Screen
+          name="CreateEvent"
+          component={CreateEventScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />
+        <Stack.Screen name="MyPostedEvents" component={MyPostedEventsScreen} />
+        <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+        <Stack.Screen name="Admin" component={AdminScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="CityEvents" component={CityEventsScreen} />
+        <Stack.Screen name="CuratorProfile" component={CuratorProfileScreen} />
+        <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+        <Stack.Screen name="Terms" component={TermsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
