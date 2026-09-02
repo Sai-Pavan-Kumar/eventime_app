@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -640,6 +641,11 @@ export default function HomeScreen() {
               tintColor={theme.colors.brand}
             />
           }
+          initialNumToRender={6}
+          maxToRenderPerBatch={8}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+          updateCellsBatchingPeriod={50}
           onEndReached={loadMoreEvents}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
