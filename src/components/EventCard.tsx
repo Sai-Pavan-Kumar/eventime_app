@@ -19,6 +19,8 @@ export interface EventCardProps {
   title?: string;
   category?: string;
   dateString?: string;
+  startTime?: string;
+  endTime?: string;
   location?: string;
   city?: string;
   organizerName?: string;
@@ -45,12 +47,12 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
   const title = props.event?.title || props.title || 'Event';
   const category = props.event?.category || props.category || 'General';
   const dateString = props.event?.date_string || props.dateString || '';
-  const startTime = props.event?.start_time || undefined;
+  const startTime = props.event?.start_time || props.startTime || undefined;
   const location = props.event?.location || props.location || '';
   const city = props.event?.city || props.city || '';
-  const collegeName = props.event?.college_name || undefined;
-  const organizerName = props.event?.organizer_name || props.organizerName || 'EvenTime Community';
-  const organizerUsername = props.organizerUsername;
+  const collegeName = props.event?.college_name || (props.event as any)?.colleges?.name || undefined;
+  const organizerName = (props.event as any)?.profiles?.full_name || props.event?.organizer_name || props.organizerName || 'EvenTime Community';
+  const organizerUsername = (props.event as any)?.profiles?.username || props.organizerUsername;
   const isFree = props.event?.is_free !== undefined ? props.event.is_free !== false : props.isFree !== false;
   const isFeatured = Boolean(props.event?.is_featured ?? props.isFeatured);
   const posterUrl = props.event?.poster_url || props.posterUrl;

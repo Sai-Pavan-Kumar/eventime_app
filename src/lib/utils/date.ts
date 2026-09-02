@@ -16,17 +16,17 @@ export function formatEventTime(
   dateStr?: string | null,
   startTime?: string | null
 ): string {
-  // 1. If date_string contains time like "2026-06-21 · 04:00 PM"
+  // 1. If explicit start_time field exists
+  if (startTime && startTime.trim()) {
+    return startTime.trim();
+  }
+
+  // 2. If date_string contains time like "2026-06-21 · 04:00 PM"
   if (dateStr && (dateStr.includes('·') || dateStr.includes('•'))) {
     const parts = dateStr.split(/[·•]/);
     if (parts.length > 1 && parts[1].trim()) {
       return parts[1].trim();
     }
-  }
-
-  // 2. If explicit start_time field exists
-  if (startTime && startTime.trim()) {
-    return startTime.trim();
   }
 
   // 3. If ISO string with time component

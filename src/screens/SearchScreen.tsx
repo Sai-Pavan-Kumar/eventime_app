@@ -237,11 +237,13 @@ export default function SearchScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <EventCard
+              event={item}
               id={item.id}
               slug={item.slug || item.id}
               title={item.title}
               category={item.category || 'General'}
               dateString={item.date_string || ''}
+              startTime={item.start_time || undefined}
               location={item.location || ''}
               city={item.city || ''}
               organizerName={(item as any).profiles?.full_name || item.organizer_name || 'Organizer'}

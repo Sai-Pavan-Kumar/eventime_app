@@ -275,11 +275,13 @@ export default function CuratorProfileScreen() {
                 {displayedEvents.map((item) => (
                   <View key={item.id} style={styles.eventCardWrapper}>
                     <EventCard
+                      event={item}
                       id={item.id}
                       slug={item.slug || item.id}
                       title={item.title}
                       category={item.category || 'General'}
                       dateString={item.date_string || ''}
+                      startTime={item.start_time || undefined}
                       location={item.location || ''}
                       city={item.city || ''}
                       organizerName={item.organizer_name || curator.full_name || 'Organizer'}
