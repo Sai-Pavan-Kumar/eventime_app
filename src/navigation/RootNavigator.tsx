@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
+import * as Linking from 'expo-linking';
 import { useAuth } from '../context/AuthContext';
 import {
   registerForPushNotificationsAsync,
@@ -33,6 +34,28 @@ import type { RootStackParamList } from '../types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
+// Universal Links & Deep Linking Configuration
+const linking = {
+  prefixes: [
+    Linking.createURL('/'),
+    'eventime://',
+    'https://eventime.thesurfboard.in',
+    'https://www.eventime.thesurfboard.in',
+    'https://eventime.in',
+    'https://www.eventime.in',
+  ],
+  config: {
+    screens: {
+      MainTabs: '',
+      EventDetail: 'events/:id',
+      CityEvents: 'city/:city',
+      CuratorProfile: 'curator/:userId',
+      Leaderboard: 'leaderboard',
+      CreateEvent: 'create',
+    },
+  },
+};
 
 export function RootNavigator() {
   const { user, profile, isLoading, isOnboarded } = useAuth();
@@ -118,7 +141,7 @@ export function RootNavigator() {
   const requiresOnboarding = (!!user && !isOnboarded) || (!user && !hasCompletedLocalOnboarding);
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} linking={linking}>
       <Stack.Navigator
         initialRouteName={requiresOnboarding ? 'Onboarding' : 'MainTabs'}
         screenOptions={{

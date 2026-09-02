@@ -42,6 +42,16 @@
               "pathPrefix": "/events"
             },
             {
+              "scheme": "https",
+              "host": "eventime.thesurfboard.in",
+              "pathPrefix": "/city"
+            },
+            {
+              "scheme": "https",
+              "host": "eventime.in",
+              "pathPrefix": "/events"
+            },
+            {
               "scheme": "eventime"
             }
           ],
