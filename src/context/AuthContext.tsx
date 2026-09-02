@@ -398,8 +398,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const isAdmin = Boolean(profile?.user_type === 'admin' || profile?.role === 'admin');
-  const isOnboarded = Boolean(profile?.is_onboarded);
+  const ADMIN_EMAILS = [
+    'eventime.admin@gmail.com',
+    'p.pavansiri@gmail.com',
+    ...(process.env.EXPO_PUBLIC_ADMIN_EMAIL ? [process.env.EXPO_PUBLIC_ADMIN_EMAIL.toLowerCase().trim()] : []),
+    ...(process.env.NEXT_PUBLIC_ADMIN_EMAIL ? [process.env.NEXT_PUBLIC_ADMIN_EMAIL.toLowerCase().trim()] : []),
+  ];
+
+  const userEmail = user?.email?.toLowerCase().trim();
+  const isAdmin = Boolean(
+    profile?.user_type === 'admin' ||
+    profile?.role === 'admin' ||
+    (userEmail && ADMIN_EMAILS.includes(userEmail))
+  );
+  const isOnboarded = Boolean(profile?.is_onboarded || isAdmin);
 
   return (
     <AuthContext.Provider

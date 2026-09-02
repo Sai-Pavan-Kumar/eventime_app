@@ -28,7 +28,8 @@
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO"
       ],
       "intentFilters": [
         {
@@ -65,6 +66,11 @@
           "color": "#6C47FF"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ee58b4c0-0130-417f-878e-59163a4ddc4c"
+      }
+    }
   }
 }

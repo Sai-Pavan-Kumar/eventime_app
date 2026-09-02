@@ -35,7 +35,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [hasConsented, setHasConsented] = useState(true);
+  const [hasConsented, setHasConsented] = useState(false);
   const [isLoading, setIsLoading] = useState<string | null>(null);
 
   // Rate limiting attempts
