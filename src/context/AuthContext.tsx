@@ -400,7 +400,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const ADMIN_EMAILS = [
     'eventime.admin@gmail.com',
-    'p.pavansiri@gmail.com',
     ...(process.env.EXPO_PUBLIC_ADMIN_EMAIL ? [process.env.EXPO_PUBLIC_ADMIN_EMAIL.toLowerCase().trim()] : []),
     ...(process.env.NEXT_PUBLIC_ADMIN_EMAIL ? [process.env.NEXT_PUBLIC_ADMIN_EMAIL.toLowerCase().trim()] : []),
   ];
