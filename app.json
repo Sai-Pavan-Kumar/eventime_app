@@ -31,12 +31,7 @@
     "plugins": [
       "expo-image-picker",
       "expo-web-browser",
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "googleServicesFile": "./google-services.json"
-        }
-      ]
+      "@react-native-google-signin/google-signin"
     ]
   }
 }
