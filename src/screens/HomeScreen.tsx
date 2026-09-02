@@ -54,6 +54,17 @@ let homeEventsCache: {
   timestamp: number;
 } | null = null;
 
+// In-memory cache for platform stats (15-minute TTL to guarantee 0 database bills)
+let cachedPlatformStats: {
+  data: {
+    event_count: number;
+    city_count: number;
+    category_count: number;
+    user_count: number;
+  };
+  timestamp: number;
+} | null = null;
+
 const getTimeOfDayGreeting = (name?: string) => {
   const h = new Date().getHours();
   const userName = name || 'there';
@@ -114,30 +125,44 @@ export default function HomeScreen() {
     city_count: number;
     category_count: number;
     user_count: number;
-  }>({
-    event_count: 0,
-    city_count: 12,
-    category_count: 36,
-    user_count: 0,
-  });
+  }>(
+    cachedPlatformStats?.data || {
+      event_count: 0,
+      city_count: 12,
+      category_count: 36,
+      user_count: 0,
+    }
+  );
 
-  const fetchPlatformStats = useCallback(async () => {
+  const fetchPlatformStats = useCallback(async (forceRefresh: boolean = false) => {
+    const now = Date.now();
+    const FIFTEEN_MINUTES = 15 * 60 * 1000;
+
+    // Use cache if fresh and not forced
+    if (!forceRefresh && cachedPlatformStats && now - cachedPlatformStats.timestamp < FIFTEEN_MINUTES) {
+      setPlatformStats(cachedPlatformStats.data);
+      return;
+    }
+
     try {
       const { data: statsData, error } = await supabase.rpc('get_platform_stats').single();
+      let freshStats: any;
       if (!error && statsData) {
-        setPlatformStats(statsData as any);
+        freshStats = statsData;
       } else {
         const [{ count: eventCount }, { count: userCount }] = await Promise.all([
           supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
           supabase.from('profiles').select('*', { count: 'exact', head: true }),
         ]);
-        setPlatformStats({
+        freshStats = {
           event_count: eventCount || 0,
           city_count: 12,
           category_count: 36,
           user_count: userCount || 0,
-        });
+        };
       }
+      cachedPlatformStats = { data: freshStats, timestamp: now };
+      setPlatformStats(freshStats);
     } catch (e) {
       console.warn('[HomeScreen] Failed to load stats', e);
     }
