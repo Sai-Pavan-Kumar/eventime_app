@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import * as Notifications from 'expo-notifications';
 import { useAuth } from '../context/AuthContext';
+import { registerForPushNotificationsAsync } from '../lib/notifications';
 import { MainTabNavigator } from './MainTabNavigator';
 import LoginScreen from '../screens/LoginScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
@@ -22,6 +24,7 @@ import { getHasCompletedOnboarding } from '../lib/guest-preferences';
 import type { RootStackParamList } from '../types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 export function RootNavigator() {
   const { user, profile, isLoading, isOnboarded } = useAuth();
@@ -32,6 +35,22 @@ export function RootNavigator() {
       setHasCompletedLocalOnboarding(completed);
     });
   }, []);
+
+  // Register for push notifications and listen for responses/deep-links
+  useEffect(() => {
+    registerForPushNotificationsAsync(user?.id);
+
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      if (data?.eventId && navigationRef.isReady()) {
+        (navigationRef as any).navigate('EventDetail', { eventId: data.eventId });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [user?.id]);
 
   if (isLoading || hasCompletedLocalOnboarding === null) {
     return (
@@ -46,7 +65,7 @@ export function RootNavigator() {
   const requiresOnboarding = (!!user && !isOnboarded) || (!user && !hasCompletedLocalOnboarding);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,

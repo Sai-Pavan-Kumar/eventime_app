@@ -42,6 +42,7 @@ import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { getCategoryConfig } from '../lib/category-config';
 import { getCategoryPoster } from '../lib/asset-registry';
+import { scheduleEventReminder } from '../lib/notifications';
 import { useAuth } from '../context/AuthContext';
 import { EventCard } from '../components/EventCard';
 import type { EventRow, RootStackParamList } from '../types';
@@ -191,6 +192,7 @@ export default function EventDetailScreen() {
           event_id: event.id,
           user_id: user.id,
         });
+        scheduleEventReminder(event);
       } else {
         await supabase
           .from('saved_events')
