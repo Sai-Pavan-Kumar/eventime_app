@@ -15,9 +15,7 @@ import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  MapPin,
   Compass,
-  ChevronDown,
   Building2,
   Calendar as CalendarIcon,
   CalendarDays,
@@ -26,7 +24,6 @@ import {
   ChevronRight,
   X,
   Clock,
-  RotateCcw,
   Sparkles,
   GraduationCap,
 } from 'lucide-react-native';
@@ -35,8 +32,6 @@ import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
 import { APP_ASSETS } from '../lib/asset-registry';
-import { CATEGORIES_LIST } from '../lib/category-config';
-import { CITIES } from '../lib/constants/cities';
 import { parseEventDateString } from '../lib/utils/date';
 import type { EventRow, RootStackParamList } from '../types';
 
@@ -93,8 +88,6 @@ export default function HomeScreen() {
     hasGoals ? 'for_you' : 'all'
   );
 
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // Calendar modal state
@@ -114,10 +107,6 @@ export default function HomeScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const PAGE_SIZE = 15;
-
-  // Filter Modals
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [showCityModal, setShowCityModal] = useState(false);
 
   // Platform stats for live ticker (Matching website parity)
   const [platformStats, setPlatformStats] = useState<{
@@ -227,14 +216,6 @@ export default function HomeScreen() {
         .order('created_at', { ascending: false })
         .range(from, to);
 
-      if (selectedCategory) {
-        query = query.eq('category', selectedCategory);
-      }
-
-      if (selectedCity) {
-        query = query.eq('city', selectedCity);
-      }
-
       const { data, error } = await query;
 
       if (error) {
@@ -278,7 +259,7 @@ export default function HomeScreen() {
       setIsRefreshing(false);
       setIsFetchingMore(false);
     }
-  }, [selectedCategory, selectedCity, user, profile]);
+  }, [user, profile]);
 
   const loadMoreEvents = () => {
     if (!hasMore || isFetchingMore || isLoading || isRefreshing) return;
@@ -338,7 +319,7 @@ export default function HomeScreen() {
     });
 
     // 3. Apply Personalized Pill Filters (For You / Around You)
-    if (!selectedDate && !selectedCategory && !selectedCity) {
+    if (!selectedDate) {
       const preferredCities = profile?.preferred_cities || [];
       const preferredGoals = profile?.goals || [];
 
@@ -357,7 +338,7 @@ export default function HomeScreen() {
     }
 
     return filtered;
-  }, [events, campusEvents, selectedDate, selectedCategory, selectedCity, activeFeedPill, profile]);
+  }, [events, campusEvents, selectedDate, activeFeedPill, profile]);
 
   // Calendar calculations
   const calendarDays = useMemo(() => {
@@ -456,14 +437,12 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Dynamic Time-of-Day Greeting for Logged-In Users */}
-      {user && (
-        <View style={styles.greetingContainer}>
-          <Text style={styles.greetingText}>
-            {getTimeOfDayGreeting(profile?.full_name?.split(' ')[0] || profile?.username || undefined)}
-          </Text>
-        </View>
-      )}
+      {/* Dynamic Time-of-Day Greeting for Everyone */}
+      <View style={styles.greetingContainer}>
+        <Text style={styles.greetingText}>
+          {getTimeOfDayGreeting(profile?.full_name?.split(' ')[0] || profile?.username || (user ? undefined : 'explorer'))}
+        </Text>
+      </View>
 
       {/* Live Stats Bar (Matching Website Parity) */}
       <View style={styles.statsBar}>
@@ -491,120 +470,86 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Filter Chips Bar (Feed Pills, Category & City Pickers) */}
-      <View style={styles.filterBar}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScrollContent}
-        >
-          {showPersonalizedPills && (
-            <>
-              {/* Feed Pills: All / For You / Around You / Campus */}
-              <TouchableOpacity
-                style={[styles.feedPill, activeFeedPill === 'all' && !selectedDate && styles.feedPillActive]}
-                onPress={() => {
-                  setActiveFeedPill('all');
-                  setSelectedDate(null);
-                }}
-              >
-                <Compass size={14} color={activeFeedPill === 'all' && !selectedDate ? '#FFF' : '#64748B'} />
-                <Text style={[styles.feedPillText, activeFeedPill === 'all' && !selectedDate && styles.feedPillTextActive]}>
-                  All
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.feedPill, activeFeedPill === 'for_you' && !selectedDate && styles.feedPillActive]}
-                onPress={() => {
-                  setActiveFeedPill('for_you');
-                  setSelectedDate(null);
-                }}
-              >
-                <Text style={[styles.feedPillText, activeFeedPill === 'for_you' && !selectedDate && styles.feedPillTextActive]}>
-                  For You
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.feedPill, activeFeedPill === 'around_you' && !selectedDate && styles.feedPillActive]}
-                onPress={() => {
-                  setActiveFeedPill('around_you');
-                  setSelectedDate(null);
-                }}
-              >
-                <Text style={[styles.feedPillText, activeFeedPill === 'around_you' && !selectedDate && styles.feedPillTextActive]}>
-                  Around You
-                </Text>
-              </TouchableOpacity>
-
-              {isStudent && (
-                <TouchableOpacity
-                  style={[styles.feedPill, activeFeedPill === 'campus' && !selectedDate && styles.feedPillActive]}
-                  onPress={() => {
-                    setActiveFeedPill('campus');
-                    setSelectedDate(null);
-                  }}
-                >
-                  <GraduationCap size={14} color={activeFeedPill === 'campus' && !selectedDate ? '#FFF' : '#64748B'} />
-                  <Text style={[styles.feedPillText, activeFeedPill === 'campus' && !selectedDate && styles.feedPillTextActive]}>
-                    Campus ({campusEvents.length})
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </>
-          )}
-
-          {/* Category Dropdown Filter */}
-          <TouchableOpacity
-            style={[styles.filterPill, Boolean(selectedCategory) && styles.filterPillSelected]}
-            onPress={() => setShowCategoryModal(true)}
+      {/* Segment Feed Pills (Only when personalized options exist for logged in user) */}
+      {showPersonalizedPills && (
+        <View style={styles.filterBar}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScrollContent}
           >
-            <Text style={[styles.filterPillText, Boolean(selectedCategory) && styles.filterPillTextSelected]}>
-              {selectedCategory || 'Categories'}
-            </Text>
-            <ChevronDown size={14} color={selectedCategory ? '#6C47FF' : '#64748B'} />
-          </TouchableOpacity>
-
-          {/* City Dropdown Filter */}
-          <TouchableOpacity
-            style={[styles.filterPill, Boolean(selectedCity) && styles.filterPillSelected]}
-            onPress={() => setShowCityModal(true)}
-          >
-            <MapPin size={13} color={selectedCity ? '#6C47FF' : '#64748B'} />
-            <Text style={[styles.filterPillText, Boolean(selectedCity) && styles.filterPillTextSelected]}>
-              {selectedCity || 'Cities'}
-            </Text>
-            <ChevronDown size={14} color={selectedCity ? '#6C47FF' : '#64748B'} />
-          </TouchableOpacity>
-
-          {/* Clear Filter Button if active */}
-          {(selectedCategory || selectedCity || selectedDate) && (
             <TouchableOpacity
-              style={styles.clearPill}
+              style={[styles.feedPill, activeFeedPill === 'all' && !selectedDate && styles.feedPillActive]}
               onPress={() => {
-                setSelectedCategory(null);
-                setSelectedCity(null);
+                setActiveFeedPill('all');
                 setSelectedDate(null);
               }}
             >
-              <RotateCcw size={12} color="#EF4444" />
-              <Text style={styles.clearPillText}>Reset</Text>
+              <Compass size={14} color={activeFeedPill === 'all' && !selectedDate ? '#FFF' : '#64748B'} />
+              <Text style={[styles.feedPillText, activeFeedPill === 'all' && !selectedDate && styles.feedPillTextActive]}>
+                All
+              </Text>
             </TouchableOpacity>
-          )}
-        </ScrollView>
-      </View>
+
+            <TouchableOpacity
+              style={[styles.feedPill, activeFeedPill === 'for_you' && !selectedDate && styles.feedPillActive]}
+              onPress={() => {
+                setActiveFeedPill('for_you');
+                setSelectedDate(null);
+              }}
+            >
+              <Text style={[styles.feedPillText, activeFeedPill === 'for_you' && !selectedDate && styles.feedPillTextActive]}>
+                For You
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.feedPill, activeFeedPill === 'around_you' && !selectedDate && styles.feedPillActive]}
+              onPress={() => {
+                setActiveFeedPill('around_you');
+                setSelectedDate(null);
+              }}
+            >
+              <Text style={[styles.feedPillText, activeFeedPill === 'around_you' && !selectedDate && styles.feedPillTextActive]}>
+                Around You
+              </Text>
+            </TouchableOpacity>
+
+            {isStudent && (
+              <TouchableOpacity
+                style={[styles.feedPill, activeFeedPill === 'campus' && !selectedDate && styles.feedPillActive]}
+                onPress={() => {
+                  setActiveFeedPill('campus');
+                  setSelectedDate(null);
+                }}
+              >
+                <GraduationCap size={14} color={activeFeedPill === 'campus' && !selectedDate ? '#FFF' : '#64748B'} />
+                <Text style={[styles.feedPillText, activeFeedPill === 'campus' && !selectedDate && styles.feedPillTextActive]}>
+                  Campus ({campusEvents.length})
+                </Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* If Calendar Date is selected from top button, show an active date badge */}
+      {selectedDate && (
+        <View style={styles.activeDateBanner}>
+          <Text style={styles.activeDateBannerText}>
+            Showing events for {new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+          </Text>
+          <TouchableOpacity onPress={() => setSelectedDate(null)} style={styles.clearActiveDateBtn}>
+            <X size={14} color="#EF4444" />
+            <Text style={styles.clearActiveDateBtnText}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Section Title */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>
-          {selectedCategory && selectedCity
-            ? `${selectedCategory}s in ${selectedCity}`
-            : selectedCategory
-            ? `${selectedCategory} Events`
-            : selectedCity
-            ? `Events in ${selectedCity}`
-            : selectedDate
+          {selectedDate
             ? `Events on ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
             : activeFeedPill === 'campus'
             ? 'Campus Events'
@@ -795,107 +740,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Category Modal */}
-      {showCategoryModal && (
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => setShowCategoryModal(false)}
-          />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Category</Text>
-              <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
-                <X size={20} color="#0F172A" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-              <TouchableOpacity
-                style={[styles.modalItem, !selectedCategory && styles.modalItemSelected]}
-                onPress={() => {
-                  setSelectedCategory(null);
-                  setShowCategoryModal(false);
-                }}
-              >
-                <Text style={[styles.modalItemText, !selectedCategory && styles.modalItemTextSelected]}>
-                  All Categories
-                </Text>
-              </TouchableOpacity>
-              {CATEGORIES_LIST.map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[styles.modalItem, selectedCategory === cat && styles.modalItemSelected]}
-                  onPress={() => {
-                    setSelectedCategory(cat);
-                    setShowCategoryModal(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.modalItemText,
-                      selectedCategory === cat && styles.modalItemTextSelected,
-                    ]}
-                  >
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      )}
-
-      {/* City Modal */}
-      {showCityModal && (
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => setShowCityModal(false)}
-          />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select City</Text>
-              <TouchableOpacity onPress={() => setShowCityModal(false)}>
-                <X size={20} color="#0F172A" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-              <TouchableOpacity
-                style={[styles.modalItem, !selectedCity && styles.modalItemSelected]}
-                onPress={() => {
-                  setSelectedCity(null);
-                  setShowCityModal(false);
-                }}
-              >
-                <Text style={[styles.modalItemText, !selectedCity && styles.modalItemTextSelected]}>
-                  Anywhere
-                </Text>
-              </TouchableOpacity>
-              {CITIES.map((city) => (
-                <TouchableOpacity
-                  key={city}
-                  style={[styles.modalItem, selectedCity === city && styles.modalItemSelected]}
-                  onPress={() => {
-                    setSelectedCity(city);
-                    setShowCityModal(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.modalItemText,
-                      selectedCity === city && styles.modalItemTextSelected,
-                    ]}
-                  >
-                    {city}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -1272,44 +1116,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#EF4444',
   },
-  modalContent: {
-    width: width - 48,
-    maxHeight: '70%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 16,
-  },
-  modalHeader: {
+  activeDateBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  modalList: {
-    marginTop: 8,
-  },
-  modalItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-  },
-  modalItemSelected: {
     backgroundColor: '#EDE9FE',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 14,
   },
-  modalItemText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  modalItemTextSelected: {
+  activeDateBannerText: {
+    fontSize: 13,
+    fontWeight: '700',
     color: '#6C47FF',
-    fontWeight: '800',
+  },
+  clearActiveDateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  clearActiveDateBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#EF4444',
   },
 });
