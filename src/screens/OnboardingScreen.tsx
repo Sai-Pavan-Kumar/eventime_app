@@ -816,15 +816,17 @@ export default function OnboardingScreen() {
       {/* Bottom Bar (Steps 1-6) */}
       {step < 7 && (
         <View style={styles.bottomNavigationBar}>
-          {step > 1 ? (
+          {step > 1 && (
             <TouchableOpacity style={styles.navBackBtn} onPress={handleBack} activeOpacity={0.7}>
               <ArrowLeft size={18} color="#64748B" />
             </TouchableOpacity>
-          ) : (
-            <View style={{ width: 44 }} />
           )}
 
-          <TouchableOpacity style={styles.navNextBtn} onPress={handleNext} activeOpacity={0.88}>
+          <TouchableOpacity
+            style={[styles.navNextBtn, step === 1 && styles.navNextBtnFull]}
+            onPress={handleNext}
+            activeOpacity={0.88}
+          >
             <Text style={styles.navNextBtnText}>Continue</Text>
             <ArrowRight size={16} color="#FFFFFF" />
           </TouchableOpacity>
@@ -1255,6 +1257,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 3,
+  },
+  navNextBtnFull: {
+    marginLeft: 0,
   },
   navNextBtnText: {
     fontSize: 15,
