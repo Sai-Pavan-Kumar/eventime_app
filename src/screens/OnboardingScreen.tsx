@@ -35,6 +35,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { CITIES } from '../lib/constants/cities';
 import { CATEGORIES_LIST, getCategoryMeta } from '../lib/category-config';
+import { INDIAN_COLLEGE_BRANCHES } from '../lib/constants/branches';
 import {
   setHasCompletedOnboarding,
   saveGuestPreferences,
@@ -152,6 +153,16 @@ export default function OnboardingScreen() {
       setCollegeSuggestions([]);
     }
   }, [collegeName, selectedCollegeId]);
+
+  // Branch suggestions filtered from 170+ branches
+  const branchSuggestions = useMemo(() => {
+    if (!branch.trim() || branch.trim().length < 1) return [];
+    return INDIAN_COLLEGE_BRANCHES.filter(
+      (b) =>
+        b.toLowerCase().includes(branch.trim().toLowerCase()) &&
+        b.toLowerCase() !== branch.trim().toLowerCase()
+    ).slice(0, 5);
+  }, [branch]);
 
   // Hardware Back Button Handler (Android)
   useEffect(() => {
@@ -539,11 +550,39 @@ export default function OnboardingScreen() {
                 )}
               </View>
 
-              {/* Branch Selection */}
+              {/* Branch Selection (Search & Type) */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Branch / Major</Text>
-                <View style={styles.branchWrap}>
-                  {COMMON_BRANCHES.map((b) => (
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Type or search branch (e.g. CSE, AI & ML, ECE...)"
+                  placeholderTextColor="#94A3B8"
+                  value={branch}
+                  onChangeText={setBranch}
+                />
+
+                {/* Branch Suggestions */}
+                {branchSuggestions.length > 0 && branch.trim().length >= 1 && (
+                  <View style={styles.suggestionsBox}>
+                    {branchSuggestions.map((b) => (
+                      <TouchableOpacity
+                        key={b}
+                        style={styles.suggestionItem}
+                        onPress={() => {
+                          setBranch(b);
+                        }}
+                      >
+                        <Text style={styles.suggestionText} numberOfLines={1}>
+                          {b}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Quick Selection Pills */}
+                <View style={[styles.branchWrap, { marginTop: 8 }]}>
+                  {COMMON_BRANCHES.slice(0, 6).map((b) => (
                     <TouchableOpacity
                       key={b}
                       style={[styles.branchPill, branch === b && styles.branchPillActive]}
