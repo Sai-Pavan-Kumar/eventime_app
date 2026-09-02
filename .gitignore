@@ -33,3 +33,8 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# Release build binaries
+release-builds/
+*.apk
+*.aab
