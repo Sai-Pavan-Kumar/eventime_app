@@ -2,10 +2,26 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import type { Session } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { supabase } from '../lib/supabase';
 import type { AuthUser, ProfileRow } from '../types';
 
 WebBrowser.maybeCompleteAuthSession();
+
+// Configure Google Sign-in with the Web Client ID (audience for idToken verification)
+const GOOGLE_WEB_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+  '503758339039-tn46mns1l75dhopjh6cut97gno6p5qmn.apps.googleusercontent.com';
+
+try {
+  GoogleSignin.configure({
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    offlineAccess: true,
+    scopes: ['profile', 'email'],
+  });
+} catch (e) {
+  console.warn('[AuthContext] GoogleSignin.configure error:', e);
+}
 
 interface AuthContextType {
   session: Session | null;
@@ -17,6 +33,7 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
+  signInWithGithub: () => Promise<{ error: Error | null }>;
   signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUpWithEmail: (email: string, password: string) => Promise<{ error: Error | null; unconfirmed?: boolean }>;
   sendPasswordReset: (email: string) => Promise<{ error: Error | null }>;
@@ -154,6 +171,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async (): Promise<{ error: Error | null }> => {
     try {
+      // 1. Try native Google Sign-In SDK (in-app bottom sheet)
+      try {
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        const response = await GoogleSignin.signIn();
+        const idToken = (response as any)?.data?.idToken || (response as any)?.idToken;
+
+        if (idToken) {
+          const { data, error } = await supabase.auth.signInWithIdToken({
+            provider: 'google',
+            token: idToken,
+          });
+
+          if (error) throw error;
+          if (data?.session?.user) {
+            setUser(data.session.user);
+            setSession(data.session);
+            await fetchProfile(data.session.user.id, data.session.user);
+          }
+          return { error: null };
+        }
+      } catch (nativeErr: any) {
+        if (nativeErr.code === statusCodes.SIGN_IN_CANCELLED) {
+          // User intentionally closed/cancelled the Google prompt
+          return { error: null };
+        }
+        console.warn('[AuthContext] Native Google sign-in failed, trying fallback:', nativeErr?.message);
+      }
+
+      // 2. Fallback to WebBrowser OAuth if native SDK is not available (e.g. Expo Go)
       const redirectUrl = Linking.createURL('auth');
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -170,8 +216,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (result.type === 'success' && result.url) {
           const resUrl = result.url;
-          
-          // Parse both query parameters and hash fragment
           const parsed = Linking.parse(resUrl);
           const params: Record<string, string> = {};
 
@@ -222,6 +266,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInWithGithub = async (): Promise<{ error: Error | null }> => {
+    try {
+      const redirectUrl = Linking.createURL('auth');
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+
+        if (result.type === 'success' && result.url) {
+          const resUrl = result.url;
+          const parsed = Linking.parse(resUrl);
+          const params: Record<string, string> = {};
+
+          if (parsed.queryParams) {
+            Object.entries(parsed.queryParams).forEach(([k, v]) => {
+              if (v) params[k] = Array.isArray(v) ? v[0] : String(v);
+            });
+          }
+
+          if (resUrl.includes('#')) {
+            const hashPart = resUrl.split('#')[1];
+            const hashParams = new URLSearchParams(hashPart);
+            hashParams.forEach((v, k) => {
+              params[k] = v;
+            });
+          }
+
+          const accessToken = params.access_token;
+          const refreshToken = params.refresh_token;
+          const code = params.code;
+
+          if (accessToken && refreshToken) {
+            const { data: sData, error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            if (sessionError) throw sessionError;
+            if (sData?.session?.user) {
+              setUser(sData.session.user);
+              setSession(sData.session);
+              await fetchProfile(sData.session.user.id, sData.session.user);
+            }
+          } else if (code) {
+            const { data: exData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+            if (exchangeError) throw exchangeError;
+            if (exData?.session?.user) {
+              setUser(exData.session.user);
+              setSession(exData.session);
+              await fetchProfile(exData.session.user.id, exData.session.user);
+            }
+          }
+        }
+      }
+      return { error: null };
+    } catch (err: any) {
+      console.error('[AuthContext] GitHub sign-in failed:', err);
+      return { error: err };
+    }
+  };
+
   const signInWithEmail = async (email: string, password: string): Promise<{ error: Error | null }> => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -263,6 +375,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      try {
+        await GoogleSignin.signOut();
+      } catch (_) {}
       await supabase.auth.signOut();
       setSession(null);
       setUser(null);
@@ -287,6 +402,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshProfile,
         signOut,
         signInWithGoogle,
+        signInWithGithub,
         signInWithEmail,
         signUpWithEmail,
         sendPasswordReset,
