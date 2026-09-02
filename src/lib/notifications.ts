@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
@@ -98,7 +99,14 @@ export async function registerForPushNotificationsAsync(userId?: string): Promis
     // Get Expo push token
     let token: string | null = null;
     try {
-      const tokenData = await Notifications.getExpoPushTokenAsync();
+      const projectId =
+        Constants?.expoConfig?.extra?.eas?.projectId ??
+        Constants?.easConfig?.projectId ??
+        'ee58b4c0-0130-417f-878e-59163a4ddc4c';
+
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId,
+      });
       token = tokenData.data;
     } catch (tokenErr) {
       console.warn('[Notifications] Could not get Expo push token:', tokenErr);

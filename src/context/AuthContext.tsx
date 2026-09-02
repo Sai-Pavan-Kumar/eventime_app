@@ -19,15 +19,8 @@ try {
   const gSignin = require('@react-native-google-signin/google-signin');
   GoogleSigninModule = gSignin.GoogleSignin;
   statusCodesEnum = gSignin.statusCodes;
-  if (GoogleSigninModule && typeof GoogleSigninModule.configure === 'function') {
-    GoogleSigninModule.configure({
-      webClientId: GOOGLE_WEB_CLIENT_ID,
-      offlineAccess: true,
-      scopes: ['profile', 'email'],
-    });
-  }
 } catch (e) {
-  // Gracefully bypassed when running in Expo Go
+  // Gracefully bypassed when running in environments without native modules
 }
 
 interface AuthContextType {
@@ -99,6 +92,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await fetchProfile(user.id, user);
     }
   }, [user, fetchProfile]);
+
+  // Configure Google Sign-in safely after native bridge is established
+  useEffect(() => {
+    try {
+      if (GoogleSigninModule && typeof GoogleSigninModule.configure === 'function') {
+        GoogleSigninModule.configure({
+          webClientId: GOOGLE_WEB_CLIENT_ID,
+          offlineAccess: true,
+          scopes: ['profile', 'email'],
+        });
+      }
+    } catch (e) {
+      console.warn('[AuthContext] Could not configure Google Sign-In:', e);
+    }
+  }, []);
 
   useEffect(() => {
     // 1. Check initial session
