@@ -108,8 +108,44 @@ export default function HomeScreen() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showCityModal, setShowCityModal] = useState(false);
 
+  // Platform stats for live ticker (Matching website parity)
+  const [platformStats, setPlatformStats] = useState<{
+    event_count: number;
+    city_count: number;
+    category_count: number;
+    user_count: number;
+  }>({
+    event_count: 0,
+    city_count: 12,
+    category_count: 36,
+    user_count: 0,
+  });
+
+  const fetchPlatformStats = useCallback(async () => {
+    try {
+      const { data: statsData, error } = await supabase.rpc('get_platform_stats').single();
+      if (!error && statsData) {
+        setPlatformStats(statsData as any);
+      } else {
+        const [{ count: eventCount }, { count: userCount }] = await Promise.all([
+          supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
+          supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        ]);
+        setPlatformStats({
+          event_count: eventCount || 0,
+          city_count: 12,
+          category_count: 36,
+          user_count: userCount || 0,
+        });
+      }
+    } catch (e) {
+      console.warn('[HomeScreen] Failed to load stats', e);
+    }
+  }, []);
+
   // Fetch all distinct event dates to show dot indicators in the calendar
   useEffect(() => {
+    fetchPlatformStats();
     supabase
       .from('events')
       .select('date_string')
@@ -130,7 +166,7 @@ export default function HomeScreen() {
           setEventDates(datesSet);
         }
       });
-  }, []);
+  }, [fetchPlatformStats]);
 
   const fetchSavedEventIds = useCallback(async () => {
     if (!user) {
@@ -243,6 +279,7 @@ export default function HomeScreen() {
     setHasMore(true);
     fetchEvents(0, true);
     fetchSavedEventIds();
+    fetchPlatformStats();
   };
 
   // Filtered Events based on Active Tab, Preferred Cities/Goals, and Calendar Date
@@ -365,6 +402,7 @@ export default function HomeScreen() {
             style={styles.brandLogo}
             contentFit="contain"
           />
+          <Text style={styles.brandNameText}>EvenTime</Text>
         </View>
 
         <View style={styles.topActions}>
@@ -402,23 +440,31 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Hero Banner Section (Shown when no active filters) */}
-      {!user && !selectedDate && !selectedCategory && !selectedCity && (
-        <View style={styles.heroSection}>
-          <View style={styles.heroTextContent}>
-            <Text style={styles.heroBadge}>DISCOVER & EXPERIENCE</Text>
-            <Text style={styles.heroTitle}>The Dictionary for Events.</Text>
-            <Text style={styles.heroSubtitle}>
-              Tech, Cultural, College & Professional events curated across India.
-            </Text>
-          </View>
-          <Image
-            source={APP_ASSETS.heroBanner}
-            style={styles.heroImage}
-            contentFit="contain"
-          />
+      {/* Live Stats Bar (Matching Website Parity) */}
+      <View style={styles.statsBar}>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{platformStats.event_count || events.length || 0}</Text>
+          <Text style={styles.statLabel}>EVENTS</Text>
         </View>
-      )}
+        <View style={styles.statDivider} />
+
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{platformStats.city_count || 12}</Text>
+          <Text style={styles.statLabel}>CITIES</Text>
+        </View>
+        <View style={styles.statDivider} />
+
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{platformStats.category_count || 36}</Text>
+          <Text style={styles.statLabel}>CATEGORIES</Text>
+        </View>
+        <View style={styles.statDivider} />
+
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{platformStats.user_count || 50}</Text>
+          <Text style={styles.statLabel}>USERS</Text>
+        </View>
+      </View>
 
       {/* Filter Chips Bar (Feed Pills, Category, City & Date Pickers) */}
       <View style={styles.filterBar}>
@@ -860,10 +906,18 @@ const styles = StyleSheet.create({
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   brandLogo: {
-    width: 120,
-    height: 32,
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+  },
+  brandNameText: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.5,
   },
   topActions: {
     flexDirection: 'row',
@@ -909,44 +963,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#64748B',
   },
-  heroSection: {
+  statsBar: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  heroTextContent: {
-    flex: 1,
-    paddingRight: 8,
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
-  heroBadge: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#6C47FF',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  heroTitle: {
-    fontSize: 18,
+  statNumber: {
+    fontSize: 14,
     fontWeight: '900',
+    color: '#6C47FF',
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '800',
     color: '#0F172A',
-    lineHeight: 22,
-    letterSpacing: -0.5,
-    marginBottom: 4,
+    letterSpacing: 0.5,
   },
-  heroSubtitle: {
-    fontSize: 12,
-    color: '#64748B',
-    lineHeight: 16,
-  },
-  heroImage: {
-    width: 80,
-    height: 80,
+  statDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: '#E2E8F0',
   },
   filterBar: {
     backgroundColor: '#FFFFFF',
