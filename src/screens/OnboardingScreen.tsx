@@ -8,7 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  Dimensions,
+  useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -16,7 +16,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import {
-  Sparkles,
   GraduationCap,
   Briefcase,
   Palette,
@@ -28,14 +27,11 @@ import {
   Check,
   Eye,
   EyeOff,
-  Flame,
-  Globe2,
-  Calendar,
-  Layers,
+  ImageIcon,
+  Sparkles,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { theme } from '../config/theme';
 import { CITIES } from '../lib/constants/cities';
 import { CATEGORIES_LIST, getCategoryMeta } from '../lib/category-config';
 import {
@@ -46,10 +42,8 @@ import {
 } from '../lib/guest-preferences';
 import { APP_ASSETS } from '../lib/asset-registry';
 
-const { width } = Dimensions.get('window');
-const IMAGE_SIZE = Math.min(width * 0.65, 240);
-
 export default function OnboardingScreen() {
+  const { width, height } = useWindowDimensions();
   const navigation = useNavigation<any>();
   const {
     user,
@@ -90,6 +84,14 @@ export default function OnboardingScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authLoading, setAuthLoading] = useState<string | null>(null);
+
+  // Responsive Dimensions
+  const isSmallDevice = height < 700;
+  const placeholderSize = isSmallDevice
+    ? Math.min(width * 0.45, 160)
+    : step >= 4
+    ? Math.min(width * 0.38, 140)
+    : Math.min(width * 0.58, 220);
 
   const toggleCity = (cityName: string) => {
     if (preferredCities.includes(cityName)) {
@@ -233,28 +235,28 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Top Bar with Step Indicators */}
+      {/* Top Header */}
       <View style={styles.topBar}>
-        <View style={styles.topBrandGroup}>
-          <Image source={APP_ASSETS.logo} style={styles.topLogo} contentFit="contain" />
-          <Text style={styles.topBrandText}>EvenTime</Text>
+        <View style={styles.brandGroup}>
+          <Image source={APP_ASSETS.logo} style={styles.brandLogo} contentFit="contain" />
+          <Text style={styles.brandTitle}>EvenTime</Text>
         </View>
 
-        {step < 6 ? (
-          <TouchableOpacity onPress={handleLaunchApp} style={styles.skipPill} activeOpacity={0.7}>
-            <Text style={styles.skipPillText}>Skip</Text>
+        {step < 6 && (
+          <TouchableOpacity onPress={handleLaunchApp} style={styles.skipBtn} activeOpacity={0.7}>
+            <Text style={styles.skipBtnText}>Skip</Text>
           </TouchableOpacity>
-        ) : null}
+        )}
       </View>
 
-      {/* Segmented Step Indicator */}
-      <View style={styles.stepIndicatorRow}>
+      {/* Segmented Step Bar */}
+      <View style={styles.stepProgressBar}>
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <View
             key={i}
             style={[
-              styles.stepBarSegment,
-              i <= step ? styles.stepBarActive : styles.stepBarInactive,
+              styles.stepBarItem,
+              i <= step ? styles.stepBarItemActive : styles.stepBarItemInactive,
             ]}
           />
         ))}
@@ -266,152 +268,140 @@ export default function OnboardingScreen() {
       >
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollBody}
+          contentContainerStyle={[
+            styles.scrollContent,
+            (step === 1 || step === 2 || step === 6) && styles.centeredScrollContent,
+          ]}
           keyboardShouldPersistTaps="handled"
         >
           {/* =========================================================================
-              STEP 1: What is EvenTime? (1:1 Centered Image + Minimal Punchy Text)
+              STEP 1: What is EvenTime? (Centered 1:1 Placeholder + Title + Subtitle)
              ========================================================================= */}
           {step === 1 && (
-            <View style={styles.stepCard}>
-              {/* 1:1 Centered Image Placeholder */}
-              <View style={styles.centerImageWrapper}>
-                <View style={styles.imageCardSquare}>
-                  <Image
-                    source={require('../../assets/landing-assets/what1.webp')}
-                    style={styles.imageSquare}
-                    contentFit="cover"
-                  />
-                </View>
+            <View style={styles.screenWrapper}>
+              {/* 1:1 Image Placeholder */}
+              <View
+                style={[
+                  styles.imagePlaceholderBox,
+                  { width: placeholderSize, height: placeholderSize },
+                ]}
+              >
+                <ImageIcon size={32} color="#94A3B8" />
+                <Text style={styles.placeholderLabel}>1:1 Image</Text>
               </View>
 
-              <View style={styles.badgeRow}>
-                <Globe2 size={13} color="#6C47FF" />
-                <Text style={styles.badgeText}>ALL INDIA EVENT HUB</Text>
-              </View>
-
-              <Text style={styles.headline}>What is EvenTime?</Text>
-              <Text style={styles.subheadline}>
+              <Text style={styles.headlineText}>What is EvenTime?</Text>
+              <Text style={styles.subheadlineText}>
                 All college fests, hackathons, concerts, and tech summits across India in one single live feed.
               </Text>
             </View>
           )}
 
           {/* =========================================================================
-              STEP 2: What can you explore? (1:1 Centered Image + Minimal Punchy Text)
+              STEP 2: What can you explore? (Centered 1:1 Placeholder + Title + Subtitle)
              ========================================================================= */}
           {step === 2 && (
-            <View style={styles.stepCard}>
-              {/* 1:1 Centered Image Placeholder */}
-              <View style={styles.centerImageWrapper}>
-                <View style={styles.imageCardSquare}>
-                  <Image
-                    source={require('../../assets/landing-assets/why1.webp')}
-                    style={styles.imageSquare}
-                    contentFit="cover"
-                  />
-                </View>
+            <View style={styles.screenWrapper}>
+              {/* 1:1 Image Placeholder */}
+              <View
+                style={[
+                  styles.imagePlaceholderBox,
+                  { width: placeholderSize, height: placeholderSize },
+                ]}
+              >
+                <ImageIcon size={32} color="#94A3B8" />
+                <Text style={styles.placeholderLabel}>1:1 Image</Text>
               </View>
 
-              <View style={styles.badgeRow}>
-                <Layers size={13} color="#6C47FF" />
-                <Text style={styles.badgeText}>36+ CATEGORIES</Text>
-              </View>
-
-              <Text style={styles.headline}>What can you explore?</Text>
-              <Text style={styles.subheadline}>
+              <Text style={styles.headlineText}>What can you explore?</Text>
+              <Text style={styles.subheadlineText}>
                 From inter-college hackathons and esports to creator meetups and cultural nights — never miss out.
               </Text>
             </View>
           )}
 
           {/* =========================================================================
-              STEP 3: Who are you? (1:1 Centered Image + Persona Cards)
+              STEP 3: Tell us who you are (1:1 Placeholder + Persona Cards)
              ========================================================================= */}
           {step === 3 && (
-            <View style={styles.stepCard}>
-              {/* 1:1 Centered Image Placeholder */}
-              <View style={styles.centerImageWrapper}>
-                <View style={styles.imageCardSquare}>
-                  <Image
-                    source={require('../../assets/landing-assets/benefits1.webp')}
-                    style={styles.imageSquare}
-                    contentFit="cover"
-                  />
-                </View>
+            <View style={styles.screenWrapper}>
+              {/* 1:1 Image Placeholder */}
+              <View
+                style={[
+                  styles.imagePlaceholderBox,
+                  { width: placeholderSize, height: placeholderSize },
+                ]}
+              >
+                <ImageIcon size={28} color="#94A3B8" />
+                <Text style={styles.placeholderLabel}>1:1 Image</Text>
               </View>
 
-              <View style={styles.badgeRow}>
-                <Sparkles size={13} color="#6C47FF" />
-                <Text style={styles.badgeText}>PERSONALIZATION</Text>
-              </View>
-
-              <Text style={styles.headline}>Tell us who you are</Text>
-              <Text style={styles.subheadline}>
+              <Text style={styles.headlineText}>Tell us who you are</Text>
+              <Text style={styles.subheadlineText}>
                 Select your persona to customize your event recommendations.
               </Text>
 
-              {/* Persona Options */}
-              <View style={{ gap: 10, marginTop: 4 }}>
+              {/* Persona Cards */}
+              <View style={styles.personaContainer}>
                 <TouchableOpacity
-                  style={[styles.personaPill, userType === 'student' && styles.personaPillActive]}
+                  style={[styles.personaCard, userType === 'student' && styles.personaCardActive]}
                   onPress={() => setUserType('student')}
                   activeOpacity={0.85}
                 >
-                  <View style={[styles.personaIconBox, userType === 'student' && styles.personaIconBoxActive]}>
-                    <GraduationCap size={20} color={userType === 'student' ? '#FFF' : '#6C47FF'} />
+                  <View style={[styles.personaIconContainer, userType === 'student' && styles.personaIconContainerActive]}>
+                    <GraduationCap size={20} color={userType === 'student' ? '#FFFFFF' : '#6C47FF'} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.personaTitle, userType === 'student' && styles.personaTitleActive]}>
+                    <Text style={[styles.personaCardTitle, userType === 'student' && styles.personaCardTitleActive]}>
                       College Student
                     </Text>
-                    <Text style={styles.personaSubtitle}>Campus fests, hackathons & student perks</Text>
+                    <Text style={styles.personaCardSubtitle}>Campus fests, hackathons & student perks</Text>
                   </View>
                   {userType === 'student' && (
-                    <View style={styles.checkCircle}>
-                      <Check size={14} color="#FFF" />
+                    <View style={styles.checkBadge}>
+                      <Check size={13} color="#FFFFFF" />
                     </View>
                   )}
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.personaPill, userType === 'professional' && styles.personaPillActive]}
+                  style={[styles.personaCard, userType === 'professional' && styles.personaCardActive]}
                   onPress={() => setUserType('professional')}
                   activeOpacity={0.85}
                 >
-                  <View style={[styles.personaIconBox, userType === 'professional' && styles.personaIconBoxActive]}>
-                    <Briefcase size={20} color={userType === 'professional' ? '#FFF' : '#6C47FF'} />
+                  <View style={[styles.personaIconContainer, userType === 'professional' && styles.personaIconContainerActive]}>
+                    <Briefcase size={20} color={userType === 'professional' ? '#FFFFFF' : '#6C47FF'} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.personaTitle, userType === 'professional' && styles.personaTitleActive]}>
+                    <Text style={[styles.personaCardTitle, userType === 'professional' && styles.personaCardTitleActive]}>
                       Working Professional
                     </Text>
-                    <Text style={styles.personaSubtitle}>Conferences, founder meetups & summits</Text>
+                    <Text style={styles.personaCardSubtitle}>Conferences, founder meetups & summits</Text>
                   </View>
                   {userType === 'professional' && (
-                    <View style={styles.checkCircle}>
-                      <Check size={14} color="#FFF" />
+                    <View style={styles.checkBadge}>
+                      <Check size={13} color="#FFFFFF" />
                     </View>
                   )}
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.personaPill, userType === 'creator' && styles.personaPillActive]}
+                  style={[styles.personaCard, userType === 'creator' && styles.personaCardActive]}
                   onPress={() => setUserType('creator')}
                   activeOpacity={0.85}
                 >
-                  <View style={[styles.personaIconBox, userType === 'creator' && styles.personaIconBoxActive]}>
-                    <Palette size={20} color={userType === 'creator' ? '#FFF' : '#6C47FF'} />
+                  <View style={[styles.personaIconContainer, userType === 'creator' && styles.personaIconContainerActive]}>
+                    <Palette size={20} color={userType === 'creator' ? '#FFFFFF' : '#6C47FF'} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.personaTitle, userType === 'creator' && styles.personaTitleActive]}>
+                    <Text style={[styles.personaCardTitle, userType === 'creator' && styles.personaCardTitleActive]}>
                       Creator & Organizer
                     </Text>
-                    <Text style={styles.personaSubtitle}>Post events in 30s & top city leaderboards</Text>
+                    <Text style={styles.personaCardSubtitle}>Post events in 30s & top city leaderboards</Text>
                   </View>
                   {userType === 'creator' && (
-                    <View style={styles.checkCircle}>
-                      <Check size={14} color="#FFF" />
+                    <View style={styles.checkBadge}>
+                      <Check size={13} color="#FFFFFF" />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -420,40 +410,32 @@ export default function OnboardingScreen() {
           )}
 
           {/* =========================================================================
-              STEP 4: Pick Your Cities (1:1 Centered Visual + All Cities)
+              STEP 4: Pick Your Cities (1:1 Placeholder + All Cities Chips)
              ========================================================================= */}
           {step === 4 && (
-            <View style={styles.stepCard}>
-              {/* 1:1 Centered Visual Placeholder */}
-              <View style={styles.centerImageWrapper}>
-                <View style={styles.imageCardSquare}>
-                  <Image
-                    source={require('../../assets/cities/hyderabad1.webp')}
-                    style={styles.imageSquare}
-                    contentFit="cover"
-                  />
-                </View>
+            <View style={styles.screenWrapper}>
+              {/* 1:1 Image Placeholder */}
+              <View
+                style={[
+                  styles.imagePlaceholderBox,
+                  { width: placeholderSize, height: placeholderSize },
+                ]}
+              >
+                <MapPin size={26} color="#94A3B8" />
+                <Text style={styles.placeholderLabel}>1:1 Image</Text>
               </View>
 
-              <View style={styles.badgeRow}>
-                <MapPin size={13} color="#6C47FF" />
-                <Text style={styles.badgeText}>LOCATION RADAR</Text>
-              </View>
-
-              <View style={styles.titleWithCounter}>
-                <Text style={styles.headline}>Pick Your Cities</Text>
-                <Text style={styles.counterText}>{preferredCities.length}/3 selected</Text>
-              </View>
-              <Text style={styles.subheadline}>
-                Choose up to 3 cities for your Around You feed.
+              <Text style={styles.headlineText}>Pick Your Cities</Text>
+              <Text style={styles.subheadlineText}>
+                Choose up to 3 cities ({preferredCities.length}/3 selected)
               </Text>
 
               {/* Search Bar */}
-              <View style={styles.searchBar}>
+              <View style={styles.searchInputWrapper}>
                 <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
                 <TextInput
-                  style={styles.searchInput}
-                  placeholder="Filter 32+ Indian cities..."
+                  style={styles.textInput}
+                  placeholder="Search 32+ Indian cities..."
                   placeholderTextColor="#94A3B8"
                   value={citySearchQuery}
                   onChangeText={setCitySearchQuery}
@@ -461,22 +443,22 @@ export default function OnboardingScreen() {
               </View>
 
               {/* All Cities Chips */}
-              <View style={styles.chipsWrap}>
+              <View style={styles.chipsContainer}>
                 {filteredCities.map((cityName) => {
                   const isSelected = preferredCities.includes(cityName);
                   return (
                     <TouchableOpacity
                       key={cityName}
-                      style={[styles.cityChip, isSelected && styles.cityChipActive]}
+                      style={[styles.chipItem, isSelected && styles.chipItemActive]}
                       onPress={() => toggleCity(cityName)}
                       activeOpacity={0.7}
                     >
                       <MapPin
-                        size={12}
+                        size={11}
                         color={isSelected ? '#FFFFFF' : '#64748B'}
                         style={{ marginRight: 4 }}
                       />
-                      <Text style={[styles.cityChipText, isSelected && styles.cityChipTextActive]}>
+                      <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
                         {cityName}
                       </Text>
                     </TouchableOpacity>
@@ -487,40 +469,32 @@ export default function OnboardingScreen() {
           )}
 
           {/* =========================================================================
-              STEP 5: Choose Categories (1:1 Centered Visual + All Categories)
+              STEP 5: What do you like? (1:1 Placeholder + All Categories Chips)
              ========================================================================= */}
           {step === 5 && (
-            <View style={styles.stepCard}>
-              {/* 1:1 Centered Visual Placeholder */}
-              <View style={styles.centerImageWrapper}>
-                <View style={styles.imageCardSquare}>
-                  <Image
-                    source={require('../../assets/hero-section-v2.webp')}
-                    style={styles.imageSquare}
-                    contentFit="cover"
-                  />
-                </View>
+            <View style={styles.screenWrapper}>
+              {/* 1:1 Image Placeholder */}
+              <View
+                style={[
+                  styles.imagePlaceholderBox,
+                  { width: placeholderSize, height: placeholderSize },
+                ]}
+              >
+                <Sparkles size={26} color="#94A3B8" />
+                <Text style={styles.placeholderLabel}>1:1 Image</Text>
               </View>
 
-              <View style={styles.badgeRow}>
-                <Calendar size={13} color="#6C47FF" />
-                <Text style={styles.badgeText}>EVENT FORMATS</Text>
-              </View>
-
-              <View style={styles.titleWithCounter}>
-                <Text style={styles.headline}>What do you like?</Text>
-                <Text style={styles.counterText}>{selectedCategories.length}/6 selected</Text>
-              </View>
-              <Text style={styles.subheadline}>
-                Select your favorite categories to calibrate your algorithm.
+              <Text style={styles.headlineText}>What do you like?</Text>
+              <Text style={styles.subheadlineText}>
+                Select up to 6 categories ({selectedCategories.length}/6 selected)
               </Text>
 
               {/* Search Bar */}
-              <View style={styles.searchBar}>
+              <View style={styles.searchInputWrapper}>
                 <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
                 <TextInput
-                  style={styles.searchInput}
-                  placeholder="Filter 36+ categories (Hackathon, Fest)..."
+                  style={styles.textInput}
+                  placeholder="Search 36+ categories (Hackathon, Fest)..."
                   placeholderTextColor="#94A3B8"
                   value={categorySearchQuery}
                   onChangeText={setCategorySearchQuery}
@@ -528,7 +502,7 @@ export default function OnboardingScreen() {
               </View>
 
               {/* All Categories Chips */}
-              <View style={styles.chipsWrap}>
+              <View style={styles.chipsContainer}>
                 {filteredCategories.map((cat) => {
                   const isSelected = selectedCategories.includes(cat);
                   const meta = getCategoryMeta(cat);
@@ -536,7 +510,7 @@ export default function OnboardingScreen() {
                     <TouchableOpacity
                       key={cat}
                       style={[
-                        styles.catChip,
+                        styles.chipItem,
                         isSelected && {
                           backgroundColor: meta.accentColor || '#6C47FF',
                           borderColor: meta.accentColor || '#6C47FF',
@@ -545,7 +519,7 @@ export default function OnboardingScreen() {
                       onPress={() => toggleCategory(cat)}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.catChipText, isSelected && styles.catChipTextActive]}>
+                      <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
                         {cat}
                       </Text>
                     </TouchableOpacity>
@@ -556,39 +530,29 @@ export default function OnboardingScreen() {
           )}
 
           {/* =========================================================================
-              STEP 6: Login & Launch (1:1 Centered Emblem + Launch CTAs)
+              STEP 6: Your Feed is Ready (1:1 Placeholder + Launch Actions)
              ========================================================================= */}
           {step === 6 && (
-            <View style={styles.stepCard}>
-              {/* 1:1 Centered Passport / Card */}
-              <View style={styles.centerImageWrapper}>
-                <View style={styles.passportCardSquare}>
-                  <Image
-                    source={APP_ASSETS.logo}
-                    style={styles.passportLogo}
-                    contentFit="contain"
-                  />
-                  <Text style={styles.passportTitle}>EvenTime Pass</Text>
-                  <View style={styles.scoreBadge}>
-                    <Flame size={12} color="#F59E0B" />
-                    <Text style={styles.scoreBadgeText}>+100 ET SCORE</Text>
-                  </View>
-                </View>
+            <View style={styles.screenWrapper}>
+              {/* 1:1 Image Placeholder */}
+              <View
+                style={[
+                  styles.imagePlaceholderBox,
+                  { width: placeholderSize, height: placeholderSize },
+                ]}
+              >
+                <ImageIcon size={32} color="#94A3B8" />
+                <Text style={styles.placeholderLabel}>1:1 Image</Text>
               </View>
 
-              <View style={styles.badgeRow}>
-                <Sparkles size={13} color="#6C47FF" />
-                <Text style={styles.badgeText}>READY FOR LAUNCH</Text>
-              </View>
-
-              <Text style={styles.headline}>Your Feed is Ready.</Text>
-              <Text style={styles.subheadline}>
-                Sign in to sync your bookmarks across devices, or dive straight in as a guest.
+              <Text style={styles.headlineText}>Your Feed is Ready</Text>
+              <Text style={styles.subheadlineText}>
+                Sign in to sync your bookmarks, or dive straight in as a guest.
               </Text>
 
-              {/* Google Sign In */}
+              {/* Google Button */}
               <TouchableOpacity
-                style={styles.googleBtn}
+                style={styles.googleActionBtn}
                 onPress={handleGoogleSignIn}
                 disabled={Boolean(authLoading)}
                 activeOpacity={0.85}
@@ -597,38 +561,38 @@ export default function OnboardingScreen() {
                   <ActivityIndicator size="small" color="#1E293B" />
                 ) : (
                   <>
-                    <Image source={APP_ASSETS.logo} style={styles.googleIcon} contentFit="contain" />
-                    <Text style={styles.googleBtnText}>Continue with Google</Text>
+                    <Image source={APP_ASSETS.logo} style={styles.googleBtnLogo} contentFit="contain" />
+                    <Text style={styles.googleActionText}>Continue with Google</Text>
                   </>
                 )}
               </TouchableOpacity>
 
-              {/* Alternate Actions */}
+              {/* Guest & Email Options */}
               {!showEmailForm ? (
-                <View style={styles.altRow}>
+                <View style={styles.secondaryActionsRow}>
                   <TouchableOpacity
-                    style={styles.altBtn}
+                    style={styles.secondaryActionBtn}
                     onPress={() => setShowEmailForm(true)}
                   >
                     <Mail size={14} color="#6C47FF" />
-                    <Text style={styles.altBtnText}>Email Sign-in</Text>
+                    <Text style={styles.secondaryActionText}>Email Sign-in</Text>
                   </TouchableOpacity>
 
                   <Text style={{ color: '#CBD5E1' }}>•</Text>
 
                   <TouchableOpacity
-                    style={styles.altBtn}
+                    style={styles.secondaryActionBtn}
                     onPress={handleLaunchApp}
                     disabled={isSaving}
                   >
-                    <Text style={styles.guestText}>Explore as Guest</Text>
+                    <Text style={styles.guestActionText}>Explore as Guest</Text>
                     <ArrowRight size={13} color="#64748B" />
                   </TouchableOpacity>
                 </View>
               ) : (
-                <View style={styles.emailBox}>
+                <View style={styles.emailContainer}>
                   <TextInput
-                    style={styles.emailInput}
+                    style={styles.emailField}
                     placeholder="Email address"
                     placeholderTextColor="#94A3B8"
                     value={email}
@@ -636,9 +600,9 @@ export default function OnboardingScreen() {
                     autoCapitalize="none"
                     keyboardType="email-address"
                   />
-                  <View style={styles.passRow}>
+                  <View style={styles.passwordFieldRow}>
                     <TextInput
-                      style={{ flex: 1, fontSize: 14, color: '#0F172A' }}
+                      style={{ flex: 1, fontSize: 13, color: '#0F172A' }}
                       placeholder="Password"
                       placeholderTextColor="#94A3B8"
                       value={password}
@@ -651,14 +615,16 @@ export default function OnboardingScreen() {
                   </View>
 
                   <TouchableOpacity
-                    style={styles.emailSubmitBtn}
+                    style={styles.emailSubmitButton}
                     onPress={handleEmailAuth}
                     disabled={Boolean(authLoading)}
                   >
                     {authLoading === 'email' ? (
                       <ActivityIndicator size="small" color="#FFF" />
                     ) : (
-                      <Text style={styles.emailSubmitText}>{isSignUp ? 'Create Account' : 'Sign In'}</Text>
+                      <Text style={styles.emailSubmitButtonText}>
+                        {isSignUp ? 'Create Account' : 'Sign In'}
+                      </Text>
                     )}
                   </TouchableOpacity>
 
@@ -674,19 +640,19 @@ export default function OnboardingScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Bottom Bar with Back & Continue Buttons (Steps 1-5) */}
+      {/* Bottom Bar (Steps 1-5) */}
       {step < 6 && (
-        <View style={styles.bottomBar}>
+        <View style={styles.bottomNavigationBar}>
           {step > 1 ? (
-            <TouchableOpacity style={styles.backBtn} onPress={handleBack} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.navBackBtn} onPress={handleBack} activeOpacity={0.7}>
               <ArrowLeft size={18} color="#64748B" />
             </TouchableOpacity>
           ) : (
             <View style={{ width: 44 }} />
           )}
 
-          <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.88}>
-            <Text style={styles.nextBtnText}>Continue</Text>
+          <TouchableOpacity style={styles.navNextBtn} onPress={handleNext} activeOpacity={0.88}>
+            <Text style={styles.navNextBtnText}>Continue</Text>
             <ArrowRight size={16} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
@@ -698,176 +664,112 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFC',
+    backgroundColor: '#FFFFFF',
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 6,
+    paddingHorizontal: 24,
+    paddingTop: 8,
     paddingBottom: 10,
   },
-  topBrandGroup: {
+  brandGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  topLogo: {
+  brandLogo: {
     width: 26,
     height: 26,
     borderRadius: 8,
   },
-  topBrandText: {
+  brandTitle: {
     fontSize: 18,
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.4,
   },
-  skipPill: {
+  skipBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
     backgroundColor: '#F1F5F9',
   },
-  skipPillText: {
+  skipBtnText: {
     fontSize: 12,
     fontWeight: '700',
     color: '#64748B',
   },
-  stepIndicatorRow: {
+  stepProgressBar: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     gap: 6,
     marginBottom: 8,
   },
-  stepBarSegment: {
+  stepBarItem: {
     flex: 1,
     height: 3,
     borderRadius: 2,
   },
-  stepBarActive: {
+  stepBarItemActive: {
     backgroundColor: '#6C47FF',
   },
-  stepBarInactive: {
+  stepBarItemInactive: {
     backgroundColor: '#E2E8F0',
   },
-  scrollBody: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 32,
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 24,
   },
-  stepCard: {
-    flex: 1,
-  },
-  centerImageWrapper: {
-    alignItems: 'center',
+  centeredScrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
-    marginVertical: 12,
   },
-  imageCardSquare: {
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
-    borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  imageSquare: {
+  screenWrapper: {
     width: '100%',
-    height: '100%',
+    alignItems: 'center',
   },
-  passportCardSquare: {
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
+  imagePlaceholderBox: {
     borderRadius: 24,
-    backgroundColor: '#1E1B4B',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: 'rgba(108, 71, 255, 0.3)',
-    shadowColor: '#6C47FF',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  passportLogo: {
-    width: 60,
-    height: 60,
-    borderRadius: 14,
-  },
-  passportTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: -0.3,
-  },
-  scoreBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(245, 158, 11, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  scoreBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#FBBF24',
-    letterSpacing: 0.6,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginBottom: 20,
     gap: 6,
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(108, 71, 255, 0.08)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginBottom: 8,
   },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#6C47FF',
-    letterSpacing: 0.8,
+  placeholderLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
   },
-  headline: {
+  headlineText: {
     fontSize: 24,
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.5,
-    lineHeight: 30,
+    textAlign: 'center',
     marginBottom: 6,
   },
-  titleWithCounter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  counterText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#6C47FF',
-  },
-  subheadline: {
+  subheadlineText: {
     fontSize: 13,
     color: '#64748B',
     lineHeight: 18,
-    marginBottom: 16,
+    textAlign: 'center',
+    paddingHorizontal: 12,
+    marginBottom: 18,
   },
-  personaPill: {
+  personaContainer: {
+    width: '100%',
+    gap: 10,
+    marginTop: 4,
+  },
+  personaCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
@@ -877,16 +779,16 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     gap: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
     elevation: 1,
   },
-  personaPillActive: {
+  personaCardActive: {
     borderColor: '#6C47FF',
     backgroundColor: '#FAF8FF',
   },
-  personaIconBox: {
+  personaIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 12,
@@ -894,23 +796,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  personaIconBoxActive: {
+  personaIconContainerActive: {
     backgroundColor: '#6C47FF',
   },
-  personaTitle: {
+  personaCardTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: '#0F172A',
   },
-  personaTitleActive: {
+  personaCardTitleActive: {
     color: '#6C47FF',
   },
-  personaSubtitle: {
+  personaCardSubtitle: {
     fontSize: 11,
     color: '#64748B',
     marginTop: 2,
   },
-  checkCircle: {
+  checkBadge: {
     width: 22,
     height: 22,
     borderRadius: 11,
@@ -918,66 +820,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchBar: {
+  searchInputWrapper: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 12,
   },
-  searchInput: {
+  textInput: {
     flex: 1,
     fontSize: 13,
     color: '#0F172A',
   },
-  chipsWrap: {
+  chipsContainer: {
+    width: '100%',
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 8,
   },
-  cityChip: {
+  chipItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  cityChipActive: {
+  chipItemActive: {
     backgroundColor: '#6C47FF',
     borderColor: '#6C47FF',
   },
-  cityChipText: {
+  chipText: {
     fontSize: 12,
     fontWeight: '700',
     color: '#334155',
   },
-  cityChipTextActive: {
+  chipTextActive: {
     color: '#FFFFFF',
   },
-  catChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  catChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  catChipTextActive: {
-    color: '#FFFFFF',
-  },
-  googleBtn: {
+  googleActionBtn: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -989,44 +879,45 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
     marginBottom: 12,
   },
-  googleIcon: {
+  googleBtnLogo: {
     width: 20,
     height: 20,
   },
-  googleBtnText: {
+  googleActionText: {
     fontSize: 15,
     fontWeight: '800',
     color: '#0F172A',
   },
-  altRow: {
+  secondaryActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 16,
     marginTop: 4,
   },
-  altBtn: {
+  secondaryActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingVertical: 8,
   },
-  altBtnText: {
+  secondaryActionText: {
     fontSize: 13,
     fontWeight: '700',
     color: '#6C47FF',
   },
-  guestText: {
+  guestActionText: {
     fontSize: 13,
     fontWeight: '700',
     color: '#64748B',
   },
-  emailBox: {
+  emailContainer: {
+    width: '100%',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
@@ -1035,7 +926,7 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 6,
   },
-  emailInput: {
+  emailField: {
     backgroundColor: '#F8FAFC',
     borderRadius: 10,
     borderWidth: 1,
@@ -1045,7 +936,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#0F172A',
   },
-  passRow: {
+  passwordFieldRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
@@ -1055,28 +946,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  emailSubmitBtn: {
+  emailSubmitButton: {
     backgroundColor: '#6C47FF',
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
   },
-  emailSubmitText: {
+  emailSubmitButtonText: {
     fontSize: 14,
     fontWeight: '800',
     color: '#FFFFFF',
   },
-  bottomBar: {
+  bottomNavigationBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingVertical: 14,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
     backgroundColor: '#FFFFFF',
   },
-  backBtn: {
+  navBackBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -1084,7 +975,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  nextBtn: {
+  navNextBtn: {
     flex: 1,
     marginLeft: 12,
     flexDirection: 'row',
@@ -1096,11 +987,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     shadowColor: '#6C47FF',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 10,
-    elevation: 4,
+    elevation: 3,
   },
-  nextBtnText: {
+  navNextBtnText: {
     fontSize: 15,
     fontWeight: '800',
     color: '#FFFFFF',
