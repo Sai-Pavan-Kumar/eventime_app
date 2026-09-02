@@ -46,35 +46,47 @@ export function RootNavigator() {
 
   // Register for push notifications, refresh listener, and listen for responses/deep-links
   useEffect(() => {
-    registerForPushNotificationsAsync(user?.id);
-    const tokenRefreshSub = setupPushTokenRefreshListener(user?.id);
+    let responseSub: Notifications.Subscription | null = null;
+    let tokenRefreshSub: Notifications.Subscription | null = null;
+    let timer: NodeJS.Timeout | null = null;
 
-    // 1. Listen for notification taps when app is in foreground or background
-    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-      if (navigationRef.isReady()) {
-        handleNotificationResponse(navigationRef, response);
-      }
-    });
+    try {
+      registerForPushNotificationsAsync(user?.id);
+      tokenRefreshSub = setupPushTokenRefreshListener(user?.id);
 
-    // 2. Check if app was launched directly from a notification tap (Cold start)
-    if (navigationRef.isReady()) {
-      checkColdStartNotification(navigationRef);
-    } else {
-      const timer = setTimeout(() => {
-        if (navigationRef.isReady()) {
-          checkColdStartNotification(navigationRef);
+      // 1. Listen for notification taps when app is in foreground or background
+      responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+        try {
+          if (navigationRef.isReady()) {
+            handleNotificationResponse(navigationRef, response);
+          }
+        } catch (err) {
+          console.warn('[RootNavigator] Notification response handler error:', err);
         }
-      }, 1000);
-      return () => {
-        clearTimeout(timer);
-        responseSub.remove();
-        tokenRefreshSub.remove();
-      };
+      });
+
+      // 2. Check if app was launched directly from a notification tap (Cold start)
+      if (navigationRef.isReady()) {
+        checkColdStartNotification(navigationRef);
+      } else {
+        timer = setTimeout(() => {
+          try {
+            if (navigationRef.isReady()) {
+              checkColdStartNotification(navigationRef);
+            }
+          } catch (err) {
+            console.warn('[RootNavigator] Cold start notification error:', err);
+          }
+        }, 1000);
+      }
+    } catch (err) {
+      console.warn('[RootNavigator] Push notifications setup error:', err);
     }
 
     return () => {
-      responseSub.remove();
-      tokenRefreshSub.remove();
+      if (timer) clearTimeout(timer);
+      if (responseSub && typeof responseSub.remove === 'function') responseSub.remove();
+      if (tokenRefreshSub && typeof tokenRefreshSub.remove === 'function') tokenRefreshSub.remove();
     };
   }, [user?.id]);
 

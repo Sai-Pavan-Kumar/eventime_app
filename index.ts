@@ -1,5 +1,7 @@
 import 'react-native-gesture-handler';
 import 'react-native-url-polyfill/auto';
+import { enableScreens } from 'react-native-screens';
+enableScreens(true);
 import { registerRootComponent } from 'expo';
 import App from './src/App';
 
