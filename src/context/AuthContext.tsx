@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import type { Session } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '../lib/supabase';
 import type { AuthUser, ProfileRow } from '../types';
 
@@ -217,7 +218,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // 2. Fallback to WebBrowser OAuth if native SDK is not available (e.g. Expo Go)
-      const redirectUrl = Linking.createURL('auth');
+      const redirectUrl = makeRedirectUri({
+        scheme: 'eventime',
+        path: 'auth',
+      });
+      console.log('[AuthContext] Google OAuth redirectUrl:', redirectUrl);
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -285,7 +290,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGithub = async (): Promise<{ error: Error | null }> => {
     try {
-      const redirectUrl = Linking.createURL('auth');
+      const redirectUrl = makeRedirectUri({
+        scheme: 'eventime',
+        path: 'auth',
+      });
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {

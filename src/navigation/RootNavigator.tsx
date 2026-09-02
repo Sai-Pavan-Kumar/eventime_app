@@ -48,6 +48,7 @@ const linking = {
   config: {
     screens: {
       MainTabs: '',
+      Login: 'auth',
       EventDetail: 'events/:id',
       CityEvents: 'city/:city',
       CuratorProfile: 'curator/:userId',
