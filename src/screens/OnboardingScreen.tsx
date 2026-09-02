@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -18,8 +19,6 @@ import { useNavigation } from '@react-navigation/native';
 import {
   GraduationCap,
   Briefcase,
-  Palette,
-  Search,
   ArrowRight,
   ArrowLeft,
   MapPin,
@@ -29,6 +28,8 @@ import {
   EyeOff,
   ImageIcon,
   Sparkles,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -42,6 +43,33 @@ import {
 } from '../lib/guest-preferences';
 import { APP_ASSETS } from '../lib/asset-registry';
 
+const POPULAR_CATEGORIES = [
+  'Hackathon',
+  'AI Event',
+  'College Fest',
+  'Concert',
+  'Developer Event',
+  'Startup Event',
+  'Tech Event',
+  'Gaming & Esports',
+  'Music Festival',
+  'Workshop',
+] as const;
+
+const COMMON_BRANCHES = [
+  'CSE',
+  'AI & ML',
+  'Data Science',
+  'ECE',
+  'IT',
+  'EEE',
+  'Mechanical',
+  'Civil',
+  'Other',
+];
+
+const GRAD_YEARS = ['2025', '2026', '2027', '2028', '2029+'];
+
 export default function OnboardingScreen() {
   const { width, height } = useWindowDimensions();
   const navigation = useNavigation<any>();
@@ -54,30 +82,37 @@ export default function OnboardingScreen() {
     signUpWithEmail,
   } = useAuth();
 
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1);
+  // Navigation step (1: Intro, 2: Explore, 3: Persona, 4: Campus (if student), 5: Cities, 6: Categories, 7: Launch)
+  const [step, setStep] = useState<number>(1);
   const [isSaving, setIsSaving] = useState(false);
 
   // Form States
-  const [userType, setUserType] = useState<'student' | 'professional' | 'creator'>('student');
+  const [userType, setUserType] = useState<'student' | 'professional'>('student');
   const [fullName] = useState(profile?.full_name || user?.user_metadata?.full_name || '');
 
-  // Cities (Max 3)
-  const [citySearchQuery, setCitySearchQuery] = useState('');
+  // Campus Form (Only for students)
+  const [collegeName, setCollegeName] = useState(profile?.college || '');
+  const [collegeSuggestions, setCollegeSuggestions] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedCollegeId, setSelectedCollegeId] = useState<string | null>(profile?.college_id || null);
+  const [branch, setBranch] = useState(profile?.branch || 'CSE');
+  const [graduationYear, setGraduationYear] = useState(profile?.graduation_year?.toString() || '2026');
+
+  // Cities (No default pre-selection)
   const [preferredCities, setPreferredCities] = useState<string[]>(
     profile?.preferred_cities && profile.preferred_cities.length > 0
       ? profile.preferred_cities
-      : ['Hyderabad', 'Bengaluru']
+      : []
   );
 
-  // Categories / Interests (Max 6)
-  const [categorySearchQuery, setCategorySearchQuery] = useState('');
+  // Categories (No default pre-selection, popular 10 first)
+  const [showAllCategories, setShowAllCategories] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     profile?.goals && profile.goals.length > 0
       ? profile.goals
-      : ['Hackathon', 'AI Event', 'Tech Event', 'College Fest']
+      : []
   );
 
-  // Auth States for Step 6
+  // Auth States for Launch Step
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -88,16 +123,53 @@ export default function OnboardingScreen() {
   // Responsive Dimensions
   const isSmallDevice = height < 700;
   const placeholderSize = isSmallDevice
-    ? Math.min(width * 0.45, 160)
+    ? Math.min(width * 0.42, 150)
     : step >= 4
-    ? Math.min(width * 0.38, 140)
-    : Math.min(width * 0.58, 220);
+    ? Math.min(width * 0.35, 130)
+    : Math.min(width * 0.55, 210);
+
+  // Total steps: 7 if student, 6 if professional
+  const totalSteps = userType === 'student' ? 7 : 6;
+
+  // Search colleges from supabase
+  useEffect(() => {
+    if (collegeName.trim().length >= 2 && !selectedCollegeId) {
+      const searchColleges = async () => {
+        try {
+          const { data } = await supabase
+            .from('colleges')
+            .select('id, name')
+            .ilike('name', `%${collegeName.trim()}%`)
+            .limit(5);
+          if (data) setCollegeSuggestions(data);
+        } catch {
+          // ignore error
+        }
+      };
+      const timer = setTimeout(searchColleges, 300);
+      return () => clearTimeout(timer);
+    } else {
+      setCollegeSuggestions([]);
+    }
+  }, [collegeName, selectedCollegeId]);
+
+  // Hardware Back Button Handler (Android)
+  useEffect(() => {
+    const onBackPress = () => {
+      if (step > 1) {
+        handleBack();
+        return true; // prevent app from closing
+      }
+      return false; // let system handle (exit app on first screen)
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [step, userType]);
 
   const toggleCity = (cityName: string) => {
     if (preferredCities.includes(cityName)) {
-      if (preferredCities.length > 1) {
-        setPreferredCities(preferredCities.filter((item) => item !== cityName));
-      }
+      setPreferredCities(preferredCities.filter((item) => item !== cityName));
     } else {
       if (preferredCities.length >= 3) {
         Alert.alert('Limit Reached', 'You can choose up to 3 cities.');
@@ -109,9 +181,7 @@ export default function OnboardingScreen() {
 
   const toggleCategory = (cat: string) => {
     if (selectedCategories.includes(cat)) {
-      if (selectedCategories.length > 1) {
-        setSelectedCategories(selectedCategories.filter((item) => item !== cat));
-      }
+      setSelectedCategories(selectedCategories.filter((item) => item !== cat));
     } else {
       if (selectedCategories.length >= 6) {
         Alert.alert('Limit Reached', 'You can choose up to 6 categories.');
@@ -121,44 +191,71 @@ export default function OnboardingScreen() {
     }
   };
 
-  const filteredCities = useMemo(() => {
-    if (!citySearchQuery.trim()) return CITIES;
-    return CITIES.filter((c) =>
-      c.toLowerCase().includes(citySearchQuery.trim().toLowerCase())
-    );
-  }, [citySearchQuery]);
-
-  const filteredCategories = useMemo(() => {
-    if (!categorySearchQuery.trim()) return CATEGORIES_LIST;
-    return CATEGORIES_LIST.filter((cat) =>
-      cat.toLowerCase().includes(categorySearchQuery.trim().toLowerCase())
-    );
-  }, [categorySearchQuery]);
-
   const currentOnboardingData: OnboardingData = {
     userType,
     fullName,
+    college: userType === 'student' ? collegeName : undefined,
+    collegeId: userType === 'student' ? selectedCollegeId : undefined,
+    branch: userType === 'student' ? branch : undefined,
+    graduationYear: userType === 'student' ? graduationYear : undefined,
     preferredCities,
     goals: selectedCategories,
   };
 
   const handleNext = () => {
-    if (step === 4 && preferredCities.length === 0) {
-      Alert.alert('City Required', 'Please select at least 1 city.');
+    // Step 1 -> 2
+    if (step === 1) {
+      setStep(2);
       return;
     }
-    if (step === 5 && selectedCategories.length === 0) {
-      Alert.alert('Category Required', 'Please select at least 1 category.');
+    // Step 2 -> 3
+    if (step === 2) {
+      setStep(3);
       return;
     }
-    if (step < 6) {
-      setStep((prev) => (prev + 1) as any);
+    // Step 3 (Persona) -> 4 (Campus if student, or Cities if pro)
+    if (step === 3) {
+      if (userType === 'student') {
+        setStep(4); // Campus details
+      } else {
+        setStep(5); // Skip campus, go to cities
+      }
+      return;
+    }
+    // Step 4 (Campus) -> 5 (Cities)
+    if (step === 4) {
+      if (!collegeName.trim()) {
+        Alert.alert('College Required', 'Please enter your college name.');
+        return;
+      }
+      setStep(5);
+      return;
+    }
+    // Step 5 (Cities) -> 6 (Categories)
+    if (step === 5) {
+      if (preferredCities.length === 0) {
+        Alert.alert('City Required', 'Please select at least 1 city.');
+        return;
+      }
+      setStep(6);
+      return;
+    }
+    // Step 6 (Categories) -> 7 (Launch)
+    if (step === 6) {
+      if (selectedCategories.length === 0) {
+        Alert.alert('Category Required', 'Please select at least 1 category.');
+        return;
+      }
+      setStep(7);
+      return;
     }
   };
 
   const handleBack = () => {
-    if (step > 1) {
-      setStep((prev) => (prev - 1) as any);
+    if (step === 5 && userType === 'professional') {
+      setStep(3); // Go back directly to persona if pro
+    } else if (step > 1) {
+      setStep((prev) => prev - 1);
     }
   };
 
@@ -233,6 +330,12 @@ export default function OnboardingScreen() {
     }
   };
 
+  // Visible Categories list based on expanded toggle
+  const visibleCategories = useMemo(() => {
+    if (showAllCategories) return CATEGORIES_LIST;
+    return POPULAR_CATEGORIES;
+  }, [showAllCategories]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Top Header */}
@@ -242,7 +345,7 @@ export default function OnboardingScreen() {
           <Text style={styles.brandTitle}>EvenTime</Text>
         </View>
 
-        {step < 6 && (
+        {step < 7 && (
           <TouchableOpacity onPress={handleLaunchApp} style={styles.skipBtn} activeOpacity={0.7}>
             <Text style={styles.skipBtnText}>Skip</Text>
           </TouchableOpacity>
@@ -251,15 +354,19 @@ export default function OnboardingScreen() {
 
       {/* Segmented Step Bar */}
       <View style={styles.stepProgressBar}>
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <View
-            key={i}
-            style={[
-              styles.stepBarItem,
-              i <= step ? styles.stepBarItemActive : styles.stepBarItemInactive,
-            ]}
-          />
-        ))}
+        {Array.from({ length: totalSteps }, (_, idx) => idx + 1).map((i) => {
+          const currentVisualStep =
+            userType === 'professional' && step >= 5 ? step - 1 : step;
+          return (
+            <View
+              key={i}
+              style={[
+                styles.stepBarItem,
+                i <= currentVisualStep ? styles.stepBarItemActive : styles.stepBarItemInactive,
+              ]}
+            />
+          );
+        })}
       </View>
 
       <KeyboardAvoidingView
@@ -270,16 +377,15 @@ export default function OnboardingScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.scrollContent,
-            (step === 1 || step === 2 || step === 6) && styles.centeredScrollContent,
+            (step === 1 || step === 2 || step === 7) && styles.centeredScrollContent,
           ]}
           keyboardShouldPersistTaps="handled"
         >
           {/* =========================================================================
-              STEP 1: What is EvenTime? (Centered 1:1 Placeholder + Title + Subtitle)
+              STEP 1: What is EvenTime?
              ========================================================================= */}
           {step === 1 && (
             <View style={styles.screenWrapper}>
-              {/* 1:1 Image Placeholder */}
               <View
                 style={[
                   styles.imagePlaceholderBox,
@@ -298,11 +404,10 @@ export default function OnboardingScreen() {
           )}
 
           {/* =========================================================================
-              STEP 2: What can you explore? (Centered 1:1 Placeholder + Title + Subtitle)
+              STEP 2: What can you explore?
              ========================================================================= */}
           {step === 2 && (
             <View style={styles.screenWrapper}>
-              {/* 1:1 Image Placeholder */}
               <View
                 style={[
                   styles.imagePlaceholderBox,
@@ -321,11 +426,10 @@ export default function OnboardingScreen() {
           )}
 
           {/* =========================================================================
-              STEP 3: Tell us who you are (1:1 Placeholder + Persona Cards)
+              STEP 3: Tell us who you are (ONLY 2 OPTIONS: Student or Non-Student)
              ========================================================================= */}
           {step === 3 && (
             <View style={styles.screenWrapper}>
-              {/* 1:1 Image Placeholder */}
               <View
                 style={[
                   styles.imagePlaceholderBox,
@@ -338,10 +442,10 @@ export default function OnboardingScreen() {
 
               <Text style={styles.headlineText}>Tell us who you are</Text>
               <Text style={styles.subheadlineText}>
-                Select your persona to customize your event recommendations.
+                Choose your profile to unlock customized campus or city feeds.
               </Text>
 
-              {/* Persona Cards */}
+              {/* 2 Persona Cards */}
               <View style={styles.personaContainer}>
                 <TouchableOpacity
                   style={[styles.personaCard, userType === 'student' && styles.personaCardActive]}
@@ -349,13 +453,15 @@ export default function OnboardingScreen() {
                   activeOpacity={0.85}
                 >
                   <View style={[styles.personaIconContainer, userType === 'student' && styles.personaIconContainerActive]}>
-                    <GraduationCap size={20} color={userType === 'student' ? '#FFFFFF' : '#6C47FF'} />
+                    <GraduationCap size={22} color={userType === 'student' ? '#FFFFFF' : '#6C47FF'} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.personaCardTitle, userType === 'student' && styles.personaCardTitleActive]}>
                       College Student
                     </Text>
-                    <Text style={styles.personaCardSubtitle}>Campus fests, hackathons & student perks</Text>
+                    <Text style={styles.personaCardSubtitle}>
+                      Unlocks Your Campus feed, inter-college fests & student perks
+                    </Text>
                   </View>
                   {userType === 'student' && (
                     <View style={styles.checkBadge}>
@@ -370,36 +476,17 @@ export default function OnboardingScreen() {
                   activeOpacity={0.85}
                 >
                   <View style={[styles.personaIconContainer, userType === 'professional' && styles.personaIconContainerActive]}>
-                    <Briefcase size={20} color={userType === 'professional' ? '#FFFFFF' : '#6C47FF'} />
+                    <Briefcase size={22} color={userType === 'professional' ? '#FFFFFF' : '#6C47FF'} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.personaCardTitle, userType === 'professional' && styles.personaCardTitleActive]}>
-                      Working Professional
+                      Working Professional & Explorer
                     </Text>
-                    <Text style={styles.personaCardSubtitle}>Conferences, founder meetups & summits</Text>
+                    <Text style={styles.personaCardSubtitle}>
+                      Unlocks For You & Around You tech summits, conferences & meetups
+                    </Text>
                   </View>
                   {userType === 'professional' && (
-                    <View style={styles.checkBadge}>
-                      <Check size={13} color="#FFFFFF" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.personaCard, userType === 'creator' && styles.personaCardActive]}
-                  onPress={() => setUserType('creator')}
-                  activeOpacity={0.85}
-                >
-                  <View style={[styles.personaIconContainer, userType === 'creator' && styles.personaIconContainerActive]}>
-                    <Palette size={20} color={userType === 'creator' ? '#FFFFFF' : '#6C47FF'} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.personaCardTitle, userType === 'creator' && styles.personaCardTitleActive]}>
-                      Creator & Organizer
-                    </Text>
-                    <Text style={styles.personaCardSubtitle}>Post events in 30s & top city leaderboards</Text>
-                  </View>
-                  {userType === 'creator' && (
                     <View style={styles.checkBadge}>
                       <Check size={13} color="#FFFFFF" />
                     </View>
@@ -410,11 +497,105 @@ export default function OnboardingScreen() {
           )}
 
           {/* =========================================================================
-              STEP 4: Pick Your Cities (1:1 Placeholder + All Cities Chips)
+              STEP 4: Campus Details (ONLY SHOWN IF STUDENT)
              ========================================================================= */}
           {step === 4 && (
             <View style={styles.screenWrapper}>
-              {/* 1:1 Image Placeholder */}
+              <View
+                style={[
+                  styles.imagePlaceholderBox,
+                  { width: placeholderSize, height: placeholderSize },
+                ]}
+              >
+                <GraduationCap size={28} color="#94A3B8" />
+                <Text style={styles.placeholderLabel}>1:1 Image</Text>
+              </View>
+
+              <Text style={styles.headlineText}>Your Campus Details</Text>
+              <Text style={styles.subheadlineText}>
+                We'll calibrate your personalized college campus feed.
+              </Text>
+
+              {/* College Input */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>College / University Name</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g. CBIT, IIT Hyderabad, VIT..."
+                  placeholderTextColor="#94A3B8"
+                  value={collegeName}
+                  onChangeText={(txt) => {
+                    setCollegeName(txt);
+                    setSelectedCollegeId(null);
+                  }}
+                />
+
+                {/* College Suggestions */}
+                {collegeSuggestions.length > 0 && (
+                  <View style={styles.suggestionsBox}>
+                    {collegeSuggestions.map((item) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={styles.suggestionItem}
+                        onPress={() => {
+                          setCollegeName(item.name);
+                          setSelectedCollegeId(item.id);
+                          setCollegeSuggestions([]);
+                        }}
+                      >
+                        <GraduationCap size={14} color="#6C47FF" style={{ marginRight: 6 }} />
+                        <Text style={styles.suggestionText} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {/* Branch Selection */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Branch / Major</Text>
+                <View style={styles.branchWrap}>
+                  {COMMON_BRANCHES.map((b) => (
+                    <TouchableOpacity
+                      key={b}
+                      style={[styles.branchPill, branch === b && styles.branchPillActive]}
+                      onPress={() => setBranch(b)}
+                    >
+                      <Text style={[styles.branchText, branch === b && styles.branchTextActive]}>
+                        {b}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Graduation Year */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Graduation Year</Text>
+                <View style={styles.yearWrap}>
+                  {GRAD_YEARS.map((yr) => (
+                    <TouchableOpacity
+                      key={yr}
+                      style={[styles.yearPill, graduationYear === yr && styles.yearPillActive]}
+                      onPress={() => setGraduationYear(yr)}
+                    >
+                      <Text style={[styles.yearText, graduationYear === yr && styles.yearTextActive]}>
+                        {yr}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* =========================================================================
+              STEP 5: Pick Your Cities (No Search Bar, No Default Pre-selection)
+             ========================================================================= */}
+          {step === 5 && (
+            <View style={styles.screenWrapper}>
               <View
                 style={[
                   styles.imagePlaceholderBox,
@@ -427,24 +608,12 @@ export default function OnboardingScreen() {
 
               <Text style={styles.headlineText}>Pick Your Cities</Text>
               <Text style={styles.subheadlineText}>
-                Choose up to 3 cities ({preferredCities.length}/3 selected)
+                Select up to 3 cities ({preferredCities.length}/3 selected)
               </Text>
 
-              {/* Search Bar */}
-              <View style={styles.searchInputWrapper}>
-                <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Search 32+ Indian cities..."
-                  placeholderTextColor="#94A3B8"
-                  value={citySearchQuery}
-                  onChangeText={setCitySearchQuery}
-                />
-              </View>
-
-              {/* All Cities Chips */}
+              {/* All 32 Cities Chips Directly Visible */}
               <View style={styles.chipsContainer}>
-                {filteredCities.map((cityName) => {
+                {CITIES.map((cityName) => {
                   const isSelected = preferredCities.includes(cityName);
                   return (
                     <TouchableOpacity
@@ -469,11 +638,10 @@ export default function OnboardingScreen() {
           )}
 
           {/* =========================================================================
-              STEP 5: What do you like? (1:1 Placeholder + All Categories Chips)
+              STEP 6: What do you like? (Top 10 Popular First, Expand for rest)
              ========================================================================= */}
-          {step === 5 && (
+          {step === 6 && (
             <View style={styles.screenWrapper}>
-              {/* 1:1 Image Placeholder */}
               <View
                 style={[
                   styles.imagePlaceholderBox,
@@ -489,21 +657,9 @@ export default function OnboardingScreen() {
                 Select up to 6 categories ({selectedCategories.length}/6 selected)
               </Text>
 
-              {/* Search Bar */}
-              <View style={styles.searchInputWrapper}>
-                <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Search 36+ categories (Hackathon, Fest)..."
-                  placeholderTextColor="#94A3B8"
-                  value={categorySearchQuery}
-                  onChangeText={setCategorySearchQuery}
-                />
-              </View>
-
-              {/* All Categories Chips */}
+              {/* Popular Categories Chips */}
               <View style={styles.chipsContainer}>
-                {filteredCategories.map((cat) => {
+                {visibleCategories.map((cat) => {
                   const isSelected = selectedCategories.includes(cat);
                   const meta = getCategoryMeta(cat);
                   return (
@@ -526,15 +682,32 @@ export default function OnboardingScreen() {
                   );
                 })}
               </View>
+
+              {/* Show More / Show Less Toggle Button */}
+              <TouchableOpacity
+                style={styles.showMoreBtn}
+                onPress={() => setShowAllCategories(!showAllCategories)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.showMoreText}>
+                  {showAllCategories
+                    ? 'Show Less'
+                    : `+ Show All (${CATEGORIES_LIST.length - POPULAR_CATEGORIES.length} more)`}
+                </Text>
+                {showAllCategories ? (
+                  <ChevronUp size={14} color="#6C47FF" />
+                ) : (
+                  <ChevronDown size={14} color="#6C47FF" />
+                )}
+              </TouchableOpacity>
             </View>
           )}
 
           {/* =========================================================================
-              STEP 6: Your Feed is Ready (1:1 Placeholder + Launch Actions)
+              STEP 7: Your Feed is Ready (Login & Direct Launch)
              ========================================================================= */}
-          {step === 6 && (
+          {step === 7 && (
             <View style={styles.screenWrapper}>
-              {/* 1:1 Image Placeholder */}
               <View
                 style={[
                   styles.imagePlaceholderBox,
@@ -640,8 +813,8 @@ export default function OnboardingScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Bottom Bar (Steps 1-5) */}
-      {step < 6 && (
+      {/* Bottom Bar (Steps 1-6) */}
+      {step < 7 && (
         <View style={styles.bottomNavigationBar}>
           {step > 1 ? (
             <TouchableOpacity style={styles.navBackBtn} onPress={handleBack} activeOpacity={0.7}>
@@ -739,7 +912,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
     gap: 6,
   },
   placeholderLabel: {
@@ -766,14 +939,14 @@ const styles = StyleSheet.create({
   },
   personaContainer: {
     width: '100%',
-    gap: 10,
-    marginTop: 4,
+    gap: 12,
+    marginTop: 6,
   },
   personaCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    padding: 14,
+    padding: 16,
     borderRadius: 18,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
@@ -789,9 +962,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF8FF',
   },
   personaIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
@@ -810,7 +983,8 @@ const styles = StyleSheet.create({
   personaCardSubtitle: {
     fontSize: 11,
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 3,
+    lineHeight: 15,
   },
   checkBadge: {
     width: 22,
@@ -820,22 +994,98 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchInputWrapper: {
+  formGroup: {
     width: '100%',
+    marginBottom: 16,
+  },
+  formLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#475569',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  formInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  suggestionsBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  suggestionText: {
+    fontSize: 13,
+    color: '#1E293B',
+    fontWeight: '600',
+  },
+  branchWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  branchPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
   },
-  textInput: {
+  branchPillActive: {
+    backgroundColor: '#6C47FF',
+    borderColor: '#6C47FF',
+  },
+  branchText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  branchTextActive: {
+    color: '#FFFFFF',
+  },
+  yearWrap: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  yearPill: {
     flex: 1,
-    fontSize: 13,
-    color: '#0F172A',
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  yearPillActive: {
+    backgroundColor: '#6C47FF',
+    borderColor: '#6C47FF',
+  },
+  yearText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#475569',
+  },
+  yearTextActive: {
+    color: '#FFFFFF',
   },
   chipsContainer: {
     width: '100%',
@@ -865,6 +1115,21 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#FFFFFF',
+  },
+  showMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: 'rgba(108, 71, 255, 0.08)',
+  },
+  showMoreText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#6C47FF',
   },
   googleActionBtn: {
     width: '100%',
