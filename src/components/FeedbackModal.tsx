@@ -13,7 +13,7 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
 } from 'react-native';
-import { MessageSquare, X, Bug, Lightbulb, MessageCircle } from 'lucide-react-native';
+import { MessageSquare, X, Bug, Lightbulb } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../config/theme';
@@ -25,7 +25,7 @@ export interface FeedbackModalProps {
 
 export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
   const { user } = useAuth();
-  const [feedbackType, setFeedbackType] = useState<'general' | 'bug' | 'feature'>('general');
+  const [feedbackType, setFeedbackType] = useState<'bug' | 'feature'>('bug');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -51,7 +51,7 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
         'Thank you for helping us make EvenTime better! Our product team reviews every message.'
       );
       setMessage('');
-      setFeedbackType('general');
+      setFeedbackType('bug');
       onClose();
     } catch (err: any) {
       console.error('[FeedbackModal] Error:', err);
@@ -62,9 +62,8 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
   };
 
   const FEEDBACK_TYPES = [
-    { id: 'general', label: 'General', icon: MessageCircle },
-    { id: 'bug', label: 'Bug', icon: Bug },
-    { id: 'feature', label: 'Feature', icon: Lightbulb },
+    { id: 'bug', label: 'Report Bug', icon: Bug },
+    { id: 'feature', label: 'Feature Request', icon: Lightbulb },
   ] as const;
 
   return (
@@ -126,10 +125,8 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
                   style={styles.textInput}
                   placeholder={
                     feedbackType === 'bug'
-                      ? 'Describe what happened and steps to reproduce...'
-                      : feedbackType === 'feature'
-                      ? 'What feature would make EvenTime indispensable for you?'
-                      : 'Share your thoughts, suggestions, or comments...'
+                      ? 'Describe the issue, what happened, and steps to reproduce...'
+                      : 'Share your feature idea, suggestion, or recommendation...'
                   }
                   placeholderTextColor="#94A3B8"
                   multiline
