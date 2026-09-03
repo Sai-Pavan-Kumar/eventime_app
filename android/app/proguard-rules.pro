@@ -7,23 +7,23 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# react-native-reanimated
--keep class com.swmansion.reanimated.** { *; }
+# Add project specific ProGuard rules here.
+-dontwarn com.facebook.react.**
 -keep class com.facebook.react.turbomodule.** { *; }
-
-# React Native & Hermes
--keep class com.facebook.react.** { *; }
 -keep class com.facebook.hermes.** { *; }
 -keepclassmembers class * {
   @com.facebook.react.uimanager.annotations.ReactProp <methods>;
   @com.facebook.react.uimanager.annotations.ReactPropGroup <methods>;
 }
 
-# Expo modules
+# Expo modules JNI & reflection
+-dontwarn expo.modules.**
 -keep class expo.modules.** { *; }
 
 # Google Sign In
+-dontwarn com.google.android.gms.**
 -keep class com.google.android.gms.** { *; }
 
 # Async Storage
+-dontwarn com.reactnativecommunity.asyncstorage.**
 -keep class com.reactnativecommunity.asyncstorage.** { *; }
