@@ -74,6 +74,24 @@ export default function SettingsScreen() {
     }
   };
 
+  const selectAllCities = () => {
+    if (!isAdmin) return;
+    if (preferredCities.length === CITIES.length) {
+      setPreferredCities([]);
+    } else {
+      setPreferredCities([...CITIES]);
+    }
+  };
+
+  const selectAllCategories = () => {
+    if (!isAdmin) return;
+    if (goals.length === CATEGORIES_LIST.length) {
+      setGoals([]);
+    } else {
+      setGoals([...CATEGORIES_LIST]);
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
     const cleanUsername = username.trim().toLowerCase();
@@ -106,8 +124,8 @@ export default function SettingsScreen() {
         college: userType === 'student' ? college.trim() || null : null,
         branch: userType === 'student' ? branch : null,
         graduation_year: userType === 'student' ? graduationYear : null,
-        preferred_cities: preferredCities.slice(0, 3),
-        goals: goals.slice(0, 6),
+        preferred_cities: isAdmin ? preferredCities : preferredCities.slice(0, 3),
+        goals: isAdmin ? goals : goals.slice(0, 6),
         updated_at: new Date().toISOString(),
       };
 
@@ -305,9 +323,18 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Preferred Cities</Text>
-            <Text style={styles.limitBadge}>
-              {preferredCities.length} {isAdmin ? '(Unlimited)' : '/ 3 Max'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {isAdmin && (
+                <TouchableOpacity onPress={selectAllCities} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={styles.adminSelectAllText}>
+                    {preferredCities.length === CITIES.length ? 'Deselect All' : 'Select All'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <Text style={styles.limitBadge}>
+                {preferredCities.length} {isAdmin ? '(Unlimited)' : '/ 3 Max'}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.chipGrid}>
@@ -331,9 +358,18 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Category Interests</Text>
-            <Text style={styles.limitBadge}>
-              {goals.length} {isAdmin ? '(Unlimited)' : '/ 6 Max'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {isAdmin && (
+                <TouchableOpacity onPress={selectAllCategories} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={styles.adminSelectAllText}>
+                    {goals.length === CATEGORIES_LIST.length ? 'Deselect All' : 'Select All'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <Text style={styles.limitBadge}>
+                {goals.length} {isAdmin ? '(Unlimited)' : '/ 6 Max'}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.chipGrid}>
@@ -583,6 +619,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: theme.borderRadius.sm,
+  },
+  adminSelectAllText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 12,
+    color: theme.colors.brand,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
   },
   inputGroup: {
     marginBottom: 14,
