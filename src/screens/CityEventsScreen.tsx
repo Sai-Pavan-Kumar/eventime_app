@@ -174,10 +174,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingText: {
+    fontFamily: 'Switzer-Medium',
     marginTop: 12,
     fontSize: 14,
     color: '#64748B',
-    fontWeight: '600',
   },
   listContent: {
     paddingBottom: 100,
@@ -232,14 +232,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   cityBadgeText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 11,
-    fontWeight: '800',
     textTransform: 'uppercase',
   },
   coverTitle: {
-    fontSize: 22,
-    fontWeight: '900',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 24,
     color: '#FFFFFF',
     letterSpacing: -0.5,
     textShadowColor: 'rgba(0, 0, 0, 0.6)',
@@ -247,9 +247,9 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   coverSubtitle: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 13,
     color: 'rgba(255, 255, 255, 0.85)',
-    fontWeight: '600',
     marginTop: 2,
   },
   cardWrapper: {
@@ -266,13 +266,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 18,
-    fontWeight: '800',
     color: '#0F172A',
     marginBottom: 6,
     textAlign: 'center',
   },
   emptySubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: '#64748B',
     textAlign: 'center',
@@ -286,8 +287,8 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   hostBtnText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '800',
   },
 });

@@ -222,10 +222,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingText: {
+    fontFamily: 'Switzer-Medium',
     marginTop: 12,
     fontSize: 14,
     color: '#64748B',
-    fontWeight: '600',
   },
   header: {
     backgroundColor: '#FFFFFF',
@@ -236,12 +236,13 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   title: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 22,
-    fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.5,
   },
   subtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: '#64748B',
     marginTop: 4,
@@ -258,9 +259,9 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    fontFamily: 'Switzer-Medium',
     fontSize: 14,
     color: '#0F172A',
-    fontWeight: '600',
   },
   listContent: {
     padding: 16,
@@ -299,8 +300,8 @@ const styles = StyleSheet.create({
     right: 12,
   },
   cityName: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 16,
-    fontWeight: '800',
     color: '#FFFFFF',
     marginBottom: 4,
     textShadowColor: 'rgba(0, 0, 0, 0.6)',
@@ -318,8 +319,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   countText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
-    fontWeight: '800',
     color: '#6C47FF',
   },
   emptyContainer: {
@@ -333,13 +334,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 18,
-    fontWeight: '800',
     color: '#0F172A',
     marginBottom: 6,
     textAlign: 'center',
   },
   emptySubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: '#64748B',
     textAlign: 'center',
@@ -353,8 +355,8 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   hostBtnText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '800',
   },
 });

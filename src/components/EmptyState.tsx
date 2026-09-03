@@ -70,16 +70,16 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   title: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 20,
-    fontWeight: '800',
     color: '#0F172A',
     textAlign: 'center',
     marginBottom: 8,
     letterSpacing: -0.3,
   },
   message: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 14,
-    fontWeight: '500',
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 21,
@@ -98,9 +98,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   actionBtnText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '700',
     letterSpacing: -0.2,
   },
 });

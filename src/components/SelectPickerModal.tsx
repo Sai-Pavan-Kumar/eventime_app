@@ -16,6 +16,7 @@ export interface SelectPickerModalProps {
   title: string;
   items: readonly string[] | string[];
   selectedItem?: string | null;
+  itemCounts?: Record<string, number>;
   onSelect: (item: string) => void;
   onClose: () => void;
   searchPlaceholder?: string;
@@ -29,6 +30,7 @@ export function SelectPickerModal({
   title,
   items,
   selectedItem = '',
+  itemCounts,
   onSelect,
   onClose,
   searchPlaceholder = 'Search...',
@@ -102,15 +104,25 @@ export function SelectPickerModal({
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.itemText, !selectedItem && styles.itemTextActive]}>
-                    {clearLabel}
-                  </Text>
+                  <View style={styles.itemTextContainer}>
+                    <Text style={[styles.itemText, !selectedItem && styles.itemTextActive]}>
+                      {clearLabel}
+                    </Text>
+                    {itemCounts && (
+                      <View style={[styles.countBadge, !selectedItem && styles.countBadgeSelected]}>
+                        <Text style={[styles.countText, !selectedItem && styles.countTextSelected]}>
+                          {Object.values(itemCounts).reduce((a, b) => a + b, 0)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   {!selectedItem && <Check size={18} color={theme.colors.brand} />}
                 </TouchableOpacity>
               ) : null
             }
             renderItem={({ item }) => {
               const isSelected = selectedItem && item.toLowerCase() === selectedItem.toLowerCase();
+              const count = itemCounts ? (itemCounts[item] ?? itemCounts[item.toLowerCase()] ?? 0) : undefined;
               return (
                 <TouchableOpacity
                   style={[styles.itemRow, isSelected && styles.itemRowActive]}
@@ -120,9 +132,18 @@ export function SelectPickerModal({
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.itemText, isSelected && styles.itemTextActive]}>
-                    {item}
-                  </Text>
+                  <View style={styles.itemTextContainer}>
+                    <Text style={[styles.itemText, isSelected && styles.itemTextActive]}>
+                      {item}
+                    </Text>
+                    {count !== undefined && (
+                      <View style={[styles.countBadge, count > 0 && styles.countBadgeActive, isSelected && styles.countBadgeSelected]}>
+                        <Text style={[styles.countText, count > 0 && styles.countTextActive, isSelected && styles.countTextSelected]}>
+                          {count}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   {isSelected && <Check size={18} color={theme.colors.brand} />}
                 </TouchableOpacity>
               );
@@ -157,8 +178,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   headerTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 16,
-    fontWeight: '800',
     color: '#0F172A',
   },
   closeBtn: {
@@ -180,6 +201,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    fontFamily: 'Switzer-Regular',
     fontSize: 14,
     color: '#0F172A',
     padding: 0,
@@ -202,12 +224,41 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F3FF',
   },
   itemText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 14,
-    fontWeight: '600',
     color: '#334155',
   },
   itemTextActive: {
-    fontWeight: '800',
+    fontFamily: 'Switzer-Bold',
     color: theme.colors.brand,
+  },
+  itemTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  countBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  countBadgeActive: {
+    backgroundColor: '#EEF2FF',
+  },
+  countBadgeSelected: {
+    backgroundColor: '#6C47FF',
+  },
+  countText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  countTextActive: {
+    color: '#6C47FF',
+  },
+  countTextSelected: {
+    color: '#FFFFFF',
   },
 });

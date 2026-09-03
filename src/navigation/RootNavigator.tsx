@@ -195,8 +195,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   splashBrandTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 28,
-    fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: -0.5,
   },
@@ -205,13 +205,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   splashByText: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 12,
-    fontWeight: '500',
     color: 'rgba(255, 255, 255, 0.7)',
   },
   splashSurfboardText: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 15,
-    fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 0.3,
   },

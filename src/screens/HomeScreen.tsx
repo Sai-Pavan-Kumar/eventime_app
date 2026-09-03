@@ -355,33 +355,52 @@ export default function HomeScreen() {
     });
 
     // 4. Personalized Tab Filters
-    const preferredCities = profile?.preferred_cities?.length
+    const preferredCities: string[] = profile?.preferred_cities?.length
       ? profile.preferred_cities
       : (guestPrefs?.preferredCities || []);
-    const preferredGoals = profile?.goals?.length
+    const preferredGoals: string[] = profile?.goals?.length
       ? profile.goals
       : (guestPrefs?.goals || []);
 
     if (activeFeedPill === 'for_you') {
-      if (preferredGoals.length > 0 || preferredCities.length > 0) {
-        const goalSet = new Set(preferredGoals);
-        const matches = pool.filter((e) => {
-          const matchesCity = e.is_virtual || preferredCities.length === 0 || (e.city ? preferredCities.includes(e.city) : false);
-          const matchesCategory = preferredGoals.length === 0 || (e.category ? goalSet.has(e.category) : false);
-          return matchesCity && matchesCategory;
-        });
-        if (matches.length > 0) {
-          pool = matches;
-        } else if (preferredCities.length > 0) {
-          const cityMatches = pool.filter((e) => e.is_virtual || (e.city ? preferredCities.includes(e.city) : false));
-          if (cityMatches.length > 0) pool = cityMatches;
-        }
+      // Both city AND category must be set; events must strictly match both
+      if (preferredCities.length === 0 || preferredGoals.length === 0) {
+        return [];
       }
+
+      const goalSet = new Set(preferredGoals.map((g) => g.toLowerCase().trim()));
+      const citySet = new Set(preferredCities.map((c) => c.toLowerCase().trim()));
+
+      pool = pool.filter((e) => {
+        const matchesCity =
+          Boolean(e.is_virtual) ||
+          (e.city ? citySet.has(e.city.toLowerCase().trim()) : false);
+        const matchesCategory =
+          e.category ? goalSet.has(e.category.toLowerCase().trim()) : false;
+        return matchesCity && matchesCategory;
+      });
     } else if (activeFeedPill === 'around_you') {
-      if (preferredCities.length > 0) {
-        const cityMatches = pool.filter((e) => e.is_virtual || (e.city ? preferredCities.includes(e.city) : false));
-        if (cityMatches.length > 0) pool = cityMatches;
+      // Must match preferred city, but EXCLUDES events already displayed in "For You"
+      if (preferredCities.length === 0) {
+        return [];
       }
+
+      const citySet = new Set(preferredCities.map((c) => c.toLowerCase().trim()));
+      const goalSet = new Set(preferredGoals.map((g) => g.toLowerCase().trim()));
+
+      pool = pool.filter((e) => {
+        const matchesCity =
+          Boolean(e.is_virtual) ||
+          (e.city ? citySet.has(e.city.toLowerCase().trim()) : false);
+        if (!matchesCity) return false;
+
+        // If event matches the user's category interests, it is in "For You", so exclude from "Around You"
+        if (goalSet.size > 0 && e.category && goalSet.has(e.category.toLowerCase().trim())) {
+          return false;
+        }
+
+        return true;
+      });
     }
 
     // 5. Sort upcoming chronologically (soonest first)
@@ -538,7 +557,6 @@ export default function HomeScreen() {
               setSelectedDate(null);
             }}
           >
-            <Sparkles size={14} color={activeFeedPill === 'for_you' && !selectedDate ? '#FFF' : '#64748B'} />
             <Text style={[styles.feedPillText, activeFeedPill === 'for_you' && !selectedDate && styles.feedPillTextActive]}>
               For You
             </Text>
@@ -551,7 +569,6 @@ export default function HomeScreen() {
               setSelectedDate(null);
             }}
           >
-            <Compass size={14} color={activeFeedPill === 'around_you' && !selectedDate ? '#FFF' : '#64748B'} />
             <Text style={[styles.feedPillText, activeFeedPill === 'around_you' && !selectedDate && styles.feedPillTextActive]}>
               Around You
             </Text>
@@ -650,6 +667,10 @@ export default function HomeScreen() {
               title={
                 selectedDate
                   ? 'No Events Scheduled'
+                  : activeFeedPill === 'for_you'
+                  ? 'No Matching Events For You'
+                  : activeFeedPill === 'around_you'
+                  ? 'No Events In Your Cities'
                   : activeFeedPill === 'campus'
                   ? 'No Campus Events'
                   : 'No Events Found'
@@ -657,14 +678,30 @@ export default function HomeScreen() {
               message={
                 selectedDate
                   ? `There are no events scheduled for ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}. Be the first to host one!`
+                  : activeFeedPill === 'for_you'
+                  ? 'No upcoming events match both your selected cities and categories. Update your preferences in Profile or explore all events in Around You!'
+                  : activeFeedPill === 'around_you'
+                  ? 'No upcoming events found in your preferred cities. Add more cities in your Profile or host an event yourself!'
                   : activeFeedPill === 'campus'
                   ? 'There are no private events currently listed for your campus. Host one for your college!'
-                  : activeFeedPill === 'around_you'
-                  ? 'No events found around your selected cities. Discover online events or post one!'
                   : 'No events match your current filters. Explore other categories or host one yourself!'
               }
-              buttonText="Host an Event"
-              onButtonPress={() => navigation.navigate('CreateEvent', {})}
+              buttonText={
+                activeFeedPill === 'for_you'
+                  ? 'Explore Around You'
+                  : activeFeedPill === 'around_you'
+                  ? 'Update Cities'
+                  : 'Host an Event'
+              }
+              onButtonPress={() => {
+                if (activeFeedPill === 'for_you') {
+                  setActiveFeedPill('around_you');
+                } else if (activeFeedPill === 'around_you') {
+                  (navigation as any).navigate('ProfileTab');
+                } else {
+                  navigation.navigate('CreateEvent', {});
+                }
+              }}
             />
           }
           refreshControl={
@@ -847,8 +884,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   brandNameText: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 20,
-    fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.5,
   },
@@ -870,8 +907,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#EDE9FE',
   },
   topCalendarBtnText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#475569',
   },
   topCalendarBtnTextActive: {
@@ -892,8 +929,8 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   greetingText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 13,
-    fontWeight: '700',
     color: '#64748B',
   },
   statsBar: {
@@ -912,13 +949,13 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   statNumber: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 14,
-    fontWeight: '900',
     color: '#6C47FF',
   },
   statLabel: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 10,
-    fontWeight: '800',
     color: '#0F172A',
     letterSpacing: 0.5,
   },
@@ -951,8 +988,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F172A',
   },
   feedPillText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#64748B',
   },
   feedPillTextActive: {
@@ -974,13 +1011,13 @@ const styles = StyleSheet.create({
     borderColor: '#C4B5FD',
   },
   filterPillText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
-    fontWeight: '600',
     color: '#475569',
   },
   filterPillTextSelected: {
+    fontFamily: 'Switzer-Bold',
     color: '#6C47FF',
-    fontWeight: '700',
   },
   clearPill: {
     flexDirection: 'row',
@@ -992,8 +1029,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
   },
   clearPillText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
-    fontWeight: '700',
     color: '#EF4444',
   },
   sectionHeader: {
@@ -1005,14 +1042,14 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 19,
     color: '#0F172A',
     letterSpacing: -0.3,
   },
   eventCountText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
-    fontWeight: '600',
     color: '#94A3B8',
   },
   emptyContainer: {
@@ -1021,12 +1058,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 16,
-    fontWeight: '700',
     color: '#0F172A',
     marginBottom: 4,
   },
   emptySubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: '#64748B',
     textAlign: 'center',
@@ -1073,8 +1111,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   monthYearText: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 15,
-    fontWeight: '800',
     color: '#0F172A',
   },
   modalCloseBtn: {
@@ -1094,8 +1132,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   weekdayText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#94A3B8',
     width: 36,
     textAlign: 'center',
@@ -1127,17 +1165,17 @@ const styles = StyleSheet.create({
     borderColor: '#6C47FF',
   },
   dayText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 13,
-    fontWeight: '600',
     color: '#0F172A',
   },
   dayTextSelected: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFFFFF',
-    fontWeight: '800',
   },
   dayTextToday: {
+    fontFamily: 'Switzer-Bold',
     color: '#6C47FF',
-    fontWeight: '700',
   },
   eventDot: {
     position: 'absolute',
@@ -1166,8 +1204,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#EDE9FE',
   },
   todayBtnText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#6C47FF',
   },
   clearDateBtn: {
@@ -1175,8 +1213,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   clearDateBtnText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
-    fontWeight: '600',
     color: '#EF4444',
   },
   activeDateBanner: {
@@ -1191,8 +1229,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   activeDateBannerText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
-    fontWeight: '700',
     color: '#6C47FF',
   },
   clearActiveDateBtn: {
@@ -1205,8 +1243,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   clearActiveDateBtnText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
-    fontWeight: '700',
     color: '#EF4444',
   },
 });

@@ -302,14 +302,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 20,
-    fontWeight: '800',
     color: theme.colors.textPrimary,
     textAlign: 'center',
     letterSpacing: -0.3,
     marginBottom: 6,
   },
   subtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: theme.colors.textSecondary,
     textAlign: 'center',
@@ -327,8 +328,8 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   ratingLabel: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 13,
-    fontWeight: '600',
     color: theme.colors.textMuted,
     textAlign: 'center',
     marginBottom: 16,
@@ -342,12 +343,12 @@ const styles = StyleSheet.create({
     borderColor: '#FDE68A',
   },
   positiveNote: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 12,
     color: '#92400E',
     lineHeight: 17,
     textAlign: 'center',
     marginBottom: 14,
-    fontWeight: '500',
   },
   constructiveContainer: {
     marginTop: 6,
@@ -364,11 +365,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   constructiveTitle: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 14,
     color: theme.colors.textPrimary,
   },
   constructiveSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 12,
     color: theme.colors.textSecondary,
     marginBottom: 12,
@@ -393,15 +395,16 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.brand,
   },
   tagChipText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 11,
-    fontWeight: '600',
     color: theme.colors.textSecondary,
   },
   tagChipTextActive: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFFFFF',
-    fontWeight: '700',
   },
   feedbackInput: {
+    fontFamily: 'Switzer-Regular',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#CBD5E1',
@@ -424,9 +427,9 @@ const styles = StyleSheet.create({
     ...theme.shadows.brand,
   },
   primaryActionText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '800',
     letterSpacing: 0.2,
   },
   snoozeBtn: {
@@ -435,8 +438,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   snoozeText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
-    fontWeight: '600',
     color: theme.colors.textMuted,
   },
   successState: {
@@ -453,12 +456,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   successTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 18,
-    fontWeight: '800',
     color: theme.colors.textPrimary,
     marginBottom: 6,
   },
   successSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: theme.colors.textSecondary,
     textAlign: 'center',

@@ -204,8 +204,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   headerTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 16,
-    fontWeight: '800',
     color: '#0F172A',
   },
   headerActions: {
@@ -220,8 +220,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
   },
   clearBtnText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#EF4444',
   },
   closeBtn: {
@@ -245,8 +245,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   monthYearTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 16,
-    fontWeight: '800',
     color: '#0F172A',
   },
   dayHeaderRow: {
@@ -259,8 +259,8 @@ const styles = StyleSheet.create({
   dayHeaderCell: {
     flex: 1,
     textAlign: 'center',
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#94A3B8',
   },
   calendarGrid: {
@@ -290,16 +290,16 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   dayCellText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 14,
-    fontWeight: '600',
     color: '#1E293B',
   },
   todayCellText: {
+    fontFamily: 'Switzer-Bold',
     color: '#6C47FF',
-    fontWeight: '700',
   },
   selectedDayCellText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFFFFF',
-    fontWeight: '800',
   },
 });

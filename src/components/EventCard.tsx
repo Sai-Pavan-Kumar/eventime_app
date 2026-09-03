@@ -231,8 +231,8 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
       <View style={styles.content}>
 
 
-        {/* Title */}
-        <Text style={styles.title} numberOfLines={2}>
+        {/* Title (Single line on cards, full title on detail screen) */}
+        <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
           {title}
         </Text>
 
@@ -376,14 +376,14 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   dateOverlayText: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 12,
-    fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   brandOverlayText: {
+    fontFamily: 'Outfit-ExtraBold',
     fontSize: 11,
-    fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     opacity: 0.85,
@@ -404,9 +404,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   featuredText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 10,
-    fontWeight: '800',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
@@ -425,8 +425,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
   },
   statusText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 10,
-    fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -435,8 +435,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   title: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 17,
-    fontWeight: '800',
     color: '#0F172A',
     lineHeight: 23,
     marginBottom: 6,
@@ -447,14 +447,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   organizerText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
     color: '#64748B',
-    fontWeight: '500',
     flexShrink: 1,
   },
   organizerHighlight: {
+    fontFamily: 'Switzer-Bold',
     color: '#0F172A',
-    fontWeight: '700',
   },
   organizerLink: {
     color: theme.colors.brand,
@@ -482,14 +482,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   infoText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
     color: '#64748B',
-    fontWeight: '500',
     flexShrink: 1,
   },
   cityHighlight: {
+    fontFamily: 'Switzer-Semibold',
     color: '#475569',
-    fontWeight: '600',
   },
   cityLink: {
     color: theme.colors.brand,
@@ -539,9 +539,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   matchBadgeOverlayText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 10,
-    fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },

@@ -512,8 +512,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 17,
     color: '#0F172A',
   },
   listContent: {
@@ -560,8 +560,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarLetter: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 18,
-    fontWeight: '800',
     color: theme.colors.brand,
   },
   rankBadge: {
@@ -575,20 +575,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   rankBadgeText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 11,
-    fontWeight: '900',
   },
   podiumName: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 13,
     color: '#0F172A',
     textAlign: 'center',
     maxWidth: 90,
   },
   podiumScore: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
-    fontWeight: '800',
     color: theme.colors.brand,
     marginBottom: 8,
   },
@@ -600,8 +600,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   listSectionTitle: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '800',
     color: '#64748B',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
@@ -622,8 +622,8 @@ const styles = StyleSheet.create({
     borderColor: '#DDD6FE',
   },
   rankNumber: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '800',
     color: '#94A3B8',
     width: 32,
   },
@@ -646,22 +646,23 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   rowAvatarLetter: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: '#64748B',
   },
   rowDetails: {
     flex: 1,
   },
   rowName: {
+    fontFamily: 'Switzer-Semibold',
     fontSize: 14,
-    fontWeight: '700',
     color: '#0F172A',
   },
   rowNameMe: {
     color: theme.colors.brand,
   },
   rowCollege: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 11,
     color: '#64748B',
     marginTop: 2,
@@ -675,8 +676,8 @@ const styles = StyleSheet.create({
     borderColor: '#FEF3C7',
   },
   rowScoreText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '800',
     color: '#D97706',
   },
   emptyContainer: {
@@ -692,12 +693,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 19,
-    fontWeight: '800',
     color: '#0F172A',
     marginBottom: 6,
   },
   emptySubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 14,
     color: '#64748B',
     textAlign: 'center',
@@ -729,23 +731,24 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   myRankText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 12,
-    fontWeight: '800',
   },
   myRankTitle: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '700',
   },
   myRankSubtitle: {
+    fontFamily: 'Switzer-Regular',
     color: '#94A3B8',
     fontSize: 11,
   },
   myScoreText: {
+    fontFamily: 'Outfit-Bold',
     color: '#F59E0B',
     fontSize: 15,
-    fontWeight: '900',
   },
   infoBtn: {
     width: 36,

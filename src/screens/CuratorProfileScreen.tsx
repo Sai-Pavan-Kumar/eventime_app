@@ -392,19 +392,20 @@ const styles = StyleSheet.create({
     borderRadius: 44,
   },
   fullName: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 20,
-    fontWeight: '800',
     color: '#0F172A',
     letterSpacing: -0.4,
     marginBottom: 2,
   },
   usernameText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: theme.colors.brand,
     marginBottom: 4,
   },
   collegeText: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: '#64748B',
     textAlign: 'center',
@@ -429,13 +430,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2E8F0',
   },
   statNumber: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 18,
-    fontWeight: '800',
     color: '#0F172A',
   },
   statLabel: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 10,
-    fontWeight: '700',
     color: '#94A3B8',
     letterSpacing: 0.8,
     marginTop: 2,
@@ -448,13 +449,13 @@ const styles = StyleSheet.create({
     borderColor: '#FEF3C7',
   },
   scoreNumber: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 18,
-    fontWeight: '900',
     color: '#D97706',
   },
   scoreLabel: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 10,
-    fontWeight: '800',
     color: '#D97706',
     letterSpacing: 0.8,
     marginTop: 2,
@@ -481,13 +482,13 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   tabButtonText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 13,
-    fontWeight: '600',
     color: '#64748B',
   },
   tabButtonTextActive: {
+    fontFamily: 'Switzer-Bold',
     color: '#0F172A',
-    fontWeight: '800',
   },
   eventsSection: {
     minHeight: 200,
@@ -509,13 +510,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   noEventsTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 15,
-    fontWeight: '700',
     color: '#0F172A',
     marginTop: 12,
     marginBottom: 4,
   },
   noEventsSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: '#94A3B8',
     textAlign: 'center',

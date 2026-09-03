@@ -48,3 +48,15 @@ export function formatEventTime(
   // 4. Clean fallback matching website
   return 'All Day';
 }
+
+export function formatEventDateDetailed(dateStr?: string | null): string {
+  if (!dateStr) return 'Date TBA';
+  const parsed = parseEventDateString(dateStr);
+  if (!parsed) return dateStr;
+  return parsed.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}

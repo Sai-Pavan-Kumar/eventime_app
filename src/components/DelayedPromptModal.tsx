@@ -139,16 +139,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 20,
-    fontWeight: '800',
     color: '#0F172A',
     marginBottom: 8,
     textAlign: 'center',
     letterSpacing: -0.3,
   },
   message: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 14,
-    fontWeight: '500',
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 20,
@@ -172,16 +172,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   primaryBtnText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 15,
-    fontWeight: '700',
     color: '#FFFFFF',
   },
   secondaryBtn: {
     paddingVertical: 8,
   },
   secondaryBtnText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 13,
-    fontWeight: '600',
     color: '#94A3B8',
   },
 });

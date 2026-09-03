@@ -414,21 +414,22 @@ const styles = StyleSheet.create({
     ...theme.shadows.brand,
   },
   appName: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 28,
-    fontWeight: '900',
     color: theme.colors.textPrimary,
     letterSpacing: -0.5,
     marginBottom: 4,
   },
   tagline: {
+    fontFamily: 'Outfit-SemiBold',
     fontSize: 13,
-    fontWeight: '700',
     color: theme.colors.brand,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     marginBottom: 6,
   },
   subtagline: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: theme.colors.textSecondary,
     textAlign: 'center',
@@ -465,8 +466,8 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   googleButtonText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 15,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
   },
   githubButton: {
@@ -485,8 +486,8 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   githubButtonText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 15,
-    fontWeight: '700',
     color: '#FFFFFF',
   },
   dividerContainer: {
@@ -500,10 +501,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.border,
   },
   dividerText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
     color: theme.colors.textSecondary,
     paddingHorizontal: 10,
-    fontWeight: '500',
   },
   emailToggleBtn: {
     flexDirection: 'row',
@@ -515,8 +516,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emailToggleText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: theme.colors.brand,
   },
   formContainer: {
@@ -532,14 +533,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   label: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
-    fontWeight: '600',
     color: theme.colors.textPrimary,
     marginBottom: 6,
   },
   forgotText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '600',
     color: theme.colors.brand,
   },
   inputWrapper: {
@@ -555,6 +556,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   input: {
+    fontFamily: 'Switzer-Regular',
     flex: 1,
     paddingVertical: 12,
     fontSize: 14,
@@ -577,9 +579,9 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   primaryButtonText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 15,
-    fontWeight: '700',
   },
   switchAuthBtn: {
     alignItems: 'center',
@@ -587,9 +589,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   switchAuthText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
     color: theme.colors.brand,
-    fontWeight: '600',
   },
   consentRow: {
     flexDirection: 'row',
@@ -616,14 +618,15 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.brand,
   },
   consentText: {
+    fontFamily: 'Switzer-Regular',
     flex: 1,
     fontSize: 11,
     color: theme.colors.textSecondary,
     lineHeight: 16,
   },
   consentLink: {
+    fontFamily: 'Switzer-Bold',
     color: theme.colors.textPrimary,
-    fontWeight: '600',
   },
   trustFooter: {
     flexDirection: 'row',
@@ -633,8 +636,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   trustText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
     color: theme.colors.textSecondary,
-    fontWeight: '500',
   },
 });

@@ -12,7 +12,7 @@ import {
   TextInput,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { Image } from 'expo-image';
@@ -46,11 +46,14 @@ import { scheduleEventReminder } from '../lib/notifications';
 import { useAuth } from '../context/AuthContext';
 import { EventCard } from '../components/EventCard';
 import { EmptyState } from '../components/EmptyState';
+import { formatEventDateDetailed, parseEventDateString, formatEventTime } from '../lib/utils/date';
 import type { EventRow, RootStackParamList } from '../types';
 
 const { width } = Dimensions.get('window');
 
 export default function EventDetailScreen() {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 24);
   const route = useRoute<RouteProp<RootStackParamList, 'EventDetail'>>();
   const navigation = useNavigation<any>();
   const { user, profile } = useAuth();
@@ -70,6 +73,15 @@ export default function EventDetailScreen() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+
+  const isPast = (() => {
+    if (!event?.date_string) return false;
+    const parsed = parseEventDateString(event.date_string);
+    if (!parsed) return false;
+    const endOfDay = new Date(parsed);
+    endOfDay.setHours(23, 59, 59, 999);
+    return endOfDay.getTime() < Date.now();
+  })();
 
   const fetchSimilarEvents = useCallback(async (currentEvent: EventRow) => {
     try {
@@ -262,15 +274,20 @@ export default function EventDetailScreen() {
 
   const handleAddToCalendar = async () => {
     if (!event) return;
-    const base = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-    const title = encodeURIComponent(`${event.title} · via EvenTime`);
-    const dateStr = event.date_string?.replace(/-/g, '') ?? '';
-    const dates = dateStr ? `${dateStr}/${dateStr}` : '';
-    const details = encodeURIComponent(event.description ?? '');
-    const location = encodeURIComponent(event.is_virtual ? 'Online' : (event.location || event.city || ''));
-    const url = `${base}&text=${title}&dates=${dates}&details=${details}&location=${location}`;
+    try {
+      const base = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+      const title = encodeURIComponent(`${event.title} · via EvenTime`);
+      const dateStr = event.date_string?.replace(/-/g, '') ?? '';
+      const dates = dateStr ? `${dateStr}/${dateStr}` : '';
+      const details = encodeURIComponent(event.description ?? '');
+      const location = encodeURIComponent(event.is_virtual ? 'Online' : (event.location || event.city || ''));
+      const url = `${base}&text=${title}&dates=${dates}&details=${details}&location=${location}`;
 
-    await WebBrowser.openBrowserAsync(url);
+      await WebBrowser.openBrowserAsync(url);
+    } catch (err) {
+      console.error('[EventDetail] Add to calendar error:', err);
+      Alert.alert('Error', 'Could not open calendar.');
+    }
   };
 
   const handleOrganizerPress = () => {
@@ -289,13 +306,21 @@ export default function EventDetailScreen() {
   };
 
   const handleRegister = async () => {
-    const link = event?.registration_link || event?.website || event?.external_link;
-    if (!link) {
+    const rawLink = (event?.registration_link || event?.website || event?.external_link || '').trim();
+    if (!rawLink) {
       Alert.alert('No Link Provided', 'Organizer did not specify a registration link.');
       return;
     }
-    const formattedUrl = link.startsWith('http') ? link : `https://${link}`;
-    await WebBrowser.openBrowserAsync(formattedUrl);
+
+    try {
+      const formattedUrl = rawLink.startsWith('http://') || rawLink.startsWith('https://')
+        ? rawLink
+        : `https://${rawLink}`;
+      await WebBrowser.openBrowserAsync(encodeURI(formattedUrl));
+    } catch (err) {
+      console.error('[EventDetail] Open registration link error:', err);
+      Alert.alert('Unable to Open Link', 'The registration link provided for this event is invalid or cannot be opened.');
+    }
   };
 
   const handleSendReport = async () => {
@@ -410,7 +435,10 @@ export default function EventDetailScreen() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 110 + bottomPadding }]}
+      >
         {/* Poster Media */}
         <View style={styles.posterContainer}>
           <Image
@@ -419,26 +447,14 @@ export default function EventDetailScreen() {
             contentFit="cover"
             transition={300}
           />
-
-          <View style={[styles.categoryBadge, { backgroundColor: categoryConfig.accentColor }]}>
-            <Text style={styles.categoryBadgeText}>
-              {event.category || 'Event'}
-            </Text>
-          </View>
         </View>
 
         {/* Event Main Info */}
         <View style={styles.mainInfo}>
           <Text style={styles.title}>{event.title}</Text>
 
-          {/* Pricing & Organizer Row */}
+          {/* Organizer Attribution Row */}
           <View style={styles.pillRow}>
-            <View style={[styles.pricePill, event.is_free === false && styles.paidPricePill]}>
-              <Text style={[styles.pricePillText, event.is_free === false && styles.paidPriceText]}>
-                {event.is_free === false ? (event.price ? `₹${event.price}` : 'Paid Event') : 'Free Event'}
-              </Text>
-            </View>
-
             <TouchableOpacity onPress={handleOrganizerPress} activeOpacity={0.7}>
               <Text style={styles.organizerLabel}>
                 Curated by{' '}
@@ -488,9 +504,9 @@ export default function EventDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Meta Badges Grid */}
+          {/* Meta Details Card */}
           <View style={styles.detailsCard}>
-            {/* Date */}
+            {/* 1. Date (Day, Month, Date) */}
             <View style={styles.detailRow}>
               <View style={styles.detailIconWrapper}>
                 <Calendar size={18} color={theme.colors.brand} />
@@ -498,11 +514,82 @@ export default function EventDetailScreen() {
               <View style={styles.detailTextWrapper}>
                 <Text style={styles.detailLabel}>Date</Text>
                 <Text style={styles.detailValue}>
-                  {event.date_string || 'TBA'}
-                  {event.end_date_string && event.end_date_string !== event.date_string ? ` - ${event.end_date_string}` : ''}
+                  {formatEventDateDetailed(event.date_string)}
+                  {event.end_date_string && event.end_date_string !== event.date_string
+                    ? ` - ${formatEventDateDetailed(event.end_date_string)}`
+                    : ''}
                 </Text>
               </View>
             </View>
+
+            {/* 2. Time */}
+            {(event.start_time || event.end_time || event.date_string) && (
+              <View style={styles.detailRow}>
+                <View style={styles.detailIconWrapper}>
+                  <Clock size={18} color={theme.colors.brand} />
+                </View>
+                <View style={styles.detailTextWrapper}>
+                  <Text style={styles.detailLabel}>Time</Text>
+                  <Text style={styles.detailValue}>
+                    {formatEventTime(event.date_string, event.start_time)}
+                    {event.end_time ? ` - ${event.end_time}` : ''}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* 3. Location (if available or virtual) */}
+            {(Boolean(event.location) || Boolean(event.is_virtual)) && (
+              <View style={styles.detailRow}>
+                <View style={styles.detailIconWrapper}>
+                  {event.is_virtual ? (
+                    <Video size={18} color={theme.colors.brand} />
+                  ) : (
+                    <MapPin size={18} color={theme.colors.brand} />
+                  )}
+                </View>
+                <View style={styles.detailTextWrapper}>
+                  <Text style={styles.detailLabel}>
+                    {event.is_virtual ? 'Event Mode' : 'Location / Venue'}
+                  </Text>
+                  <Text style={styles.detailValue}>
+                    {event.is_virtual ? 'Virtual / Online Event' : event.location}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* 4. City */}
+            <TouchableOpacity
+              style={styles.detailRow}
+              onPress={() => event.city && !event.is_virtual && navigation.navigate('CityEvents', { city: event.city })}
+              activeOpacity={event.is_virtual ? 1 : 0.7}
+            >
+              <View style={styles.detailIconWrapper}>
+                <Building size={18} color={theme.colors.brand} />
+              </View>
+              <View style={styles.detailTextWrapper}>
+                <Text style={styles.detailLabel}>City</Text>
+                <Text style={styles.detailValue}>
+                  {event.is_virtual ? 'Online / Remote' : event.city || 'India'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 5. Registration Price (if it is a paid event) */}
+            {(event.is_free === false || Boolean(event.price)) && (
+              <View style={styles.detailRow}>
+                <View style={[styles.detailIconWrapper, { backgroundColor: '#FEF3C7' }]}>
+                  <Tag size={18} color="#D97706" />
+                </View>
+                <View style={styles.detailTextWrapper}>
+                  <Text style={styles.detailLabel}>Registration Fee</Text>
+                  <Text style={[styles.detailValue, { color: '#B45309', fontWeight: '800' }]}>
+                    {event.price ? `₹${event.price}` : 'Paid Event'}
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* Registration Deadline (If present) */}
             {event.registration_deadline && (
@@ -516,42 +603,6 @@ export default function EventDetailScreen() {
                 </View>
               </View>
             )}
-
-            {/* Time */}
-            {(event.start_time || event.end_time) && (
-              <View style={styles.detailRow}>
-                <View style={styles.detailIconWrapper}>
-                  <Clock size={18} color={theme.colors.brand} />
-                </View>
-                <View style={styles.detailTextWrapper}>
-                  <Text style={styles.detailLabel}>Time</Text>
-                  <Text style={styles.detailValue}>
-                    {event.start_time || ''} {event.end_time ? `- ${event.end_time}` : ''}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* Location */}
-            <TouchableOpacity
-              style={styles.detailRow}
-              onPress={() => event.city && navigation.navigate('CityEvents', { city: event.city })}
-              activeOpacity={0.7}
-            >
-              <View style={styles.detailIconWrapper}>
-                {event.is_virtual ? (
-                  <Video size={18} color={theme.colors.brand} />
-                ) : (
-                  <MapPin size={18} color={theme.colors.brand} />
-                )}
-              </View>
-              <View style={styles.detailTextWrapper}>
-                <Text style={styles.detailLabel}>Location / Venue</Text>
-                <Text style={styles.detailValue}>
-                  {event.is_virtual ? 'Virtual / Online Event' : event.location || event.city || 'India'}
-                </Text>
-              </View>
-            </TouchableOpacity>
 
             {/* College Specific Details */}
             {(event.colleges?.name || event.college_only) && (
@@ -579,22 +630,6 @@ export default function EventDetailScreen() {
                   <Text style={styles.detailLabel}>Eligible Branches</Text>
                   <Text style={styles.detailValue}>
                     {event.college_branch || event.branch_tags?.join(', ')}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* Team Size / Audience */}
-            {(event.team_size || (event.target_audience && event.target_audience.length > 0)) && (
-              <View style={styles.detailRow}>
-                <View style={styles.detailIconWrapper}>
-                  <Users size={18} color={theme.colors.brand} />
-                </View>
-                <View style={styles.detailTextWrapper}>
-                  <Text style={styles.detailLabel}>Audience & Team</Text>
-                  <Text style={styles.detailValue}>
-                    {event.team_size ? `${event.team_size} • ` : ''}
-                    {event.target_audience ? event.target_audience.join(', ') : 'Open to all'}
                   </Text>
                 </View>
               </View>
@@ -662,14 +697,17 @@ export default function EventDetailScreen() {
       </ScrollView>
 
       {/* Fixed Bottom Register Bar */}
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { paddingBottom: bottomPadding + 6 }]}>
         <TouchableOpacity
-          style={styles.registerBtn}
-          onPress={handleRegister}
-          activeOpacity={0.85}
+          style={[styles.registerBtn, isPast && styles.registerBtnDisabled]}
+          onPress={isPast ? undefined : handleRegister}
+          activeOpacity={isPast ? 1 : 0.85}
+          disabled={isPast || !event?.registration_link}
         >
-          <Text style={styles.registerBtnText}>Register for Event</Text>
-          <ExternalLink size={18} color="#FFF" />
+          <Text style={[styles.registerBtnText, isPast && styles.registerBtnTextDisabled]}>
+            {isPast ? 'Event Concluded' : 'Register for Event'}
+          </Text>
+          {!isPast && <ExternalLink size={18} color="#FFF" />}
         </TouchableOpacity>
       </View>
 
@@ -831,8 +869,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.85)',
   },
   categoryBadgeText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
-    fontWeight: '800',
     color: '#FFFFFF',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -841,10 +879,10 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 22,
     color: '#0F172A',
-    lineHeight: 26,
+    lineHeight: 28,
     marginBottom: 8,
     letterSpacing: -0.3,
   },
@@ -862,8 +900,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   pricePillText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
-    fontWeight: '800',
     color: '#059669',
   },
   paidPricePill: {
@@ -873,11 +911,12 @@ const styles = StyleSheet.create({
     color: theme.colors.brand,
   },
   organizerLabel: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: '#64748B',
   },
   organizerName: {
-    fontWeight: '700',
+    fontFamily: 'Switzer-Bold',
     color: theme.colors.brand,
     textDecorationLine: 'underline',
   },
@@ -899,8 +938,8 @@ const styles = StyleSheet.create({
     borderColor: '#E9D5FF',
   },
   goalChipText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
-    fontWeight: '700',
     color: '#6C47FF',
   },
   actionStrip: {
@@ -920,8 +959,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   calendarActionText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: theme.colors.brand,
   },
   interestedBigBtn: {
@@ -939,8 +978,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
   },
   interestedBigText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#0F172A',
   },
   interestedBigTextActive: {
@@ -974,15 +1013,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   detailLabel: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
     color: '#94A3B8',
-    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   detailValue: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: '#0F172A',
     marginTop: 2,
   },
@@ -995,12 +1034,13 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 17,
     color: '#0F172A',
     marginBottom: 8,
   },
   descriptionText: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 14,
     color: '#334155',
     lineHeight: 22,
@@ -1012,8 +1052,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   similarTitle: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 17,
     color: '#0F172A',
   },
   similarScrollContainer: {
@@ -1031,9 +1071,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   reportText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
     color: '#94A3B8',
-    fontWeight: '600',
   },
   bottomBar: {
     position: 'absolute',
@@ -1061,9 +1101,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   registerBtnText: {
+    fontFamily: 'Outfit-Bold',
     color: '#FFF',
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 16,
+  },
+  registerBtnDisabled: {
+    backgroundColor: '#E2E8F0',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  registerBtnTextDisabled: {
+    color: '#94A3B8',
   },
   modalOverlay: {
     flex: 1,
@@ -1077,17 +1125,19 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 18,
-    fontWeight: '800',
     color: '#0F172A',
     marginBottom: 4,
   },
   modalSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: '#64748B',
     marginBottom: 14,
   },
   reportInput: {
+    fontFamily: 'Switzer-Regular',
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -1108,8 +1158,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   modalCancelText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 14,
-    fontWeight: '600',
     color: '#64748B',
   },
   modalSubmitBtn: {
@@ -1119,8 +1169,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   modalSubmitText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 14,
-    fontWeight: '700',
   },
 });

@@ -140,12 +140,19 @@ export default function SettingsScreen() {
           onPress: async () => {
             if (!user) return;
             try {
-              // Delete personal relational data
-              await Promise.all([
-                supabase.from('saved_events').delete().eq('user_id', user.id),
-                supabase.from('interested_events').delete().eq('user_id', user.id),
-                supabase.from('profiles').delete().eq('id', user.id),
-              ]);
+              // 1. Unlink creator association on created events to prevent foreign key constraint violations
+              await supabase.from('events').update({ creator_id: null } as any).eq('creator_id', user.id);
+
+              // 2. Execute server-side delete_user RPC with fallback to relational deletion
+              const { error: rpcErr } = await supabase.rpc('delete_user');
+              if (rpcErr) {
+                console.warn('[Settings] delete_user RPC fallback:', rpcErr.message);
+                await Promise.all([
+                  supabase.from('saved_events').delete().eq('user_id', user.id),
+                  supabase.from('interested_events').delete().eq('user_id', user.id),
+                  supabase.from('profiles').delete().eq('id', user.id),
+                ]);
+              }
 
               await supabase.auth.signOut();
               Alert.alert('Account Deleted', 'Your account data has been completely erased.');
@@ -504,8 +511,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 18,
     color: theme.colors.textPrimary,
   },
   saveHeaderBtn: {
@@ -513,8 +520,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   saveHeaderText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 15,
-    fontWeight: '800',
     color: theme.colors.brand,
   },
   scrollContent: {
@@ -537,8 +544,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 16,
     color: theme.colors.textPrimary,
     marginBottom: 12,
   },
@@ -557,20 +564,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   missingBannerTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 14,
-    fontWeight: '800',
     color: '#B45309',
   },
   missingBannerList: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
-    fontWeight: '600',
     color: '#D97706',
     marginTop: 4,
     lineHeight: 18,
   },
   limitBadge: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: theme.colors.brand,
     backgroundColor: theme.colors.brandLight,
     paddingHorizontal: 8,
@@ -581,12 +588,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   label: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
     marginBottom: 6,
   },
   input: {
+    fontFamily: 'Switzer-Regular',
     backgroundColor: theme.colors.surfaceSecondary,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -618,8 +626,8 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.brand,
   },
   typeOptionText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
   },
   typeOptionTextActive: {
@@ -642,11 +650,12 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.brand,
   },
   smallChipText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 11,
-    fontWeight: '600',
     color: theme.colors.textSecondary,
   },
   smallChipTextActive: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
   },
   chipGrid: {
@@ -669,13 +678,13 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.brand,
   },
   chipText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
-    fontWeight: '600',
     color: theme.colors.textPrimary,
   },
   chipTextActive: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
-    fontWeight: '700',
   },
   bottomSaveBtn: {
     backgroundColor: theme.colors.brand,
@@ -689,9 +698,9 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   bottomSaveBtnText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 15,
-    fontWeight: '800',
   },
   legalRow: {
     flexDirection: 'row',
@@ -707,8 +716,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   legalText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 14,
-    fontWeight: '600',
     color: theme.colors.textPrimary,
   },
   legalArrow: {
@@ -716,6 +725,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
   },
   sectionSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: theme.colors.textSecondary,
     marginBottom: 16,
@@ -734,12 +744,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   notifTitle: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
     marginBottom: 3,
   },
   notifDescription: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 12,
     color: theme.colors.textSecondary,
     lineHeight: 16,
@@ -750,8 +761,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   deleteAccountText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
-    fontWeight: '700',
     color: theme.colors.danger,
   },
 });

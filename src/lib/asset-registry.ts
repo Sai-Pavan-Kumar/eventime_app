@@ -15,13 +15,12 @@ export const APP_ASSETS = {
     throneEmpty: require('../../assets/throne-empty.webp'),
   },
   onboarding: {
-    screen1: require('../../assets/onboarding/screen1.webp'),
-    screen2: require('../../assets/onboarding/screen2.webp'),
-    screen3: require('../../assets/onboarding/screen3.webp'),
-    screen4: require('../../assets/onboarding/screen4.webp'),
-    screen5: require('../../assets/onboarding/screen5.webp'),
-    screen6: require('../../assets/onboarding/screen6.webp'),
-    screen7: require('../../assets/onboarding/screen7.webp'),
+    screen1: require('../../assets/onboarding/Screen1.webp'),
+    screen2: require('../../assets/onboarding/Screen2.webp'),
+    screen3: require('../../assets/onboarding/Screen3.webp'),
+    screen4: require('../../assets/onboarding/Screen4.webp'),
+    screen5: require('../../assets/onboarding/Screen5.webp'),
+    screen6: require('../../assets/onboarding/Screen6.webp'),
   },
 };
 

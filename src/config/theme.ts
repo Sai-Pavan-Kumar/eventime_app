@@ -22,10 +22,16 @@ export const theme = {
   },
   typography: {
     fontFamily: {
-      regular: 'System',
-      medium: 'System',
-      bold: 'System',
-      black: 'System',
+      heading: 'Outfit-Bold',
+      headingSemiBold: 'Outfit-SemiBold',
+      headingMedium: 'Outfit-Medium',
+      headingExtraBold: 'Outfit-ExtraBold',
+      headingBlack: 'Outfit-Black',
+      regular: 'Switzer-Regular',
+      medium: 'Switzer-Medium',
+      semiBold: 'Switzer-Semibold',
+      bold: 'Switzer-Bold',
+      black: 'Switzer-Extrabold',
     },
     fontSize: {
       xs: 11,
@@ -77,4 +83,33 @@ export const theme = {
       elevation: 6,
     },
   },
+};
+
+export const FONTS = {
+  // Heading Fonts (Outfit)
+  outfit: {
+    regular: 'Outfit-Regular',
+    medium: 'Outfit-Medium',
+    semiBold: 'Outfit-SemiBold',
+    bold: 'Outfit-Bold',
+    extraBold: 'Outfit-ExtraBold',
+    black: 'Outfit-Black',
+  },
+  // Body Fonts (Switzer)
+  switzer: {
+    regular: 'Switzer-Regular',
+    medium: 'Switzer-Medium',
+    semiBold: 'Switzer-Semibold',
+    bold: 'Switzer-Bold',
+    extraBold: 'Switzer-Extrabold',
+  },
+  // Quick Aliases
+  heading: 'Outfit-Bold',
+  headingSemiBold: 'Outfit-SemiBold',
+  headingMedium: 'Outfit-Medium',
+  headingExtraBold: 'Outfit-ExtraBold',
+  body: 'Switzer-Regular',
+  bodyMedium: 'Switzer-Medium',
+  bodySemiBold: 'Switzer-Semibold',
+  bodyBold: 'Switzer-Bold',
 };

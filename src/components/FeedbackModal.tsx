@@ -8,8 +8,12 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
-import { MessageSquare, X, Bug, Lightbulb, Sparkles } from 'lucide-react-native';
+import { MessageSquare, X, Bug, Lightbulb, MessageCircle } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../config/theme';
@@ -57,80 +61,111 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
     }
   };
 
+  const FEEDBACK_TYPES = [
+    { id: 'general', label: 'General', icon: MessageCircle },
+    { id: 'bug', label: 'Bug', icon: Bug },
+    { id: 'feature', label: 'Feature', icon: Lightbulb },
+  ] as const;
+
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerTitleRow}>
-              <MessageSquare size={20} color={theme.colors.brand} />
-              <Text style={styles.modalTitle}>Share Feedback</Text>
-            </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-              <X size={18} color="#64748B" />
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.subtitle}>
-            Have an idea, found a bug, or want a feature? Tell us below:
-          </Text>
-
-          {/* Type Selector */}
-          <View style={styles.typeRow}>
-            {[
-              { id: 'general', label: 'General', icon: Sparkles },
-              { id: 'bug', label: 'Bug Report', icon: Bug },
-              { id: 'feature', label: 'Feature Idea', icon: Lightbulb },
-            ].map((t) => {
-              const isSelected = feedbackType === t.id;
-              const Icon = t.icon;
-              return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.keyboardAvoid}
+          >
+            <View style={styles.modalCard}>
+              {/* Header */}
+              <View style={styles.header}>
+                <View style={styles.headerLeft}>
+                  <View style={styles.headerIconCircle}>
+                    <MessageSquare size={18} color={theme.colors.brand} />
+                  </View>
+                  <View>
+                    <Text style={styles.modalTitle}>Share Feedback</Text>
+                    <Text style={styles.modalSubtitle}>Direct line to the product makers</Text>
+                  </View>
+                </View>
                 <TouchableOpacity
-                  key={t.id}
-                  style={[styles.typeBtn, isSelected && styles.typeBtnActive]}
-                  onPress={() => setFeedbackType(t.id as any)}
+                  style={styles.closeBtn}
+                  onPress={onClose}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Icon size={14} color={isSelected ? '#6C47FF' : '#64748B'} />
-                  <Text style={[styles.typeText, isSelected && styles.typeTextActive]}>
-                    {t.label}
-                  </Text>
+                  <X size={16} color="#64748B" />
                 </TouchableOpacity>
-              );
-            })}
-          </View>
+              </View>
 
-          {/* Text Input */}
-          <TextInput
-            style={styles.textInput}
-            placeholder="Type your message here..."
-            placeholderTextColor="#94A3B8"
-            multiline
-            numberOfLines={4}
-            value={message}
-            onChangeText={setMessage}
-          />
+              {/* iOS Segmented Control */}
+              <View style={styles.segmentedContainer}>
+                {FEEDBACK_TYPES.map((t) => {
+                  const isSelected = feedbackType === t.id;
+                  const Icon = t.icon;
+                  return (
+                    <TouchableOpacity
+                      key={t.id}
+                      style={[styles.segmentBtn, isSelected && styles.segmentBtnActive]}
+                      onPress={() => setFeedbackType(t.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Icon
+                        size={14}
+                        color={isSelected ? theme.colors.brand : '#64748B'}
+                      />
+                      <Text style={[styles.segmentText, isSelected && styles.segmentTextActive]}>
+                        {t.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
+              {/* Message Input */}
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder={
+                    feedbackType === 'bug'
+                      ? 'Describe what happened and steps to reproduce...'
+                      : feedbackType === 'feature'
+                      ? 'What feature would make EvenTime indispensable for you?'
+                      : 'Share your thoughts, suggestions, or comments...'
+                  }
+                  placeholderTextColor="#94A3B8"
+                  multiline
+                  numberOfLines={4}
+                  value={message}
+                  onChangeText={setMessage}
+                  maxLength={1000}
+                />
+                <View style={styles.charCountRow}>
+                  <Text style={styles.charCountText}>{message.length}/1000</Text>
+                </View>
+              </View>
 
-            <TouchableOpacity
-              style={[styles.submitBtn, isSubmitting && { opacity: 0.7 }]}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <Text style={styles.submitText}>Submit Feedback</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+              {/* Action Buttons */}
+              <View style={styles.actionRow}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.submitBtn, isSubmitting && { opacity: 0.7 }]}
+                  onPress={handleSubmit}
+                  disabled={isSubmitting}
+                  activeOpacity={0.85}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="#FFF" size="small" />
+                  ) : (
+                    <Text style={styles.submitText}>Submit Feedback</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }
@@ -138,104 +173,152 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
     padding: 20,
   },
+  keyboardAvoid: {
+    width: '100%',
+    alignItems: 'center',
+  },
   modalCard: {
+    width: '100%',
+    maxWidth: 440,
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 20,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  headerTitleRow: {
+  headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+  },
+  headerIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F5F3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 16,
     color: '#0F172A',
   },
-  closeBtn: {
-    padding: 4,
-  },
-  subtitle: {
-    fontSize: 13,
+  modalSubtitle: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 12,
     color: '#64748B',
-    marginBottom: 16,
-    lineHeight: 18,
+    marginTop: 1,
   },
-  typeRow: {
+  closeBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentedContainer: {
     flexDirection: 'row',
-    gap: 8,
+    backgroundColor: '#F1F5F9',
+    padding: 3,
+    borderRadius: 12,
     marginBottom: 14,
   },
-  typeBtn: {
+  segmentBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
     paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: 'transparent',
+    borderRadius: 9,
+    gap: 5,
   },
-  typeBtnActive: {
-    backgroundColor: '#F5F3FF',
-    borderColor: '#DDD6FE',
+  segmentBtnActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  typeText: {
-    fontSize: 11,
-    fontWeight: '700',
+  segmentText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 12,
     color: '#64748B',
   },
-  typeTextActive: {
-    color: '#6C47FF',
+  segmentTextActive: {
+    fontFamily: 'Switzer-Bold',
+    color: theme.colors.brand,
   },
-  textInput: {
+  inputContainer: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 14,
-    padding: 14,
+    padding: 12,
+    marginBottom: 16,
+  },
+  textInput: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 14,
     color: '#0F172A',
     textAlignVertical: 'top',
     height: 110,
-    marginBottom: 16,
+    lineHeight: 20,
   },
-  actionButtons: {
+  charCountRow: {
+    alignItems: 'flex-end',
+    marginTop: 4,
+  },
+  charCountText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 10,
+    color: '#94A3B8',
+  },
+  actionRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'flex-end',
     gap: 10,
   },
   cancelBtn: {
     paddingHorizontal: 16,
     paddingVertical: 10,
+    borderRadius: 10,
   },
   cancelText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 14,
-    fontWeight: '600',
     color: '#64748B',
   },
   submitBtn: {
     backgroundColor: theme.colors.brand,
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 11,
     borderRadius: 12,
+    shadowColor: theme.colors.brand,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
   },
   submitText: {
-    color: '#FFF',
+    fontFamily: 'Switzer-Bold',
+    color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '700',
   },
 });

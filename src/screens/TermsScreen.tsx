@@ -101,8 +101,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 17,
     color: '#0F172A',
   },
   scrollContent: {
@@ -128,20 +128,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   badgeText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
-    fontWeight: '800',
     color: theme.colors.brand,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   title: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 22,
-    fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.4,
     marginBottom: 4,
   },
   updatedDate: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: '#64748B',
     marginBottom: 16,
@@ -155,12 +156,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionHeading: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 15,
-    fontWeight: '800',
     color: '#0F172A',
     marginBottom: 8,
   },
   paragraph: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 14,
     color: '#334155',
     lineHeight: 22,

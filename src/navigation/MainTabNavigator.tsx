@@ -23,7 +23,7 @@ export function MainTabNavigator() {
   const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
 
-  const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 8);
+  const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 16 : 8);
 
   return (
     <Tab.Navigator
@@ -36,8 +36,8 @@ export function MainTabNavigator() {
           backgroundColor: '#FFFFFF',
           borderTopColor: '#F1F5F9',
           borderTopWidth: 1,
-          height: 60 + safeBottom,
-          paddingBottom: safeBottom,
+          height: 62 + safeBottom,
+          paddingBottom: safeBottom + 2,
           paddingTop: 8,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -4 },
@@ -46,8 +46,8 @@ export function MainTabNavigator() {
           elevation: 10,
         },
         tabBarLabelStyle: {
+          fontFamily: 'Switzer-Bold',
           fontSize: 11,
-          fontWeight: '700',
           marginTop: 2,
         },
       }}
@@ -81,8 +81,8 @@ export function MainTabNavigator() {
         options={{
           tabBarLabel: 'Post',
           tabBarLabelStyle: {
+            fontFamily: 'Switzer-Bold',
             fontSize: 11,
-            fontWeight: '700',
             marginTop: 4,
             color: '#6C47FF',
           },

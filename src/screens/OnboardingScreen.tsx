@@ -448,6 +448,8 @@ export default function OnboardingScreen() {
               source={slide.image}
               style={styles.image1x1}
               contentFit="cover"
+              cachePolicy="none"
+              priority="high"
               transition={200}
             />
           </View>
@@ -531,6 +533,8 @@ export default function OnboardingScreen() {
                   source={APP_ASSETS.onboarding.screen6}
                   style={styles.image1x1}
                   contentFit="cover"
+                  cachePolicy="none"
+                  priority="high"
                   transition={200}
                 />
               </View>
@@ -540,7 +544,7 @@ export default function OnboardingScreen() {
             <View style={styles.authHeader}>
               <Text style={styles.authTitle}>Step into India’s{'\n'}Event Dictionary.</Text>
               <Text style={styles.authSubtitle}>
-                Sign in to personalize your campus feed, or start exploring immediately.
+                Sign in to personalize your feed, or start exploring immediately.
               </Text>
             </View>
 
@@ -1004,8 +1008,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   skipButtonText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
-    fontWeight: '700',
     color: '#64748B',
   },
   centerVisualArea: {
@@ -1015,15 +1019,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   imageContainer1x1: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    backgroundColor: 'transparent',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 4,
   },
   image1x1: {
     width: '100%',
@@ -1034,16 +1031,16 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   tourHeadline: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 26,
-    fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.8,
     lineHeight: 32,
     marginBottom: 10,
   },
   tourDescription: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 14,
-    fontWeight: '500',
     color: '#64748B',
     lineHeight: 21,
     marginBottom: 28,
@@ -1085,8 +1082,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   tourPrimaryBtnText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 15,
-    fontWeight: '700',
     color: '#FFFFFF',
   },
 
@@ -1113,8 +1110,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   authTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 24,
-    fontWeight: '900',
     color: '#0F172A',
     textAlign: 'center',
     letterSpacing: -0.6,
@@ -1122,8 +1119,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   authSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
-    fontWeight: '500',
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 19,
@@ -1161,13 +1158,13 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   googleG: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 13,
-    fontWeight: '900',
     color: '#FFFFFF',
   },
   googleBtnText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 15,
-    fontWeight: '700',
     color: '#0F172A',
   },
   githubBtn: {
@@ -1183,8 +1180,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   githubBtnText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 15,
-    fontWeight: '700',
     color: '#FFFFFF',
   },
   emailToggleBtn: {
@@ -1198,8 +1195,8 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   emailToggleText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: '#475569',
   },
   emailFormBox: {
@@ -1214,11 +1211,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   inputLabel: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#475569',
   },
   textInput: {
+    fontFamily: 'Switzer-Regular',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -1238,6 +1236,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   passwordInput: {
+    fontFamily: 'Switzer-Regular',
     flex: 1,
     paddingVertical: 10,
     fontSize: 14,
@@ -1254,8 +1253,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   emailSubmitBtnText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: '#FFFFFF',
   },
   switchAuthModeBtn: {
@@ -1263,8 +1262,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   switchAuthModeText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '600',
     color: '#6C47FF',
   },
   guestLinkBtn: {
@@ -1276,8 +1275,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   guestLinkText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: '#6C47FF',
   },
   legalNotice: {
@@ -1286,8 +1285,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   legalText: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 11,
-    fontWeight: '500',
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 16,
@@ -1304,23 +1303,23 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   setupStepIndicator: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '800',
     color: '#6C47FF',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginBottom: 6,
   },
   setupTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 24,
-    fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.6,
     marginBottom: 6,
   },
   setupSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
-    fontWeight: '500',
     color: '#64748B',
     lineHeight: 19,
   },
@@ -1342,21 +1341,21 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   atSymbol: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 16,
-    fontWeight: '700',
     color: '#6C47FF',
     marginRight: 6,
   },
   usernameInput: {
+    fontFamily: 'Switzer-Bold',
     flex: 1,
     paddingVertical: 12,
     fontSize: 15,
-    fontWeight: '700',
     color: '#0F172A',
   },
   errorMessage: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
-    fontWeight: '600',
     color: '#EF4444',
     marginTop: 6,
   },
@@ -1381,8 +1380,8 @@ const styles = StyleSheet.create({
     borderColor: '#0F172A',
   },
   roleTabText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: '#64748B',
   },
   roleTabTextActive: {
@@ -1399,6 +1398,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   searchInput: {
+    fontFamily: 'Switzer-Regular',
     flex: 1,
     paddingVertical: 11,
     fontSize: 14,
@@ -1420,8 +1420,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   suggestionText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 13,
-    fontWeight: '600',
     color: '#0F172A',
   },
   chipRow: {
@@ -1441,16 +1441,16 @@ const styles = StyleSheet.create({
     borderColor: '#6C47FF',
   },
   chipText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#64748B',
   },
   chipTextActive: {
     color: '#FFFFFF',
   },
   selectionCounter: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#6C47FF',
     marginBottom: 12,
   },
@@ -1474,13 +1474,13 @@ const styles = StyleSheet.create({
     borderColor: '#6C47FF',
   },
   gridChipText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 13,
-    fontWeight: '600',
     color: '#475569',
   },
   gridChipTextActive: {
+    fontFamily: 'Switzer-Bold',
     color: '#6C47FF',
-    fontWeight: '800',
   },
   stepButtonsRow: {
     flexDirection: 'row',
@@ -1503,10 +1503,15 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     gap: 8,
     backgroundColor: '#0F172A',
     paddingVertical: 14,
     borderRadius: 100,
+  },
+  stepNextBtnText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 15,
+    color: '#FFFFFF',
   },
 });

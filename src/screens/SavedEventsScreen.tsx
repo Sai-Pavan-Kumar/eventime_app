@@ -170,13 +170,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 18,
     color: theme.colors.textPrimary,
   },
   countText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
-    fontWeight: '700',
     color: theme.colors.textSecondary,
     marginBottom: 12,
   },
@@ -205,11 +205,12 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   emptyTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 18,
-    fontWeight: '800',
     color: theme.colors.textPrimary,
   },
   emptySubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: theme.colors.textSecondary,
     textAlign: 'center',
@@ -224,8 +225,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
   },
   exploreBtnText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 14,
-    fontWeight: '700',
   },
 });

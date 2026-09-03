@@ -1744,8 +1744,8 @@ const modalStyles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   headerTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 16,
-    fontWeight: '800',
     color: '#0F172A',
   },
   closeBtn: {
@@ -1767,6 +1767,7 @@ const modalStyles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    fontFamily: 'Switzer-Regular',
     fontSize: 14,
     color: '#0F172A',
     padding: 0,
@@ -1789,12 +1790,12 @@ const modalStyles = StyleSheet.create({
     backgroundColor: '#F5F3FF',
   },
   itemText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 14,
-    fontWeight: '600',
     color: '#334155',
   },
   itemTextActive: {
-    fontWeight: '800',
+    fontFamily: 'Switzer-Bold',
     color: theme.colors.brand,
   },
   // Calendar Modal Styles
@@ -1820,8 +1821,8 @@ const modalStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   monthYearTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 16,
-    fontWeight: '800',
     color: '#0F172A',
   },
   dayHeaderRow: {
@@ -1834,8 +1835,8 @@ const modalStyles = StyleSheet.create({
   dayHeaderCell: {
     flex: 1,
     textAlign: 'center',
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#94A3B8',
   },
   calendarGrid: {
@@ -1865,17 +1866,17 @@ const modalStyles = StyleSheet.create({
     elevation: 3,
   },
   dayCellText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 14,
-    fontWeight: '600',
     color: '#1E293B',
   },
   todayCellText: {
+    fontFamily: 'Switzer-Bold',
     color: '#6C47FF',
-    fontWeight: '700',
   },
   selectedDayCellText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFFFFF',
-    fontWeight: '800',
   },
 
   // Time Modal Styles
@@ -1896,14 +1897,14 @@ const modalStyles = StyleSheet.create({
     borderColor: '#E9D5FF',
   },
   timePreviewText: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 26,
-    fontWeight: '900',
     color: '#6C47FF',
     letterSpacing: 1,
   },
   timeSectionLabel: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#64748B',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -1930,8 +1931,8 @@ const modalStyles = StyleSheet.create({
     borderColor: '#6C47FF',
   },
   timeChipText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
-    fontWeight: '700',
     color: '#334155',
   },
   timeChipTextActive: {
@@ -1955,8 +1956,8 @@ const modalStyles = StyleSheet.create({
     borderColor: '#6C47FF',
   },
   periodBtnText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '800',
     color: '#475569',
   },
   periodBtnTextActive: {
@@ -1970,9 +1971,9 @@ const modalStyles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmTimeBtnText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '800',
   },
 });
 
@@ -2000,11 +2001,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 16,
-    fontWeight: '800',
     color: '#0F172A',
   },
   headerSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 11,
     color: '#64748B',
     marginTop: 1,
@@ -2031,23 +2033,24 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   label: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
-    fontWeight: '700',
     color: '#334155',
     marginBottom: 6,
   },
   optionalLabel: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 11,
-    fontWeight: '500',
     color: '#94A3B8',
   },
   subLabel: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#475569',
     marginBottom: 5,
   },
   inputPlain: {
+    fontFamily: 'Switzer-Regular',
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
@@ -2073,6 +2076,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    fontFamily: 'Switzer-Regular',
     fontSize: 14,
     color: '#0F172A',
     padding: 0,
@@ -2093,13 +2097,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   selectTriggerText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: '#0F172A',
   },
   placeholderText: {
+    fontFamily: 'Switzer-Medium',
     color: '#94A3B8',
-    fontWeight: '500',
   },
   pickerTrigger: {
     flexDirection: 'row',
@@ -2118,8 +2122,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pickerTriggerText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: '#0F172A',
   },
   sectionDivider: {
@@ -2139,8 +2143,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   toggleText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: theme.colors.brand,
   },
   toggleTextActive: {
@@ -2161,8 +2165,8 @@ const styles = StyleSheet.create({
     borderColor: '#1E293B',
   },
   modePillText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
-    fontWeight: '700',
     color: theme.colors.brand,
   },
   modePillTextActive: {
@@ -2178,11 +2182,12 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   virtualCardTitle: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
-    fontWeight: '700',
     color: '#0F172A',
   },
   virtualCardSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 11,
     color: '#64748B',
     marginTop: 2,
@@ -2205,8 +2210,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F3FF',
   },
   pricingText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
-    fontWeight: '700',
     color: '#64748B',
   },
   pricingTextActive: {
@@ -2234,11 +2239,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   collegeCardTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 14,
-    fontWeight: '800',
     color: '#1E40AF',
   },
   collegeCardSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 11,
     color: '#3B82F6',
     marginTop: 1,
@@ -2253,11 +2259,12 @@ const styles = StyleSheet.create({
     borderTopColor: '#DBEAFE',
   },
   switchTitle: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
-    fontWeight: '700',
     color: '#1E3A8A',
   },
   switchSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 11,
     color: '#3B82F6',
     marginTop: 2,
@@ -2280,17 +2287,17 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   collegeDropdownText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 13,
     color: '#0F172A',
-    fontWeight: '600',
   },
   addNewCollegeItem: {
     backgroundColor: '#FAF8FF',
   },
   addNewCollegeText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
     color: '#6C47FF',
-    fontWeight: '800',
   },
   horizontalChips: {
     flexDirection: 'row',
@@ -2310,9 +2317,9 @@ const styles = StyleSheet.create({
     borderColor: '#2563EB',
   },
   smallChipText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
     color: '#1E40AF',
-    fontWeight: '600',
   },
   smallChipTextActive: {
     color: '#FFFFFF',
@@ -2331,13 +2338,13 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.brand,
   },
   chipText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
-    fontWeight: '600',
     color: '#475569',
   },
   chipTextActive: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFFFFF',
-    fontWeight: '700',
   },
   adminFeatureCard: {
     flexDirection: 'row',
@@ -2351,11 +2358,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   adminFeatureTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 14,
-    fontWeight: '800',
     color: '#92400E',
   },
   adminFeatureSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 11,
     color: '#B45309',
     marginTop: 2,
@@ -2373,8 +2381,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   optionalToggleTitle: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
-    fontWeight: '700',
     color: '#6C47FF',
   },
   optionalContent: {
@@ -2399,9 +2407,9 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   submitBtnText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 14,
-    fontWeight: '800',
   },
   secondaryBtn: {
     paddingVertical: 16,
@@ -2412,9 +2420,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryBtnText: {
+    fontFamily: 'Switzer-Bold',
     color: '#475569',
     fontSize: 14,
-    fontWeight: '700',
   },
   stepBackBtn: {
     flexDirection: 'row',
@@ -2423,8 +2431,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   stepBackText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 13,
-    fontWeight: '700',
     color: '#64748B',
   },
   step1ActionsRow: {
@@ -2455,9 +2463,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   changePosterText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 12,
-    fontWeight: '700',
   },
   uploadSquareArea: {
     width: '100%',
@@ -2472,12 +2480,13 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   uploadSquareTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 15,
-    fontWeight: '800',
     color: '#0F172A',
     marginTop: 10,
   },
   uploadSquareSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 12,
     color: '#64748B',
     marginTop: 4,
@@ -2495,10 +2504,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   extractingText: {
+    fontFamily: 'Switzer-Medium',
     flex: 1,
     fontSize: 12,
     color: '#6C47FF',
-    fontWeight: '600',
   },
   errorAlertBox: {
     flexDirection: 'row',
@@ -2512,10 +2521,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   errorAlertText: {
+    fontFamily: 'Switzer-Medium',
     flex: 1,
     fontSize: 12,
     color: '#EF4444',
-    fontWeight: '600',
   },
   confidenceBox: {
     flexDirection: 'row',
@@ -2529,10 +2538,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   confidenceText: {
+    fontFamily: 'Switzer-Medium',
     flex: 1,
     fontSize: 12,
     color: '#047857',
-    fontWeight: '600',
   },
   trustWarningBox: {
     flexDirection: 'row',
@@ -2546,10 +2555,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   trustWarningText: {
+    fontFamily: 'Switzer-Regular',
     flex: 1,
     fontSize: 12,
     color: '#B45309',
-    fontWeight: '500',
   },
   trustSuccessBox: {
     flexDirection: 'row',
@@ -2563,10 +2572,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   trustSuccessText: {
+    fontFamily: 'Switzer-Medium',
     flex: 1,
     fontSize: 12,
     color: '#047857',
-    fontWeight: '600',
   },
   guestContainer: {
     flex: 1,
@@ -2584,13 +2593,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   guestTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 20,
-    fontWeight: '800',
     color: '#0F172A',
     marginBottom: 8,
     textAlign: 'center',
   },
   guestSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 14,
     color: '#64748B',
     textAlign: 'center',
@@ -2604,8 +2614,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   signInBtnText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 15,
-    fontWeight: '700',
   },
 });

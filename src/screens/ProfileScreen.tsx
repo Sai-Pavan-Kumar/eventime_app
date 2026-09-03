@@ -316,21 +316,27 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* Feedback & Support */}
-        <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>Support & Feedback</Text>
+        {/* Apple-grade Feedback Card */}
+        <View style={styles.feedbackCardWrap}>
+          <View style={styles.feedbackCardHeader}>
+            <View style={styles.feedbackIconCircle}>
+              <MessageSquare size={18} color="#6C47FF" />
+            </View>
+            <View style={styles.feedbackHeaderTextWrap}>
+              <Text style={styles.feedbackCardTitle}>Help Us Shape EvenTime</Text>
+              <Text style={styles.feedbackCardSubtitle}>
+                Spotted an issue or have an idea? Share your thoughts directly with our team.
+              </Text>
+            </View>
+          </View>
 
           <TouchableOpacity
-            style={styles.menuItem}
+            style={styles.feedbackActionBtn}
             onPress={() => setShowFeedbackModal(true)}
+            activeOpacity={0.8}
           >
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.menuIconBg, { backgroundColor: '#F5F3FF' }]}>
-                <MessageSquare size={18} color="#6C47FF" />
-              </View>
-              <Text style={styles.menuItemText}>Share Feedback / Bug Report</Text>
-            </View>
-            <ChevronRight size={18} color={theme.colors.textMuted} />
+            <Text style={styles.feedbackActionBtnText}>Share Feedback / Suggestion</Text>
+            <ChevronRight size={15} color="#6C47FF" />
           </TouchableOpacity>
         </View>
 
@@ -426,11 +432,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   guestTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 22,
-    fontWeight: '900',
     color: theme.colors.textPrimary,
   },
   guestSubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: theme.colors.textSecondary,
     textAlign: 'center',
@@ -446,9 +453,9 @@ const styles = StyleSheet.create({
     ...theme.shadows.brand,
   },
   signInBtnText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 15,
-    fontWeight: '700',
   },
   profileCard: {
     backgroundColor: theme.colors.surface,
@@ -478,9 +485,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarInitials: {
+    fontFamily: 'Outfit-Bold',
     color: '#FFF',
     fontSize: 24,
-    fontWeight: '900',
   },
   profileDetails: {
     flex: 1,
@@ -491,8 +498,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   fullName: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 18,
     color: theme.colors.textPrimary,
   },
   adminBadge: {
@@ -505,12 +512,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   adminBadgeText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 9,
-    fontWeight: '900',
     letterSpacing: 0.5,
   },
   username: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 13,
     color: theme.colors.textSecondary,
     marginTop: 2,
@@ -526,12 +534,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   tierText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
-    fontWeight: '800',
   },
   scoreText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
-    fontWeight: '700',
   },
   academicRow: {
     flexDirection: 'row',
@@ -543,9 +551,9 @@ const styles = StyleSheet.create({
     borderTopColor: theme.colors.border,
   },
   academicText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
     color: theme.colors.textSecondary,
-    fontWeight: '500',
     flex: 1,
   },
   goalsRow: {
@@ -562,14 +570,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   goalChipText: {
+    fontFamily: 'Switzer-Semibold',
     fontSize: 11,
-    fontWeight: '600',
     color: '#6C47FF',
   },
   moreGoalsText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 11,
     color: '#94A3B8',
-    fontWeight: '500',
   },
   completionCard: {
     marginTop: 14,
@@ -583,13 +591,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   completionTitle: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
   },
   completionAction: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 11,
-    fontWeight: '700',
     color: theme.colors.brand,
   },
   completionBarBg: {
@@ -620,13 +628,13 @@ const styles = StyleSheet.create({
     ...theme.shadows.sm,
   },
   statNumber: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 18,
-    fontWeight: '900',
     color: theme.colors.textPrimary,
   },
   statLabel: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 10,
-    fontWeight: '700',
     color: theme.colors.textMuted,
     textTransform: 'uppercase',
   },
@@ -640,8 +648,8 @@ const styles = StyleSheet.create({
     ...theme.shadows.sm,
   },
   menuSectionTitle: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '800',
     color: theme.colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -673,18 +681,76 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   menuItemText: {
+    fontFamily: 'Switzer-Semibold',
     fontSize: 14,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
   },
   adminMenuItemText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
-    fontWeight: '800',
     color: '#991B1B',
   },
   adminMenuSubtext: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 11,
     color: '#B91C1C',
     marginTop: 2,
+  },
+  feedbackCardWrap: {
+    marginBottom: theme.spacing.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  feedbackCardHeader: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 14,
+  },
+  feedbackIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F5F3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedbackHeaderTextWrap: {
+    flex: 1,
+  },
+  feedbackCardTitle: {
+    fontFamily: 'Outfit-Bold',
+    fontSize: 15,
+    color: '#0F172A',
+    marginBottom: 3,
+  },
+  feedbackCardSubtitle: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 17,
+  },
+  feedbackActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  feedbackActionBtnText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 13,
+    color: '#6C47FF',
   },
 });

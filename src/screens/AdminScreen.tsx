@@ -1073,8 +1073,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 18,
     color: '#0F172A',
   },
   tabsContainer: {
@@ -1097,11 +1097,12 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.brand,
   },
   tabText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 13,
-    fontWeight: '700',
     color: '#64748B',
   },
   tabTextActive: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFFFFF',
   },
   content: {
@@ -1111,8 +1112,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   sectionHeader: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 16,
-    fontWeight: '800',
     color: '#0F172A',
     marginBottom: 12,
   },
@@ -1131,13 +1132,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   kpiValue: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 24,
-    fontWeight: '900',
     color: '#0F172A',
   },
   kpiLabel: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#64748B',
   },
   controlCard: {
@@ -1554,8 +1555,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   modalCancelText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 14,
-    fontWeight: '600',
     color: '#64748B',
   },
   modalConfirmBtn: {
@@ -1565,9 +1566,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   modalConfirmText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 14,
-    fontWeight: '700',
   },
   statusFiltersRow: {
     marginBottom: 12,
@@ -1589,8 +1590,8 @@ const styles = StyleSheet.create({
     borderColor: '#6C47FF',
   },
   statusFilterChipText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 12,
-    fontWeight: '700',
     color: '#64748B',
   },
   statusFilterChipTextActive: {

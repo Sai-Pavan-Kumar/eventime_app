@@ -30,6 +30,7 @@ import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { EmptyState } from '../components/EmptyState';
+import { parseEventDateString } from '../lib/utils/date';
 import type { EventRow, RootStackParamList } from '../types';
 
 export default function MyPostedEventsScreen() {
@@ -49,8 +50,7 @@ export default function MyPostedEventsScreen() {
       const { data, error } = await supabase
         .from('events')
         .select('*, saved_events(count), interested_events(count)')
-        .eq('creator_id', user.id)
-        .order('created_at', { ascending: false });
+        .eq('creator_id', user.id);
 
       if (error) throw error;
 
@@ -59,7 +59,17 @@ export default function MyPostedEventsScreen() {
         saved_count: ev.saved_events?.[0]?.count || 0,
       }));
 
-      setEvents(formatted);
+      // Sort strictly in chronological order (soonest/earliest event date to latest)
+      const sorted = formatted.sort((a: any, b: any) => {
+        const timeA = parseEventDateString(a.date_string)?.getTime() || 0;
+        const timeB = parseEventDateString(b.date_string)?.getTime() || 0;
+        if (timeA === 0 && timeB === 0) return 0;
+        if (timeA === 0) return 1;
+        if (timeB === 0) return -1;
+        return timeA - timeB;
+      });
+
+      setEvents(sorted);
     } catch (err) {
       console.error('Fetch my posted events error:', err);
     } finally {
@@ -261,8 +271,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 18,
     color: theme.colors.textPrimary,
   },
   listContent: {
@@ -319,20 +329,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
   },
   statusText: {
+    fontFamily: 'Switzer-Bold',
     fontSize: 10,
-    fontWeight: '800',
   },
   eventTitle: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 15,
     color: theme.colors.textPrimary,
-    lineHeight: 18,
+    lineHeight: 19,
     marginBottom: 4,
   },
   eventDate: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 11,
     color: theme.colors.textSecondary,
-    fontWeight: '600',
   },
   cardFooter: {
     flexDirection: 'row',
@@ -349,8 +359,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   savesText: {
+    fontFamily: 'Switzer-Medium',
     fontSize: 12,
-    fontWeight: '600',
     color: theme.colors.textSecondary,
   },
   actionButtons: {
@@ -376,11 +386,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   emptyTitle: {
+    fontFamily: 'Outfit-Bold',
     fontSize: 18,
-    fontWeight: '800',
     color: theme.colors.textPrimary,
   },
   emptySubtitle: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: theme.colors.textSecondary,
     textAlign: 'center',
@@ -395,8 +406,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
   },
   postNowText: {
+    fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 14,
-    fontWeight: '700',
   },
 });
