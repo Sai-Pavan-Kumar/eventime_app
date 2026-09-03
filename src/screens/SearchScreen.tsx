@@ -14,10 +14,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Search, X, SlidersHorizontal, MapPin } from 'lucide-react-native';
+import { Search, X, MapPin, ChevronDown, Calendar } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
+import { SelectPickerModal } from '../components/SelectPickerModal';
+import { DatePickerModal } from '../components/DatePickerModal';
 import { CATEGORIES_LIST } from '../lib/category-config';
 import { CITIES } from '../lib/constants/cities';
 import { APP_ASSETS } from '../lib/asset-registry';
@@ -33,7 +35,13 @@ export default function SearchScreen() {
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [priceFilter, setPriceFilter] = useState<'all' | 'free' | 'paid'>('all');
-  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'tomorrow' | 'weekend'>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'tomorrow'>('all');
+  const [selectedCustomDate, setSelectedCustomDate] = useState<string | null>(null);
+  const [selectedCustomFormatted, setSelectedCustomFormatted] = useState<string | null>(null);
+
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showCityModal, setShowCityModal] = useState(false);
+  const [showDatePickerModal, setShowDatePickerModal] = useState(false);
 
   const [events, setEvents] = useState<EventRow[]>([]);
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(new Set());
@@ -102,15 +110,19 @@ export default function SearchScreen() {
         const evDate = new Date(parsed);
         evDate.setHours(0, 0, 0, 0);
         
+        if (selectedCustomDate) {
+          const y = parsed.getFullYear();
+          const m = String(parsed.getMonth() + 1).padStart(2, '0');
+          const d = String(parsed.getDate()).padStart(2, '0');
+          return `${y}-${m}-${d}` === selectedCustomDate;
+        }
+
         if (evDate.getTime() < today.getTime()) return false;
 
         if (dateFilter === 'today') {
           return evDate.getTime() === today.getTime();
         } else if (dateFilter === 'tomorrow') {
           return evDate.getTime() === tomorrow.getTime();
-        } else if (dateFilter === 'weekend') {
-          const day = evDate.getDay();
-          return day === 0 || day === 6;
         }
 
         return true;
@@ -122,7 +134,7 @@ export default function SearchScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [keyword, selectedCity, selectedCategory, priceFilter, dateFilter]);
+  }, [keyword, selectedCity, selectedCategory, priceFilter, dateFilter, selectedCustomDate]);
 
   useEffect(() => {
     fetchSavedEventIds();
@@ -142,6 +154,8 @@ export default function SearchScreen() {
     setSelectedCategory(null);
     setPriceFilter('all');
     setDateFilter('all');
+    setSelectedCustomDate(null);
+    setSelectedCustomFormatted(null);
   };
 
   return (
@@ -166,61 +180,78 @@ export default function SearchScreen() {
           )}
         </View>
 
-        {/* Filter Chips Horizontal Scroll */}
+        {/* Filter Chips Horizontal Scroll: Today | Tomorrow | Calendar | City | Category */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterScroll}
         >
-          {/* Date Filters */}
+          {/* 1. Today */}
           <TouchableOpacity
-            style={[styles.chip, dateFilter === 'today' && styles.chipActive]}
-            onPress={() => setDateFilter(dateFilter === 'today' ? 'all' : 'today')}
+            style={[styles.chip, dateFilter === 'today' && !selectedCustomDate && styles.chipActive]}
+            onPress={() => {
+              setSelectedCustomDate(null);
+              setSelectedCustomFormatted(null);
+              setDateFilter(dateFilter === 'today' ? 'all' : 'today');
+            }}
+            activeOpacity={0.8}
           >
-            <Text style={[styles.chipText, dateFilter === 'today' && styles.chipTextActive]}>Today</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.chip, dateFilter === 'tomorrow' && styles.chipActive]}
-            onPress={() => setDateFilter(dateFilter === 'tomorrow' ? 'all' : 'tomorrow')}
-          >
-            <Text style={[styles.chipText, dateFilter === 'tomorrow' && styles.chipTextActive]}>Tomorrow</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.chip, dateFilter === 'weekend' && styles.chipActive]}
-            onPress={() => setDateFilter(dateFilter === 'weekend' ? 'all' : 'weekend')}
-          >
-            <Text style={[styles.chipText, dateFilter === 'weekend' && styles.chipTextActive]}>Weekend</Text>
+            <Text style={[styles.chipText, dateFilter === 'today' && !selectedCustomDate && styles.chipTextActive]}>
+              Today
+            </Text>
           </TouchableOpacity>
 
-          {/* Price Filters */}
+          {/* 2. Tomorrow */}
           <TouchableOpacity
-            style={[styles.chip, priceFilter === 'free' && styles.chipActive]}
-            onPress={() => setPriceFilter(priceFilter === 'free' ? 'all' : 'free')}
+            style={[styles.chip, dateFilter === 'tomorrow' && !selectedCustomDate && styles.chipActive]}
+            onPress={() => {
+              setSelectedCustomDate(null);
+              setSelectedCustomFormatted(null);
+              setDateFilter(dateFilter === 'tomorrow' ? 'all' : 'tomorrow');
+            }}
+            activeOpacity={0.8}
           >
-            <Text style={[styles.chipText, priceFilter === 'free' && styles.chipTextActive]}>Free</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.chip, priceFilter === 'paid' && styles.chipActive]}
-            onPress={() => setPriceFilter(priceFilter === 'paid' ? 'all' : 'paid')}
-          >
-            <Text style={[styles.chipText, priceFilter === 'paid' && styles.chipTextActive]}>Paid</Text>
+            <Text style={[styles.chipText, dateFilter === 'tomorrow' && !selectedCustomDate && styles.chipTextActive]}>
+              Tomorrow
+            </Text>
           </TouchableOpacity>
 
-          {/* Category Chips */}
-          {CATEGORIES_LIST.map((cat) => {
-            const active = selectedCategory === cat;
-            return (
-              <TouchableOpacity
-                key={cat}
-                style={[styles.chip, active && styles.chipActive]}
-                onPress={() => setSelectedCategory(active ? null : cat)}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                  {cat}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          {/* 3. Calendar Button */}
+          <TouchableOpacity
+            style={[styles.dropdownChip, selectedCustomDate && styles.chipActive]}
+            onPress={() => setShowDatePickerModal(true)}
+            activeOpacity={0.8}
+          >
+            <Calendar size={13} color={selectedCustomDate ? '#FFF' : '#64748B'} />
+            <Text style={[styles.chipText, selectedCustomDate && styles.chipTextActive]}>
+              {selectedCustomFormatted || 'Date'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* 4. City Dropdown */}
+          <TouchableOpacity
+            style={[styles.dropdownChip, selectedCity && styles.chipActive]}
+            onPress={() => setShowCityModal(true)}
+            activeOpacity={0.8}
+          >
+            <MapPin size={13} color={selectedCity ? '#FFF' : '#64748B'} />
+            <Text style={[styles.chipText, selectedCity && styles.chipTextActive]}>
+              {selectedCity || 'City'}
+            </Text>
+            <ChevronDown size={14} color={selectedCity ? '#FFF' : '#64748B'} />
+          </TouchableOpacity>
+
+          {/* 5. Category Dropdown */}
+          <TouchableOpacity
+            style={[styles.dropdownChip, selectedCategory && styles.chipActive]}
+            onPress={() => setShowCategoryModal(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.chipText, selectedCategory && styles.chipTextActive]}>
+              {selectedCategory || 'Category'}
+            </Text>
+            <ChevronDown size={14} color={selectedCategory ? '#FFF' : '#64748B'} />
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -296,6 +327,52 @@ export default function SearchScreen() {
           }
         />
       )}
+
+      {/* Category Picker Modal */}
+      <SelectPickerModal
+        visible={showCategoryModal}
+        title="Select Category"
+        items={CATEGORIES_LIST}
+        selectedItem={selectedCategory}
+        onSelect={(cat) => setSelectedCategory(cat)}
+        onClose={() => setShowCategoryModal(false)}
+        allowClear
+        clearLabel="All Categories"
+        onClear={() => setSelectedCategory(null)}
+        searchPlaceholder="Search categories..."
+      />
+
+      {/* City Picker Modal */}
+      <SelectPickerModal
+        visible={showCityModal}
+        title="Select City"
+        items={CITIES}
+        selectedItem={selectedCity}
+        onSelect={(c) => setSelectedCity(c)}
+        onClose={() => setShowCityModal(false)}
+        allowClear
+        clearLabel="All Cities"
+        onClear={() => setSelectedCity(null)}
+        searchPlaceholder="Search Indian cities..."
+      />
+
+      {/* Calendar Date Picker Modal */}
+      <DatePickerModal
+        visible={showDatePickerModal}
+        title="Select Event Date"
+        initialDateString={selectedCustomDate}
+        onSelect={(formatted, iso) => {
+          setDateFilter('all');
+          setSelectedCustomDate(iso);
+          setSelectedCustomFormatted(formatted.split(' ').slice(0, 2).join(' '));
+        }}
+        onClose={() => setShowDatePickerModal(false)}
+        allowClear
+        onClear={() => {
+          setSelectedCustomDate(null);
+          setSelectedCustomFormatted(null);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -363,6 +440,33 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#FFFFFF',
+  },
+  dropdownChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 100,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  clearChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 100,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  clearChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#EF4444',
   },
   listContent: {
     padding: 16,

@@ -11,7 +11,7 @@ WebBrowser.maybeCompleteAuthSession();
 // Configure Google Sign-in with the Web Client ID (audience for idToken verification)
 const GOOGLE_WEB_CLIENT_ID =
   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-  '503758339039-tn46mns1l75dhopjh6cut97gno6p5qmn.apps.googleusercontent.com';
+  '1022633538864-iddbj1tkq06mab3h9rtg2t1pvicvi3j4.apps.googleusercontent.com';
 
 let GoogleSigninModule: any = null;
 let statusCodesEnum: any = null;
@@ -100,7 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (GoogleSigninModule && typeof GoogleSigninModule.configure === 'function') {
         GoogleSigninModule.configure({
           webClientId: GOOGLE_WEB_CLIENT_ID,
-          offlineAccess: true,
           scopes: ['profile', 'email'],
         });
       }
@@ -159,12 +158,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const code = params.get('code');
 
           if (accessToken && refreshToken) {
-            await supabase.auth.setSession({
+            const { data: sData } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
             });
+            if (sData?.session?.user) {
+              setUser(sData.session.user);
+              setSession(sData.session);
+              await fetchProfile(sData.session.user.id, sData.session.user);
+            }
           } else if (code) {
-            await supabase.auth.exchangeCodeForSession(code);
+            const { data: exData } = await supabase.auth.exchangeCodeForSession(code);
+            if (exData?.session?.user) {
+              setUser(exData.session.user);
+              setSession(exData.session);
+              await fetchProfile(exData.session.user.id, exData.session.user);
+            }
           }
         }
       } catch (e) {
@@ -213,7 +222,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // User intentionally closed/cancelled the Google prompt
             return { error: null };
           }
-          console.warn('[AuthContext] Native Google sign-in failed, trying fallback:', nativeErr?.message);
+          console.warn('[AuthContext] Native Google sign-in failed (Code: ' + nativeErr?.code + '):', nativeErr?.message);
+          if (nativeErr?.code === '10' || nativeErr?.code === 10) {
+            console.error(
+              '[AuthContext] DEVELOPER_ERROR (code 10): Ensure SHA-1 fingerprint (5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25) and package com.eventime.app are registered in Firebase / Google Cloud Console, and Web Client ID matches.'
+            );
+          }
         }
       }
 

@@ -32,10 +32,13 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
+import { EmptyState } from '../components/EmptyState';
 import { SmartRatingModal } from '../components/SmartRatingModal';
+import { DelayedPromptModal } from '../components/DelayedPromptModal';
 import { shouldShowRatingPrompt } from '../lib/rating-prompt';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { parseEventDateString } from '../lib/utils/date';
+import { getGuestPreferences, OnboardingData } from '../lib/guest-preferences';
 import type { EventRow, RootStackParamList } from '../types';
 
 const { width } = Dimensions.get('window');
@@ -65,7 +68,7 @@ let cachedPlatformStats: {
 
 const getTimeOfDayGreeting = (name?: string) => {
   const h = new Date().getHours();
-  const userName = name || 'there';
+  const userName = name ? (name.length > 12 ? name.slice(0, 12) : name) : 'there';
   if (h >= 6 && h < 9) return `Morning, ${userName}.`;
   if (h >= 9 && h < 12) return `Tiffin time, ${userName}.`;
   if (h >= 12 && h < 14) return `Afternoon, ${userName}.`;
@@ -83,13 +86,27 @@ export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user, profile } = useAuth();
 
-  const isStudent = Boolean(user && profile?.user_type === 'student' && profile?.college_id);
-  const hasGoals = Boolean(profile?.goals && profile.goals.length > 0);
+  const [guestPrefs, setGuestPrefs] = useState<OnboardingData | null>(null);
 
-  // Active Feed Pill: 'all' | 'for_you' | 'around_you' | 'campus'
-  const [activeFeedPill, setActiveFeedPill] = useState<'all' | 'for_you' | 'around_you' | 'campus'>(
-    hasGoals ? 'for_you' : 'all'
+  useEffect(() => {
+    if (!user) {
+      getGuestPreferences().then((prefs) => {
+        if (prefs) setGuestPrefs(prefs);
+      });
+    }
+  }, [user]);
+
+  const isStudent = Boolean(
+    (user && profile?.user_type === 'student' && profile?.college_id) ||
+    (!user && guestPrefs?.userType === 'student' && guestPrefs?.collegeId)
   );
+  const hasGoals = Boolean(
+    (profile?.goals && profile.goals.length > 0) ||
+    (guestPrefs?.goals && guestPrefs.goals.length > 0)
+  );
+
+  // Active Feed Pill: 'for_you' | 'around_you' | 'campus'
+  const [activeFeedPill, setActiveFeedPill] = useState<'for_you' | 'around_you' | 'campus'>('for_you');
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
@@ -316,45 +333,66 @@ export default function HomeScreen() {
       source = campusEvents;
     }
 
-    // 2. Filter by Date (Calendar vs Upcoming)
-    let filtered = source.filter((ev) => {
-      const parsed = parseEventDateString(ev.date_string || '');
-      if (!parsed) return true;
-
-      if (selectedDate) {
+    // 2. Specific Date Selected (Calendar Filter)
+    if (selectedDate) {
+      return source.filter((ev) => {
+        const parsed = parseEventDateString(ev.date_string || '');
+        if (!parsed) return false;
         const y = parsed.getFullYear();
         const m = String(parsed.getMonth() + 1).padStart(2, '0');
         const d = String(parsed.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}` === selectedDate;
-      }
+      });
+    }
 
-      // Default feed: Only today & upcoming events
+    // 3. Default Feed: Strictly Today & Upcoming Events Only (No past events on home feed)
+    let pool = source.filter((ev) => {
+      const parsed = parseEventDateString(ev.date_string || '');
+      if (!parsed) return true;
       const evDate = new Date(parsed);
       evDate.setHours(0, 0, 0, 0);
       return evDate.getTime() >= today.getTime();
     });
 
-    // 3. Apply Personalized Pill Filters (For You / Around You)
-    if (!selectedDate) {
-      const preferredCities = profile?.preferred_cities || [];
-      const preferredGoals = profile?.goals || [];
+    // 4. Personalized Tab Filters
+    const preferredCities = profile?.preferred_cities?.length
+      ? profile.preferred_cities
+      : (guestPrefs?.preferredCities || []);
+    const preferredGoals = profile?.goals?.length
+      ? profile.goals
+      : (guestPrefs?.goals || []);
 
-      if (activeFeedPill === 'for_you' && (preferredGoals.length > 0 || preferredCities.length > 0)) {
+    if (activeFeedPill === 'for_you') {
+      if (preferredGoals.length > 0 || preferredCities.length > 0) {
         const goalSet = new Set(preferredGoals);
-        filtered = filtered.filter((e) => {
+        const matches = pool.filter((e) => {
           const matchesCity = e.is_virtual || preferredCities.length === 0 || (e.city ? preferredCities.includes(e.city) : false);
-          const matchesCategory = e.category ? goalSet.has(e.category) : false;
+          const matchesCategory = preferredGoals.length === 0 || (e.category ? goalSet.has(e.category) : false);
           return matchesCity && matchesCategory;
         });
-      } else if (activeFeedPill === 'around_you' && preferredCities.length > 0) {
-        filtered = filtered.filter((e) => {
-          return e.is_virtual || (e.city ? preferredCities.includes(e.city) : false);
-        });
+        if (matches.length > 0) {
+          pool = matches;
+        } else if (preferredCities.length > 0) {
+          const cityMatches = pool.filter((e) => e.is_virtual || (e.city ? preferredCities.includes(e.city) : false));
+          if (cityMatches.length > 0) pool = cityMatches;
+        }
+      }
+    } else if (activeFeedPill === 'around_you') {
+      if (preferredCities.length > 0) {
+        const cityMatches = pool.filter((e) => e.is_virtual || (e.city ? preferredCities.includes(e.city) : false));
+        if (cityMatches.length > 0) pool = cityMatches;
       }
     }
 
-    return filtered;
-  }, [events, campusEvents, selectedDate, activeFeedPill, profile]);
+    // 5. Sort upcoming chronologically (soonest first)
+    pool.sort((a, b) => {
+      const da = parseEventDateString(a.date_string)?.getTime() || 0;
+      const db = parseEventDateString(b.date_string)?.getTime() || 0;
+      return da - db;
+    });
+
+    return pool;
+  }, [events, campusEvents, selectedDate, activeFeedPill, profile, guestPrefs]);
 
   // Calendar calculations
   const calendarDays = useMemo(() => {
@@ -455,8 +493,8 @@ export default function HomeScreen() {
 
       {/* Dynamic Time-of-Day Greeting for Everyone */}
       <View style={styles.greetingContainer}>
-        <Text style={styles.greetingText}>
-          {getTimeOfDayGreeting(profile?.full_name?.split(' ')[0] || profile?.username || (user ? undefined : 'explorer'))}
+        <Text style={styles.greetingText} numberOfLines={1} ellipsizeMode="tail">
+          {getTimeOfDayGreeting(profile?.username?.trim().slice(0, 12) || profile?.full_name?.split(' ')[0]?.trim().slice(0, 12) || (user ? undefined : 'explorer'))}
         </Text>
       </View>
 
@@ -486,68 +524,55 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Segment Feed Pills (Only when personalized options exist for logged in user) */}
-      {showPersonalizedPills && (
-        <View style={styles.filterBar}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterScrollContent}
+      {/* Segment Feed Pills (For You | Around You | Your Campus for students) */}
+      <View style={styles.filterBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScrollContent}
+        >
+          <TouchableOpacity
+            style={[styles.feedPill, activeFeedPill === 'for_you' && !selectedDate && styles.feedPillActive]}
+            onPress={() => {
+              setActiveFeedPill('for_you');
+              setSelectedDate(null);
+            }}
           >
+            <Sparkles size={14} color={activeFeedPill === 'for_you' && !selectedDate ? '#FFF' : '#64748B'} />
+            <Text style={[styles.feedPillText, activeFeedPill === 'for_you' && !selectedDate && styles.feedPillTextActive]}>
+              For You
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.feedPill, activeFeedPill === 'around_you' && !selectedDate && styles.feedPillActive]}
+            onPress={() => {
+              setActiveFeedPill('around_you');
+              setSelectedDate(null);
+            }}
+          >
+            <Compass size={14} color={activeFeedPill === 'around_you' && !selectedDate ? '#FFF' : '#64748B'} />
+            <Text style={[styles.feedPillText, activeFeedPill === 'around_you' && !selectedDate && styles.feedPillTextActive]}>
+              Around You
+            </Text>
+          </TouchableOpacity>
+
+          {isStudent && (
             <TouchableOpacity
-              style={[styles.feedPill, activeFeedPill === 'all' && !selectedDate && styles.feedPillActive]}
+              style={[styles.feedPill, activeFeedPill === 'campus' && !selectedDate && styles.feedPillActive]}
               onPress={() => {
-                setActiveFeedPill('all');
+                setActiveFeedPill('campus');
                 setSelectedDate(null);
               }}
             >
-              <Compass size={14} color={activeFeedPill === 'all' && !selectedDate ? '#FFF' : '#64748B'} />
-              <Text style={[styles.feedPillText, activeFeedPill === 'all' && !selectedDate && styles.feedPillTextActive]}>
-                All
+              <GraduationCap size={14} color={activeFeedPill === 'campus' && !selectedDate ? '#FFF' : '#64748B'} />
+              <Text style={[styles.feedPillText, activeFeedPill === 'campus' && !selectedDate && styles.feedPillTextActive]}>
+                Your Campus
               </Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.feedPill, activeFeedPill === 'for_you' && !selectedDate && styles.feedPillActive]}
-              onPress={() => {
-                setActiveFeedPill('for_you');
-                setSelectedDate(null);
-              }}
-            >
-              <Text style={[styles.feedPillText, activeFeedPill === 'for_you' && !selectedDate && styles.feedPillTextActive]}>
-                For You
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.feedPill, activeFeedPill === 'around_you' && !selectedDate && styles.feedPillActive]}
-              onPress={() => {
-                setActiveFeedPill('around_you');
-                setSelectedDate(null);
-              }}
-            >
-              <Text style={[styles.feedPillText, activeFeedPill === 'around_you' && !selectedDate && styles.feedPillTextActive]}>
-                Around You
-              </Text>
-            </TouchableOpacity>
-
-            {isStudent && (
-              <TouchableOpacity
-                style={[styles.feedPill, activeFeedPill === 'campus' && !selectedDate && styles.feedPillActive]}
-                onPress={() => {
-                  setActiveFeedPill('campus');
-                  setSelectedDate(null);
-                }}
-              >
-                <GraduationCap size={14} color={activeFeedPill === 'campus' && !selectedDate ? '#FFF' : '#64748B'} />
-                <Text style={[styles.feedPillText, activeFeedPill === 'campus' && !selectedDate && styles.feedPillTextActive]}>
-                  Campus ({campusEvents.length})
-                </Text>
-              </TouchableOpacity>
-            )}
-          </ScrollView>
-        </View>
-      )}
+          )}
+        </ScrollView>
+      </View>
 
       {/* If Calendar Date is selected from top button, show an active date badge */}
       {selectedDate && (
@@ -568,12 +593,10 @@ export default function HomeScreen() {
           {selectedDate
             ? `Events on ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
             : activeFeedPill === 'campus'
-            ? 'Campus Events'
-            : activeFeedPill === 'for_you'
-            ? 'For You'
+            ? 'Your Campus'
             : activeFeedPill === 'around_you'
             ? 'Around You'
-            : "What's happening"}
+            : 'For You'}
         </Text>
         <Text style={styles.eventCountText}>{displayedEvents.length} events</Text>
       </View>
@@ -622,16 +645,27 @@ export default function HomeScreen() {
           )}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyTitle}>No events found</Text>
-              <Text style={styles.emptySubtitle}>
-                {selectedDate
-                  ? 'No events scheduled for this date.'
+            <EmptyState
+              illustration={APP_ASSETS.illustrations.empty}
+              title={
+                selectedDate
+                  ? 'No Events Scheduled'
                   : activeFeedPill === 'campus'
-                  ? 'No private campus events currently listed.'
-                  : 'Try exploring other categories or dates.'}
-              </Text>
-            </View>
+                  ? 'No Campus Events'
+                  : 'No Events Found'
+              }
+              message={
+                selectedDate
+                  ? `There are no events scheduled for ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}. Be the first to host one!`
+                  : activeFeedPill === 'campus'
+                  ? 'There are no private events currently listed for your campus. Host one for your college!'
+                  : activeFeedPill === 'around_you'
+                  ? 'No events found around your selected cities. Discover online events or post one!'
+                  : 'No events match your current filters. Explore other categories or host one yourself!'
+              }
+              buttonText="Host an Event"
+              onButtonPress={() => navigation.navigate('CreateEvent', {})}
+            />
           }
           refreshControl={
             <RefreshControl
@@ -767,6 +801,8 @@ export default function HomeScreen() {
         onClose={() => setShowRatingModal(false)}
       />
 
+      {/* Guest Delayed Action Teaser */}
+      <DelayedPromptModal />
     </SafeAreaView>
   );
 }

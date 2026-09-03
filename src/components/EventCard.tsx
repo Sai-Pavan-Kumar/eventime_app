@@ -9,7 +9,6 @@ import { getCategoryPoster } from '../lib/asset-registry';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { parseEventDateString, formatEventTime } from '../lib/utils/date';
-import { getMatchLabel } from '../lib/events/match';
 import type { EventRow } from '../types';
 
 export interface EventCardProps {
@@ -64,8 +63,6 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const matchLabel = getMatchLabel(props.event || { category, city }, profile);
-
   const categoryConfig = getCategoryConfig(category);
   const isCustomPoster = Boolean(isFeatured && posterUrl && posterUrl.startsWith('http'));
   const posterSource = isCustomPoster ? { uri: posterUrl! } : getCategoryPoster(category);
@@ -93,7 +90,7 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
       return { label: 'This Week', bg: '#FEF3C7', color: '#B45309' };
     }
     if (diffDays < 0) {
-      return { label: 'Event Over', bg: '#F1F5F9', color: '#64748B' };
+      return { label: 'Past Event', bg: '#F1F5F9', color: '#64748B' };
     }
     return null;
   })();
@@ -173,9 +170,11 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
     }
   };
 
+  const isPast = statusInfo?.label === 'Past Event';
+
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, isPast && styles.pastCard]}
       onPress={handlePress}
       activeOpacity={0.92}
     >
@@ -211,17 +210,9 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
 
         {/* Bottom Left Status & Featured Badges */}
         <View style={styles.bottomOverlayCol}>
-          {isFeatured && !matchLabel && (
+          {isFeatured && (
             <View style={styles.featuredBadge}>
               <Text style={styles.featuredText}>Featured</Text>
-            </View>
-          )}
-
-          {Boolean(matchLabel) && (
-            <View style={styles.matchBadgeOverlay}>
-              <Text style={styles.matchBadgeOverlayText} numberOfLines={1}>
-                🎯 {matchLabel}
-              </Text>
             </View>
           )}
 
@@ -355,6 +346,12 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  pastCard: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    shadowOpacity: 0.02,
+    elevation: 1,
   },
   imageContainer: {
     width: '100%',

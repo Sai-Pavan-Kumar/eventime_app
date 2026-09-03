@@ -41,10 +41,11 @@ import {
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { getCategoryConfig } from '../lib/category-config';
-import { getCategoryPoster } from '../lib/asset-registry';
+import { APP_ASSETS, getCategoryPoster } from '../lib/asset-registry';
 import { scheduleEventReminder } from '../lib/notifications';
 import { useAuth } from '../context/AuthContext';
 import { EventCard } from '../components/EventCard';
+import { EmptyState } from '../components/EmptyState';
 import type { EventRow, RootStackParamList } from '../types';
 
 const { width } = Dimensions.get('window');
@@ -338,11 +339,14 @@ export default function EventDetailScreen() {
 
   if (!event) {
     return (
-      <SafeAreaView style={styles.center}>
-        <Text style={styles.errorText}>Event not found.</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
+      <SafeAreaView style={styles.center} edges={['top']}>
+        <EmptyState
+          illustration={APP_ASSETS.illustrations.notFound}
+          title="Event Not Found"
+          message="The event you are looking for might have ended, been removed, or the link has expired."
+          buttonText="Go Back"
+          onButtonPress={() => navigation.goBack()}
+        />
       </SafeAreaView>
     );
   }

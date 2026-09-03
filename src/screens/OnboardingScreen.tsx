@@ -11,38 +11,53 @@ import {
   useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
-  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
+import { GoogleIcon, GithubIcon } from '../components/SocialIcons';
 import {
   GraduationCap,
   Briefcase,
-  ArrowRight,
-  ArrowLeft,
-  MapPin,
-  Mail,
+  Search,
   Check,
+  ChevronRight,
+  ChevronLeft,
+  X,
   Eye,
   EyeOff,
+  Mail,
+  ArrowRight,
+  ArrowLeft,
+  Lock,
   Sparkles,
-  ChevronDown,
-  ChevronUp,
-  Plus,
+  ShieldCheck,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { CITIES } from '../lib/constants/cities';
-import { CATEGORIES_LIST, getCategoryMeta } from '../lib/category-config';
+import { CATEGORIES_LIST } from '../lib/category-config';
 import { INDIAN_COLLEGE_BRANCHES } from '../lib/constants/branches';
-import {
-  setHasCompletedOnboarding,
-  saveGuestPreferences,
-  syncPreferencesToSupabase,
-  OnboardingData,
-} from '../lib/guest-preferences';
+import { setHasCompletedOnboarding } from '../lib/guest-preferences';
 import { APP_ASSETS } from '../lib/asset-registry';
+import { theme } from '../config/theme';
+
+interface CollegeItem {
+  id: string;
+  name: string;
+  slug?: string | null;
+}
+
+const POPULAR_CITIES = [
+  'Hyderabad',
+  'Bengaluru',
+  'Mumbai',
+  'New Delhi',
+  'Chennai',
+  'Pune',
+  'Kolkata',
+  'Visakhapatnam',
+] as const;
 
 const POPULAR_CATEGORIES = [
   'Hackathon',
@@ -57,859 +72,903 @@ const POPULAR_CATEGORIES = [
   'Workshop',
 ] as const;
 
-const COMMON_BRANCHES = [
-  'CSE',
-  'AI & ML',
-  'Data Science',
-  'ECE',
-  'IT',
-  'EEE',
-  'Mechanical',
-  'Civil',
-  'Other',
+const GRAD_YEARS = ['2024', '2025', '2026', '2027', '2028', '2029', '2030'];
+
+// Tour slides data (Pure Apple-level UX writing, no AI badges)
+const TOUR_SLIDES = [
+  {
+    image: APP_ASSETS.onboarding.screen1,
+    headline: "All of India's Events.\nOne Unified Feed.",
+    description:
+      'Why switch between ten different apps? EvenTime indexes and organizes public events from Luma, BookMyShow, Unstop, Devfolio, college portals, and community groups into one live feed.',
+  },
+  {
+    image: APP_ASSETS.onboarding.screen2,
+    headline: 'Share Any Link.\nReach Thousands.',
+    description:
+      "You don't host events here — you curate and share them. Organizing a fest or spotted a great hackathon? Post your existing registration link and reach attendees for free.",
+  },
+  {
+    image: APP_ASSETS.onboarding.screen3,
+    headline: 'Your Campus,\nFront and Center.',
+    description:
+      'Never miss an inter-college symposium, cultural night, or 24-hour hackathon. Connect your university to see what is happening on your campus and neighboring colleges.',
+  },
+  {
+    image: APP_ASSETS.onboarding.screen4,
+    headline: "Find What's Happening\nRight Now.",
+    description:
+      'Filter events by date, 36+ curated categories, and major hubs across Hyderabad, Bengaluru, Mumbai, and Delhi. One tap opens the official source to register.',
+  },
+  {
+    image: APP_ASSETS.onboarding.screen5,
+    headline: 'Curate Events.\nClimb the Leaderboard.',
+    description:
+      'Discover hidden gems, submit verified event links, and build your curator reputation. Earn ET Score points for your contributions and top the national leaderboard.',
+  },
 ];
 
-const GRAD_YEARS = ['2025', '2026', '2027', '2028', '2029+'];
-
 export default function OnboardingScreen() {
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const navigation = useNavigation<any>();
   const {
     user,
     profile,
+    isOnboarded,
+    isLoading: isAuthLoading,
     refreshProfile,
     signInWithGoogle,
+    signInWithGithub,
     signInWithEmail,
     signUpWithEmail,
   } = useAuth();
 
-  // Navigation step (1: Intro, 2: Explore, 3: Persona, 4: Campus (if student), 5: Cities, 6: Categories, 7: Launch)
-  const [step, setStep] = useState<number>(1);
-  const [isSaving, setIsSaving] = useState(false);
+  // Screen State:
+  // 0 to 4: Tour Slides
+  // 5: Auth & Gateway Screen
+  // 6: Smart Profile Setup (Only for new users where !profile?.is_onboarded)
+  const [currentSlide, setCurrentSlide] = useState(0);
 
-  // Form States
-  const [userType, setUserType] = useState<'student' | 'professional'>('student');
-  const [fullName] = useState(profile?.full_name || user?.user_metadata?.full_name || '');
-
-  // Campus Form (Only for students)
-  const [collegeName, setCollegeName] = useState(profile?.college || '');
-  const [collegeSuggestions, setCollegeSuggestions] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedCollegeId, setSelectedCollegeId] = useState<string | null>(profile?.college_id || null);
-  const [branch, setBranch] = useState(profile?.branch || 'CSE');
-  const [graduationYear, setGraduationYear] = useState(profile?.graduation_year?.toString() || '2026');
-
-  // Cities (No default pre-selection)
-  const [preferredCities, setPreferredCities] = useState<string[]>(
-    profile?.preferred_cities && profile.preferred_cities.length > 0
-      ? profile.preferred_cities
-      : []
-  );
-
-  // Categories (No default pre-selection, popular 10 first)
-  const [showAllCategories, setShowAllCategories] = useState(false);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(
-    profile?.goals && profile.goals.length > 0
-      ? profile.goals
-      : []
-  );
-
-  // Auth States for Launch Step
+  // Auth form states for Slide 5
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [hasConsented, setHasConsented] = useState(true);
   const [authLoading, setAuthLoading] = useState<string | null>(null);
 
-  // Responsive Dimensions
-  const isSmallDevice = height < 700;
-  const imageSize = isSmallDevice
-    ? Math.min(width * 0.42, 150)
-    : step >= 4
-    ? Math.min(width * 0.35, 130)
-    : Math.min(width * 0.55, 210);
+  // Profile Setup states (Step 6)
+  const [profileSubStep, setProfileSubStep] = useState<1 | 2 | 3 | 4>(1);
+  const [username, setUsername] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
 
-  // Total steps: 7 if student, 6 if professional
-  const totalSteps = userType === 'student' ? 7 : 6;
+  const [role, setRole] = useState<'student' | 'professional'>('student');
+  const [collegeSearch, setCollegeSearch] = useState('');
+  const [collegesList, setCollegesList] = useState<CollegeItem[]>([]);
+  const [selectedCollege, setSelectedCollege] = useState<CollegeItem | null>(null);
+  const [isSearchingColleges, setIsSearchingColleges] = useState(false);
+  const [gradYear, setGradYear] = useState('');
+  const [branch, setBranch] = useState('');
 
-  // Search colleges from supabase
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // 1. Cross-Platform Parity: If user logs in and already has completed onboarding on website
   useEffect(() => {
-    if (collegeName.trim().length >= 2 && !selectedCollegeId) {
-      const searchColleges = async () => {
-        try {
-          const { data } = await supabase
-            .from('colleges')
-            .select('id, name')
-            .ilike('name', `%${collegeName.trim()}%`)
-            .limit(5);
-          if (data) setCollegeSuggestions(data);
-        } catch {
-          // ignore error
+    if (!user) return;
+
+    // DO NOT transition while profile is still loading from Supabase!
+    if (isAuthLoading || profile === null) return;
+
+    if (isOnboarded || profile.is_onboarded) {
+      setHasCompletedOnboarding(true).then(() => {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainTabs' }],
+        });
+      });
+    } else if (currentSlide === 5) {
+      // User signed in on Slide 5 and verified not onboarded
+      setCurrentSlide(6);
+    }
+  }, [user, profile, isOnboarded, isAuthLoading, currentSlide, navigation]);
+
+  // College search debounce for profile setup
+  useEffect(() => {
+    if (role !== 'student' || currentSlide !== 6 || profileSubStep !== 2) return;
+    const q = collegeSearch.trim();
+    if (!q) {
+      setCollegesList([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingColleges(true);
+      try {
+        const { data } = await supabase
+          .from('colleges')
+          .select('id, name, slug')
+          .ilike('name', `%${q}%`)
+          .limit(10);
+        if (data) {
+          setCollegesList(data);
         }
-      };
-      const timer = setTimeout(searchColleges, 300);
-      return () => clearTimeout(timer);
-    } else {
-      setCollegeSuggestions([]);
-    }
-  }, [collegeName, selectedCollegeId]);
-
-  // Branch suggestions filtered from 170+ branches
-  const branchSuggestions = useMemo(() => {
-    if (!branch.trim() || branch.trim().length < 1) return [];
-    return INDIAN_COLLEGE_BRANCHES.filter(
-      (b) =>
-        b.toLowerCase().includes(branch.trim().toLowerCase()) &&
-        b.toLowerCase() !== branch.trim().toLowerCase()
-    ).slice(0, 5);
-  }, [branch]);
-
-  // Hardware Back Button Handler (Android)
-  useEffect(() => {
-    const onBackPress = () => {
-      if (step > 1) {
-        handleBack();
-        return true; // prevent app from closing
+      } catch (err) {
+        console.error('[Onboarding] College search error:', err);
+      } finally {
+        setIsSearchingColleges(false);
       }
-      return false; // let system handle (exit app on first screen)
-    };
+    }, 250);
 
-    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-    return () => subscription.remove();
-  }, [step, userType]);
+    return () => clearTimeout(timer);
+  }, [collegeSearch, role, currentSlide, profileSubStep]);
 
-  const toggleCity = (cityName: string) => {
-    if (preferredCities.includes(cityName)) {
-      setPreferredCities(preferredCities.filter((item) => item !== cityName));
-    } else {
-      if (preferredCities.length >= 3) {
-        Alert.alert('Limit Reached', 'You can choose up to 3 cities.');
-        return;
-      }
-      setPreferredCities([...preferredCities, cityName]);
+  // 1:1 image size calculation
+  const imageSize = Math.min(width - 64, 280);
+
+  // Handlers for Tour Navigation
+  const handleNextSlide = () => {
+    if (currentSlide < 4) {
+      setCurrentSlide((prev) => prev + 1);
+    } else if (currentSlide === 4) {
+      setCurrentSlide(5); // Go to Auth & Gateway
     }
   };
 
-  const toggleCategory = (cat: string) => {
-    if (selectedCategories.includes(cat)) {
-      setSelectedCategories(selectedCategories.filter((item) => item !== cat));
-    } else {
-      if (selectedCategories.length >= 6) {
-        Alert.alert('Limit Reached', 'You can choose up to 6 categories.');
-        return;
-      }
-      setSelectedCategories([...selectedCategories, cat]);
+  const handlePrevSlide = () => {
+    if (currentSlide > 0) {
+      setCurrentSlide((prev) => prev - 1);
     }
   };
 
-  const currentOnboardingData: OnboardingData = {
-    userType,
-    fullName: fullName ? fullName.trim().slice(0, 50) : undefined,
-    college: userType === 'student' ? collegeName.trim().slice(0, 100) : undefined,
-    collegeId: userType === 'student' ? selectedCollegeId : undefined,
-    branch: userType === 'student' ? branch.trim().slice(0, 60) : undefined,
-    graduationYear: userType === 'student' ? graduationYear : undefined,
-    preferredCities: preferredCities.slice(0, 3),
-    goals: selectedCategories.slice(0, 6),
+  const handleSkipToAuth = () => {
+    setCurrentSlide(5);
   };
 
-  const handleNext = () => {
-    // Step 1 -> 2
-    if (step === 1) {
-      setStep(2);
-      return;
-    }
-    // Step 2 -> 3
-    if (step === 2) {
-      setStep(3);
-      return;
-    }
-    // Step 3 (Persona) -> 4 (Campus if student, or Cities if pro)
-    if (step === 3) {
-      if (userType === 'student') {
-        setStep(4); // Campus details
-      } else {
-        setStep(5); // Skip campus, go to cities
-      }
-      return;
-    }
-    // Step 4 (Campus) -> 5 (Cities)
-    if (step === 4) {
-      const trimmedCollege = collegeName.trim();
-      if (!trimmedCollege || trimmedCollege.length < 2) {
-        Alert.alert('Invalid College', 'Please enter a valid college name (at least 2 characters).');
-        return;
-      }
-      const trimmedBranch = branch.trim();
-      if (!trimmedBranch || trimmedBranch.length < 2) {
-        Alert.alert('Invalid Branch', 'Please enter your branch / major.');
-        return;
-      }
-      setStep(5);
-      return;
-    }
-    // Step 5 (Cities) -> 6 (Categories)
-    if (step === 5) {
-      if (preferredCities.length === 0) {
-        Alert.alert('City Required', 'Please select at least 1 city.');
-        return;
-      }
-      setStep(6);
-      return;
-    }
-    // Step 6 (Categories) -> 7 (Launch)
-    if (step === 6) {
-      if (selectedCategories.length === 0) {
-        Alert.alert('Category Required', 'Please select at least 1 category.');
-        return;
-      }
-      setStep(7);
-      return;
-    }
-  };
-
-  const handleBack = () => {
-    if (step === 5 && userType === 'professional') {
-      setStep(3); // Go back directly to persona if pro
-    } else if (step > 1) {
-      setStep((prev) => prev - 1);
-    }
-  };
-
-  const handleLaunchApp = async () => {
-    setIsSaving(true);
-    await saveGuestPreferences(currentOnboardingData);
+  const handleContinueAsGuest = async () => {
     await setHasCompletedOnboarding(true);
-    setIsSaving(false);
     navigation.reset({
       index: 0,
       routes: [{ name: 'MainTabs' }],
     });
   };
 
-  const handleGoogleSignIn = async () => {
+  // Auth Handlers (Slide 5)
+  const handleGoogleLogin = async () => {
+    if (!hasConsented) {
+      Alert.alert('Consent Required', 'Please accept the Terms and Privacy Policy to continue.');
+      return;
+    }
     setAuthLoading('google');
     const { error } = await signInWithGoogle();
     setAuthLoading(null);
     if (error) {
       Alert.alert('Sign-In Error', error.message || 'Could not complete Google Sign-In.');
+    }
+  };
+
+  const handleGithubLogin = async () => {
+    if (!hasConsented) {
+      Alert.alert('Consent Required', 'Please accept the Terms and Privacy Policy to continue.');
       return;
     }
-
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (sessionData?.session?.user) {
-      await syncPreferencesToSupabase(sessionData.session.user.id, currentOnboardingData);
-      await refreshProfile();
-      await setHasCompletedOnboarding(true);
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'MainTabs' }],
-      });
+    setAuthLoading('github');
+    const { error } = await signInWithGithub();
+    setAuthLoading(null);
+    if (error) {
+      Alert.alert('Sign-In Error', error.message || 'Could not complete GitHub Sign-In.');
     }
   };
 
   const handleEmailAuth = async () => {
-    if (!email.trim() || !password) {
-      Alert.alert('Required', 'Please enter email and password.');
+    if (!hasConsented) {
+      Alert.alert('Consent Required', 'Please accept the Terms and Privacy Policy to continue.');
       return;
     }
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password) {
+      Alert.alert('Missing Fields', 'Please enter both your email and password.');
+      return;
+    }
+
     setAuthLoading('email');
     if (isSignUp) {
-      const { error, unconfirmed } = await signUpWithEmail(email.trim(), password);
+      const { error } = await signUpWithEmail(cleanEmail, password);
       setAuthLoading(null);
       if (error) {
-        Alert.alert('Sign Up Failed', error.message);
-      } else if (unconfirmed) {
-        Alert.alert('Email Registered', 'Please sign in with this email.');
-        setIsSignUp(false);
+        Alert.alert('Sign-Up Error', error.message);
       } else {
-        await saveGuestPreferences(currentOnboardingData);
-        Alert.alert('Account Created', 'Check your email to verify, then sign in.');
-        setIsSignUp(false);
+        Alert.alert('Account Created', 'Please check your email to verify your account before logging in.');
       }
     } else {
-      const { error } = await signInWithEmail(email.trim(), password);
+      const { error } = await signInWithEmail(cleanEmail, password);
       setAuthLoading(null);
       if (error) {
-        Alert.alert('Sign In Failed', error.message);
-      } else {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData?.session?.user) {
-          await syncPreferencesToSupabase(sessionData.session.user.id, currentOnboardingData);
-          await refreshProfile();
-        }
-        await setHasCompletedOnboarding(true);
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'MainTabs' }],
-        });
+        Alert.alert('Sign-In Error', error.message);
       }
     }
   };
 
-  // Visible Categories list based on expanded toggle
-  const visibleCategories = useMemo(() => {
-    if (showAllCategories) return CATEGORIES_LIST;
-    return POPULAR_CATEGORIES;
-  }, [showAllCategories]);
+  // Profile Setup Validation & Handlers (Step 6)
+  const handleValidateUsername = async () => {
+    const clean = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    setUsername(clean);
+    if (!clean) {
+      setUsernameError('Please pick a unique username.');
+      return;
+    }
+    if (clean.length > 12) {
+      setUsernameError('Username must be 12 characters or less.');
+      return;
+    }
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Top Header */}
-      <View style={styles.topBar}>
-        <View style={styles.brandGroup}>
-          <Image source={APP_ASSETS.logo} style={styles.brandLogo} contentFit="contain" />
-          <Text style={styles.brandTitle}>EvenTime</Text>
+    setIsCheckingUsername(true);
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', clean)
+        .neq('id', user?.id || '')
+        .maybeSingle();
+
+      if (data) {
+        setUsernameError('This username is already taken. Try another.');
+      } else {
+        setUsernameError('');
+        setProfileSubStep(2); // Advance to Role/College
+      }
+    } catch (e) {
+      console.error('[Onboarding] Username check error:', e);
+      setProfileSubStep(2);
+    } finally {
+      setIsCheckingUsername(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user) {
+      Alert.alert('Session Expired', 'Please sign in to complete your profile.');
+      setCurrentSlide(5);
+      return;
+    }
+
+    setIsSavingProfile(true);
+    try {
+      const cleanUsername = username.trim().toLowerCase();
+      const updatePayload = {
+        username: cleanUsername,
+        user_type: role === 'student' ? 'student' : 'professional',
+        college: role === 'student' ? selectedCollege?.name || collegeSearch.trim() || null : null,
+        college_id: role === 'student' ? selectedCollege?.id || null : null,
+        graduation_year: role === 'student' ? gradYear || null : null,
+        branch: role === 'student' ? branch || null : null,
+        preferred_cities: selectedCities,
+        goals: selectedGoals.slice(0, 6),
+        is_onboarded: true,
+      };
+
+      const { error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Award +50 ET Score for completing onboarding (Matching website action)
+      try {
+        await supabase.rpc('increment_et_score', { user_id: user.id, delta: 50 });
+      } catch (rpcErr) {
+        console.warn('[Onboarding] increment_et_score error:', rpcErr);
+      }
+
+      await refreshProfile();
+      await setHasCompletedOnboarding(true);
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainTabs' }],
+      });
+    } catch (err: any) {
+      console.error('[Onboarding] Profile save error:', err);
+      Alert.alert('Save Failed', err.message || 'Could not save profile. Please try again.');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  // Toggle helpers for multi-select
+  const toggleCity = (city: string) => {
+    if (selectedCities.includes(city)) {
+      setSelectedCities(selectedCities.filter((c) => c !== city));
+    } else if (selectedCities.length < 3) {
+      setSelectedCities([...selectedCities, city]);
+    } else {
+      Alert.alert('Limit Reached', 'You can pick up to 3 primary cities.');
+    }
+  };
+
+  const toggleGoal = (cat: string) => {
+    if (selectedGoals.includes(cat)) {
+      setSelectedGoals(selectedGoals.filter((g) => g !== cat));
+    } else if (selectedGoals.length < 6) {
+      setSelectedGoals([...selectedGoals, cat]);
+    } else {
+      Alert.alert('Limit Reached', 'You can pick up to 6 interests.');
+    }
+  };
+
+  // ==========================================
+  // RENDER: Loading Transition (When logged in and fetching profile)
+  // ==========================================
+  if (user && (isAuthLoading || profile === null)) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#6C47FF" />
+        <Text style={{ marginTop: 16, fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
+          Personalizing your experience...
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
+  // ==========================================
+  // RENDER: Tour Slides (0 - 4)
+  // ==========================================
+  if (currentSlide < 5) {
+    const slide = TOUR_SLIDES[currentSlide];
+
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        {/* Top Bar: Brand & Skip */}
+        <View style={styles.tourHeader}>
+          {currentSlide > 0 ? (
+            <TouchableOpacity style={styles.navIconButton} onPress={handlePrevSlide} activeOpacity={0.7}>
+              <ArrowLeft size={20} color="#0F172A" />
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 40 }} />
+          )}
+
+          <TouchableOpacity style={styles.skipButton} onPress={handleSkipToAuth} activeOpacity={0.7}>
+            <Text style={styles.skipButtonText}>Skip</Text>
+          </TouchableOpacity>
         </View>
 
-        {step < 7 && (
-          <TouchableOpacity onPress={handleLaunchApp} style={styles.skipBtn} activeOpacity={0.7}>
-            <Text style={styles.skipBtnText}>Skip</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Segmented Step Bar */}
-      <View style={styles.stepProgressBar}>
-        {Array.from({ length: totalSteps }, (_, idx) => idx + 1).map((i) => {
-          const currentVisualStep =
-            userType === 'professional' && step >= 5 ? step - 1 : step;
-          return (
-            <View
-              key={i}
-              style={[
-                styles.stepBarItem,
-                i <= currentVisualStep ? styles.stepBarItemActive : styles.stepBarItemInactive,
-              ]}
+        {/* Center: 1:1 Centered Placeholder Graphic Container */}
+        <View style={styles.centerVisualArea}>
+          <View
+            style={[
+              styles.imageContainer1x1,
+              { width: imageSize, height: imageSize, borderRadius: 28 },
+            ]}
+          >
+            <Image
+              source={slide.image}
+              style={styles.image1x1}
+              contentFit="cover"
+              transition={200}
             />
-          );
-        })}
-      </View>
+          </View>
+        </View>
 
+        {/* Bottom Content Area: Apple-grade Typography & Nav */}
+        <View style={styles.tourContentArea}>
+          <Text style={styles.tourHeadline}>{slide.headline}</Text>
+          <Text style={styles.tourDescription}>{slide.description}</Text>
+
+          {/* Dots & Action Row */}
+          <View style={styles.tourFooter}>
+            {/* 5 Dots indicator */}
+            <View style={styles.dotsRow}>
+              {TOUR_SLIDES.map((_, index) => {
+                const isActive = index === currentSlide;
+                return (
+                  <View
+                    key={index}
+                    style={[
+                      styles.dot,
+                      isActive ? styles.dotActive : styles.dotInactive,
+                    ]}
+                  />
+                );
+              })}
+            </View>
+
+            {/* Next / Continue Button */}
+            <TouchableOpacity
+              style={styles.tourPrimaryBtn}
+              onPress={handleNextSlide}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.tourPrimaryBtnText}>
+                {currentSlide === 4 ? 'Get Started' : 'Continue'}
+              </Text>
+              <ArrowRight size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ==========================================
+  // RENDER: Slide 5 - Auth & Gateway Screen
+  // ==========================================
+  if (currentSlide === 5) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+        >
+          <ScrollView
+            contentContainerStyle={styles.authScrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Back to Tour Button */}
+            <View style={styles.authTopRow}>
+              <TouchableOpacity
+                style={styles.navIconButton}
+                onPress={() => setCurrentSlide(4)}
+                activeOpacity={0.7}
+              >
+                <ArrowLeft size={20} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+
+            {/* 1:1 Centered Brand Graphic Placeholder */}
+            <View style={styles.authVisualArea}>
+              <View
+                style={[
+                  styles.imageContainer1x1,
+                  { width: Math.min(width - 96, 200), height: Math.min(width - 96, 200), borderRadius: 24 },
+                ]}
+              >
+                <Image
+                  source={APP_ASSETS.onboarding.screen6}
+                  style={styles.image1x1}
+                  contentFit="cover"
+                  transition={200}
+                />
+              </View>
+            </View>
+
+            {/* Header Typography */}
+            <View style={styles.authHeader}>
+              <Text style={styles.authTitle}>Step into India’s{'\n'}Event Dictionary.</Text>
+              <Text style={styles.authSubtitle}>
+                Sign in to personalize your campus feed, or start exploring immediately.
+              </Text>
+            </View>
+
+            {/* Auth Buttons Stack (Google & GitHub Pushed First) */}
+            <View style={styles.authButtonsStack}>
+              {/* 1. Google Sign In */}
+              <TouchableOpacity
+                style={styles.googleBtn}
+                onPress={handleGoogleLogin}
+                activeOpacity={0.85}
+                disabled={authLoading !== null}
+              >
+                {authLoading === 'google' ? (
+                  <ActivityIndicator color="#0F172A" />
+                ) : (
+                  <View style={styles.btnContentRow}>
+                    <View style={{ marginRight: 10 }}>
+                      <GoogleIcon size={20} />
+                    </View>
+                    <Text style={styles.googleBtnText}>Continue with Google</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* 2. GitHub Sign In */}
+              <TouchableOpacity
+                style={styles.githubBtn}
+                onPress={handleGithubLogin}
+                activeOpacity={0.85}
+                disabled={authLoading !== null}
+              >
+                {authLoading === 'github' ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <View style={styles.btnContentRow}>
+                    <View style={{ marginRight: 10 }}>
+                      <GithubIcon size={20} color="#FFFFFF" />
+                    </View>
+                    <Text style={styles.githubBtnText}>Continue with GitHub</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* 3. Email Toggle / Form */}
+              {!showEmailForm ? (
+                <TouchableOpacity
+                  style={styles.emailToggleBtn}
+                  onPress={() => setShowEmailForm(true)}
+                  activeOpacity={0.8}
+                >
+                  <Mail size={16} color="#475569" style={{ marginRight: 8 }} />
+                  <Text style={styles.emailToggleText}>Continue with Email</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.emailFormBox}>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Email Address</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="you@example.com"
+                      placeholderTextColor="#94A3B8"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Password</Text>
+                    <View style={styles.passwordRow}>
+                      <TextInput
+                        style={styles.passwordInput}
+                        placeholder="••••••••"
+                        placeholderTextColor="#94A3B8"
+                        secureTextEntry={!showPassword}
+                        value={password}
+                        onChangeText={setPassword}
+                      />
+                      <TouchableOpacity
+                        style={styles.eyeBtn}
+                        onPress={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff size={18} color="#94A3B8" /> : <Eye size={18} color="#94A3B8" />}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.emailSubmitBtn}
+                    onPress={handleEmailAuth}
+                    activeOpacity={0.85}
+                    disabled={authLoading !== null}
+                  >
+                    {authLoading === 'email' ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.emailSubmitBtnText}>
+                        {isSignUp ? 'Create Account' : 'Sign In with Email'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.switchAuthModeBtn}
+                    onPress={() => setIsSignUp(!isSignUp)}
+                  >
+                    <Text style={styles.switchAuthModeText}>
+                      {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* 4. Continue as Guest (Exploration Entry) */}
+              <TouchableOpacity
+                style={styles.guestLinkBtn}
+                onPress={handleContinueAsGuest}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.guestLinkText}>Explore as Guest</Text>
+                <ArrowRight size={15} color="#6C47FF" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Legal & Consent Notice */}
+            <View style={styles.legalNotice}>
+              <Text style={styles.legalText}>
+                By continuing, you agree to EvenTime’s Terms of Service and Privacy Policy.
+              </Text>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    );
+  }
+
+  // ==========================================
+  // RENDER: Step 6 - Profile Setup (New Users Only)
+  // ==========================================
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
         <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.scrollContent,
-            (step === 1 || step === 2 || step === 7) && styles.centeredScrollContent,
-          ]}
+          contentContainerStyle={styles.profileSetupScroll}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {/* =========================================================================
-              STEP 1: What is EvenTime?
-             ========================================================================= */}
-          {step === 1 && (
-            <View style={styles.screenWrapper}>
-              <View
-                style={[
-                  styles.imageContainer,
-                  { width: imageSize, height: imageSize },
-                ]}
-              >
-                <Image
-                  source={APP_ASSETS.onboarding.screen1}
-                  style={styles.onboardingImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-              </View>
+          {/* Header */}
+          <View style={styles.setupHeader}>
+            <Text style={styles.setupStepIndicator}>Step {profileSubStep} of 4</Text>
+            <Text style={styles.setupTitle}>
+              {profileSubStep === 1 && 'Pick Your Username'}
+              {profileSubStep === 2 && 'Tell Us About Yourself'}
+              {profileSubStep === 3 && 'Pick Your Primary Cities'}
+              {profileSubStep === 4 && 'Select Your Interests'}
+            </Text>
+            <Text style={styles.setupSubtitle}>
+              {profileSubStep === 1 && 'Your unique handle on EvenTime. Maximum 12 characters.'}
+              {profileSubStep === 2 && 'Connect your university to unlock exclusive campus fests.'}
+              {profileSubStep === 3 && 'Choose up to 3 cities you want to see events from.'}
+              {profileSubStep === 4 && 'Pick up to 6 categories to personalize your feed.'}
+            </Text>
+          </View>
 
-              <Text style={styles.headlineText}>What is EvenTime?</Text>
-              <Text style={styles.subheadlineText}>
-                All college fests, hackathons, concerts, and tech summits across India in one single live feed.
-              </Text>
-            </View>
-          )}
-
-          {/* =========================================================================
-              STEP 2: Never Miss Out
-             ========================================================================= */}
-          {step === 2 && (
-            <View style={styles.screenWrapper}>
-              <View
-                style={[
-                  styles.imageContainer,
-                  { width: imageSize, height: imageSize },
-                ]}
-              >
-                <Image
-                  source={APP_ASSETS.onboarding.screen2}
-                  style={styles.onboardingImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-              </View>
-
-              <Text style={styles.headlineText}>Never Miss Out</Text>
-              <Text style={styles.subheadlineText}>
-                Save events, track deadlines, and get instant updates so you're always in the loop.
-              </Text>
-            </View>
-          )}
-
-          {/* =========================================================================
-              STEP 3: Tell us who you are (Simple Chips: Student / Explorer)
-             ========================================================================= */}
-          {step === 3 && (
-            <View style={styles.screenWrapper}>
-              <View
-                style={[
-                  styles.imageContainer,
-                  { width: imageSize, height: imageSize },
-                ]}
-              >
-                <Image
-                  source={APP_ASSETS.onboarding.screen3}
-                  style={styles.onboardingImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-              </View>
-
-              <Text style={styles.headlineText}>Tell us who you are</Text>
-              <Text style={styles.subheadlineText}>
-                Choose your profile to calibrate your feed.
-              </Text>
-
-              {/* 2 Simple Persona Chips */}
-              <View style={styles.personaChipRow}>
-                <TouchableOpacity
-                  style={[styles.personaChip, userType === 'student' && styles.personaChipActive]}
-                  onPress={() => setUserType('student')}
-                  activeOpacity={0.85}
-                >
-                  <GraduationCap size={20} color={userType === 'student' ? '#FFFFFF' : '#6C47FF'} />
-                  <Text style={[styles.personaChipText, userType === 'student' && styles.personaChipTextActive]}>
-                    Student
-                  </Text>
-                  {userType === 'student' && (
-                    <View style={styles.chipCheckBadge}>
-                      <Check size={12} color="#FFFFFF" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.personaChip, userType === 'professional' && styles.personaChipActive]}
-                  onPress={() => setUserType('professional')}
-                  activeOpacity={0.85}
-                >
-                  <Briefcase size={20} color={userType === 'professional' ? '#FFFFFF' : '#6C47FF'} />
-                  <Text style={[styles.personaChipText, userType === 'professional' && styles.personaChipTextActive]}>
-                    Explorer
-                  </Text>
-                  {userType === 'professional' && (
-                    <View style={styles.chipCheckBadge}>
-                      <Check size={12} color="#FFFFFF" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* =========================================================================
-              STEP 4: Campus Details (ONLY SHOWN IF STUDENT)
-             ========================================================================= */}
-          {step === 4 && (
-            <View style={styles.screenWrapper}>
-              <View
-                style={[
-                  styles.imageContainer,
-                  { width: imageSize, height: imageSize },
-                ]}
-              >
-                <Image
-                  source={APP_ASSETS.onboarding.screen4}
-                  style={styles.onboardingImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-              </View>
-
-              <Text style={styles.headlineText}>Your Campus Details</Text>
-              <Text style={styles.subheadlineText}>
-                We'll calibrate your personalized college campus feed.
-              </Text>
-
-              {/* College Input */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>College / University Name</Text>
+          {/* SUB-STEP 1: Username */}
+          {profileSubStep === 1 && (
+            <View style={styles.setupCard}>
+              <Text style={styles.inputLabel}>Username (Unique handle)</Text>
+              <View style={styles.usernameInputRow}>
+                <Text style={styles.atSymbol}>@</Text>
                 <TextInput
-                  style={styles.formInput}
-                  placeholder="Type to search (e.g. CBIT, IIT, VIT...)"
+                  style={styles.usernameInput}
+                  placeholder="username"
                   placeholderTextColor="#94A3B8"
-                  value={collegeName}
-                  onChangeText={(txt) => {
-                    setCollegeName(txt);
-                    setSelectedCollegeId(null);
+                  value={username}
+                  maxLength={12}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={(t) => {
+                    setUsername(t.toLowerCase().replace(/[^a-z0-9_]/g, ''));
+                    setUsernameError('');
                   }}
                 />
-
-                {/* College Suggestions + Notion-style Add Option */}
-                {collegeName.trim().length >= 2 && (
-                  <View style={styles.suggestionsBox}>
-                    {collegeSuggestions.map((item) => (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={styles.suggestionItem}
-                        onPress={() => {
-                          setCollegeName(item.name);
-                          setSelectedCollegeId(item.id);
-                          setCollegeSuggestions([]);
-                        }}
-                      >
-                        <GraduationCap size={14} color="#6C47FF" style={{ marginRight: 6 }} />
-                        <Text style={styles.suggestionText} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-
-                    {/* Notion-style Add Custom College */}
-                    {!collegeSuggestions.some(
-                      (c) => c.name.toLowerCase() === collegeName.trim().toLowerCase()
-                    ) && (
-                      <TouchableOpacity
-                        style={[styles.suggestionItem, styles.addNewSuggestionItem]}
-                        onPress={() => {
-                          setSelectedCollegeId(null);
-                          setCollegeSuggestions([]);
-                        }}
-                      >
-                        <Plus size={14} color="#6C47FF" style={{ marginRight: 6 }} />
-                        <Text style={styles.addNewSuggestionText} numberOfLines={1}>
-                          Use "{collegeName.trim()}" (Add as new college)
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )}
               </View>
+              {Boolean(usernameError) && (
+                <Text style={styles.errorMessage}>{usernameError}</Text>
+              )}
 
-              {/* Branch Selection (Search & Type Only) */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Branch / Major</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="Type to search branch (e.g. CSE, Biotech, BBA...)"
-                  placeholderTextColor="#94A3B8"
-                  value={branch}
-                  onChangeText={setBranch}
-                />
-
-                {/* Branch Suggestions + Custom Branch Option */}
-                {branch.trim().length >= 1 && (
-                  <View style={styles.suggestionsBox}>
-                    {branchSuggestions.map((b) => (
-                      <TouchableOpacity
-                        key={b}
-                        style={styles.suggestionItem}
-                        onPress={() => {
-                          setBranch(b);
-                        }}
-                      >
-                        <Text style={styles.suggestionText} numberOfLines={1}>
-                          {b}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-
-                    {!INDIAN_COLLEGE_BRANCHES.some(
-                      (b) => b.toLowerCase() === branch.trim().toLowerCase()
-                    ) && (
-                      <TouchableOpacity
-                        style={[styles.suggestionItem, styles.addNewSuggestionItem]}
-                        onPress={() => {
-                          // keep custom typed branch
-                        }}
-                      >
-                        <Plus size={14} color="#6C47FF" style={{ marginRight: 6 }} />
-                        <Text style={styles.addNewSuggestionText} numberOfLines={1}>
-                          Use "{branch.trim()}"
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )}
-              </View>
-
-              {/* Graduation Year */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Graduation Year</Text>
-                <View style={styles.yearWrap}>
-                  {GRAD_YEARS.map((yr) => (
-                    <TouchableOpacity
-                      key={yr}
-                      style={[styles.yearPill, graduationYear === yr && styles.yearPillActive]}
-                      onPress={() => setGraduationYear(yr)}
-                    >
-                      <Text style={[styles.yearText, graduationYear === yr && styles.yearTextActive]}>
-                        {yr}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* =========================================================================
-              STEP 5: Pick Your Cities (No Search Bar, No Default Pre-selection)
-             ========================================================================= */}
-          {step === 5 && (
-            <View style={styles.screenWrapper}>
-              <View
-                style={[
-                  styles.imageContainer,
-                  { width: imageSize, height: imageSize },
-                ]}
-              >
-                <Image
-                  source={APP_ASSETS.onboarding.screen5}
-                  style={styles.onboardingImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-              </View>
-
-              <Text style={styles.headlineText}>Pick Your Cities</Text>
-              <Text style={styles.subheadlineText}>
-                Select up to 3 cities ({preferredCities.length}/3 selected)
-              </Text>
-
-              {/* All 32 Cities Chips Directly Visible */}
-              <View style={styles.chipsContainer}>
-                {CITIES.map((cityName) => {
-                  const isSelected = preferredCities.includes(cityName);
-                  return (
-                    <TouchableOpacity
-                      key={cityName}
-                      style={[styles.chipItem, isSelected && styles.chipItemActive]}
-                      onPress={() => toggleCity(cityName)}
-                      activeOpacity={0.7}
-                    >
-                      <MapPin
-                        size={11}
-                        color={isSelected ? '#FFFFFF' : '#64748B'}
-                        style={{ marginRight: 4 }}
-                      />
-                      <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
-                        {cityName}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-
-          {/* =========================================================================
-              STEP 6: What do you like? (Top 10 Popular First, Expand for rest)
-             ========================================================================= */}
-          {step === 6 && (
-            <View style={styles.screenWrapper}>
-              <View
-                style={[
-                  styles.imageContainer,
-                  { width: imageSize, height: imageSize },
-                ]}
-              >
-                <Image
-                  source={APP_ASSETS.onboarding.screen6}
-                  style={styles.onboardingImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-              </View>
-
-              <Text style={styles.headlineText}>What do you like?</Text>
-              <Text style={styles.subheadlineText}>
-                Select up to 6 categories ({selectedCategories.length}/6 selected)
-              </Text>
-
-              {/* Popular Categories Chips */}
-              <View style={styles.chipsContainer}>
-                {visibleCategories.map((cat) => {
-                  const isSelected = selectedCategories.includes(cat);
-                  const meta = getCategoryMeta(cat);
-                  return (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[
-                        styles.chipItem,
-                        isSelected && {
-                          backgroundColor: meta.accentColor || '#6C47FF',
-                          borderColor: meta.accentColor || '#6C47FF',
-                        },
-                      ]}
-                      onPress={() => toggleCategory(cat)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Show More / Show Less Toggle Button */}
               <TouchableOpacity
-                style={styles.showMoreBtn}
-                onPress={() => setShowAllCategories(!showAllCategories)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.showMoreText}>
-                  {showAllCategories
-                    ? 'Show Less'
-                    : `+ Show All (${CATEGORIES_LIST.length - POPULAR_CATEGORIES.length} more)`}
-                </Text>
-                {showAllCategories ? (
-                  <ChevronUp size={14} color="#6C47FF" />
-                ) : (
-                  <ChevronDown size={14} color="#6C47FF" />
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* =========================================================================
-              STEP 7: Your Feed is Ready (Login & Direct Launch)
-             ========================================================================= */}
-          {step === 7 && (
-            <View style={styles.screenWrapper}>
-              <View
-                style={[
-                  styles.imageContainer,
-                  { width: imageSize, height: imageSize },
-                ]}
-              >
-                <Image
-                  source={APP_ASSETS.onboarding.screen7}
-                  style={styles.onboardingImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-              </View>
-
-              <Text style={styles.headlineText}>Your Feed is Ready</Text>
-              <Text style={styles.subheadlineText}>
-                Sign in to sync your bookmarks, or dive straight in as a guest.
-              </Text>
-
-              {/* Google Button */}
-              <TouchableOpacity
-                style={styles.googleActionBtn}
-                onPress={handleGoogleSignIn}
-                disabled={Boolean(authLoading)}
+                style={[styles.tourPrimaryBtn, { marginTop: 24 }]}
+                onPress={handleValidateUsername}
+                disabled={isCheckingUsername}
                 activeOpacity={0.85}
               >
-                {authLoading === 'google' ? (
-                  <ActivityIndicator size="small" color="#1E293B" />
+                {isCheckingUsername ? (
+                  <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <>
-                    <Image source={APP_ASSETS.logo} style={styles.googleBtnLogo} contentFit="contain" />
-                    <Text style={styles.googleActionText}>Continue with Google</Text>
+                    <Text style={styles.tourPrimaryBtnText}>Continue</Text>
+                    <ArrowRight size={18} color="#FFFFFF" />
                   </>
                 )}
               </TouchableOpacity>
+            </View>
+          )}
 
-              {/* Guest & Email Options */}
-              {!showEmailForm ? (
-                <View style={styles.secondaryActionsRow}>
-                  <TouchableOpacity
-                    style={styles.secondaryActionBtn}
-                    onPress={() => setShowEmailForm(true)}
-                  >
-                    <Mail size={14} color="#6C47FF" />
-                    <Text style={styles.secondaryActionText}>Email Sign-in</Text>
-                  </TouchableOpacity>
+          {/* SUB-STEP 2: Role & College */}
+          {profileSubStep === 2 && (
+            <View style={styles.setupCard}>
+              {/* Role Selector */}
+              <View style={styles.roleTabsRow}>
+                <TouchableOpacity
+                  style={[styles.roleTab, role === 'student' && styles.roleTabActive]}
+                  onPress={() => setRole('student')}
+                  activeOpacity={0.8}
+                >
+                  <GraduationCap size={18} color={role === 'student' ? '#FFFFFF' : '#64748B'} />
+                  <Text style={[styles.roleTabText, role === 'student' && styles.roleTabTextActive]}>
+                    Student
+                  </Text>
+                </TouchableOpacity>
 
-                  <Text style={{ color: '#CBD5E1' }}>•</Text>
+                <TouchableOpacity
+                  style={[styles.roleTab, role === 'professional' && styles.roleTabActive]}
+                  onPress={() => setRole('professional')}
+                  activeOpacity={0.8}
+                >
+                  <Briefcase size={18} color={role === 'professional' ? '#FFFFFF' : '#64748B'} />
+                  <Text style={[styles.roleTabText, role === 'professional' && styles.roleTabTextActive]}>
+                    Working Pro
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-                  <TouchableOpacity
-                    style={styles.secondaryActionBtn}
-                    onPress={handleLaunchApp}
-                    disabled={isSaving}
-                  >
-                    <Text style={styles.guestActionText}>Explore as Guest</Text>
-                    <ArrowRight size={13} color="#64748B" />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.emailContainer}>
-                  <TextInput
-                    style={styles.emailField}
-                    placeholder="Email address"
-                    placeholderTextColor="#94A3B8"
-                    value={email}
-                    onChangeText={setEmail}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                  />
-                  <View style={styles.passwordFieldRow}>
+              {role === 'student' ? (
+                <View style={{ marginTop: 20 }}>
+                  <Text style={styles.inputLabel}>College / University</Text>
+                  <View style={styles.searchBox}>
+                    <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
                     <TextInput
-                      style={{ flex: 1, fontSize: 13, color: '#0F172A' }}
-                      placeholder="Password"
+                      style={styles.searchInput}
+                      placeholder="Search college (e.g. CBIT, IIT, BITS)..."
                       placeholderTextColor="#94A3B8"
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry={!showPassword}
+                      value={selectedCollege ? selectedCollege.name : collegeSearch}
+                      onChangeText={(t) => {
+                        setSelectedCollege(null);
+                        setCollegeSearch(t);
+                      }}
                     />
-                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                      {showPassword ? <EyeOff size={16} color="#94A3B8" /> : <Eye size={16} color="#94A3B8" />}
-                    </TouchableOpacity>
+                    {isSearchingColleges && <ActivityIndicator size="small" color="#6C47FF" />}
                   </View>
 
-                  <TouchableOpacity
-                    style={styles.emailSubmitButton}
-                    onPress={handleEmailAuth}
-                    disabled={Boolean(authLoading)}
-                  >
-                    {authLoading === 'email' ? (
-                      <ActivityIndicator size="small" color="#FFF" />
-                    ) : (
-                      <Text style={styles.emailSubmitButtonText}>
-                        {isSignUp ? 'Create Account' : 'Sign In'}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+                  {/* College suggestions dropdown */}
+                  {!selectedCollege && collegesList.length > 0 && (
+                    <View style={styles.suggestionsBox}>
+                      {collegesList.map((col) => (
+                        <TouchableOpacity
+                          key={col.id}
+                          style={styles.suggestionItem}
+                          onPress={() => {
+                            setSelectedCollege(col);
+                            setCollegeSearch(col.name);
+                            setCollegesList([]);
+                          }}
+                        >
+                          <Text style={styles.suggestionText}>{col.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
 
-                  <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)} style={{ marginTop: 6, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 12, color: '#6C47FF', fontWeight: '700' }}>
-                      {isSignUp ? 'Already registered? Sign In' : 'New user? Create Account'}
-                    </Text>
-                  </TouchableOpacity>
+                  {/* Graduation Year */}
+                  <Text style={[styles.inputLabel, { marginTop: 16 }]}>Graduation Year</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                    {GRAD_YEARS.map((y) => (
+                      <TouchableOpacity
+                        key={y}
+                        style={[styles.chip, gradYear === y && styles.chipActive]}
+                        onPress={() => setGradYear(y)}
+                      >
+                        <Text style={[styles.chipText, gradYear === y && styles.chipTextActive]}>{y}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  {/* Branch */}
+                  <Text style={[styles.inputLabel, { marginTop: 16 }]}>Branch / Stream</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                    {INDIAN_COLLEGE_BRANCHES.slice(0, 10).map((b) => (
+                      <TouchableOpacity
+                        key={b}
+                        style={[styles.chip, branch === b && styles.chipActive]}
+                        onPress={() => setBranch(b)}
+                      >
+                        <Text style={[styles.chipText, branch === b && styles.chipTextActive]}>{b}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
                 </View>
-              )}
+              ) : null}
+
+              <View style={styles.stepButtonsRow}>
+                <TouchableOpacity
+                  style={styles.stepBackBtn}
+                  onPress={() => setProfileSubStep(1)}
+                  activeOpacity={0.7}
+                >
+                  <ArrowLeft size={18} color="#64748B" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.stepNextBtn}
+                  onPress={() => setProfileSubStep(3)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.tourPrimaryBtnText}>Next: Cities</Text>
+                  <ArrowRight size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* SUB-STEP 3: Cities Selection */}
+          {profileSubStep === 3 && (
+            <View style={styles.setupCard}>
+              <Text style={styles.selectionCounter}>
+                {selectedCities.length} of 3 cities selected
+              </Text>
+
+              <View style={styles.selectionGrid}>
+                {POPULAR_CITIES.map((c) => {
+                  const isSelected = selectedCities.includes(c);
+                  return (
+                    <TouchableOpacity
+                      key={c}
+                      style={[styles.gridChip, isSelected && styles.gridChipActive]}
+                      onPress={() => toggleCity(c)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.gridChipText, isSelected && styles.gridChipTextActive]}>
+                        {c}
+                      </Text>
+                      {isSelected && <Check size={14} color="#6C47FF" style={{ marginLeft: 6 }} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={styles.stepButtonsRow}>
+                <TouchableOpacity
+                  style={styles.stepBackBtn}
+                  onPress={() => setProfileSubStep(2)}
+                  activeOpacity={0.7}
+                >
+                  <ArrowLeft size={18} color="#64748B" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.stepNextBtn}
+                  onPress={() => setProfileSubStep(4)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.tourPrimaryBtnText}>Next: Interests</Text>
+                  <ArrowRight size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* SUB-STEP 4: Interests & Goals */}
+          {profileSubStep === 4 && (
+            <View style={styles.setupCard}>
+              <Text style={styles.selectionCounter}>
+                {selectedGoals.length} of 6 interests selected
+              </Text>
+
+              <View style={styles.selectionGrid}>
+                {POPULAR_CATEGORIES.map((cat) => {
+                  const isSelected = selectedGoals.includes(cat);
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[styles.gridChip, isSelected && styles.gridChipActive]}
+                      onPress={() => toggleGoal(cat)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.gridChipText, isSelected && styles.gridChipTextActive]}>
+                        {cat}
+                      </Text>
+                      {isSelected && <Check size={14} color="#6C47FF" style={{ marginLeft: 6 }} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={styles.stepButtonsRow}>
+                <TouchableOpacity
+                  style={styles.stepBackBtn}
+                  onPress={() => setProfileSubStep(3)}
+                  activeOpacity={0.7}
+                >
+                  <ArrowLeft size={18} color="#64748B" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.stepNextBtn, { backgroundColor: '#6C47FF' }]}
+                  onPress={handleSaveProfile}
+                  disabled={isSavingProfile}
+                  activeOpacity={0.85}
+                >
+                  {isSavingProfile ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Text style={styles.tourPrimaryBtnText}>Finish & Claim +50 ET</Text>
+                      <Sparkles size={16} color="#FFFFFF" />
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Bottom Bar (Steps 1-6) */}
-      {step < 7 && (
-        <View style={styles.bottomNavigationBar}>
-          {step > 1 && (
-            <TouchableOpacity style={styles.navBackBtn} onPress={handleBack} activeOpacity={0.7}>
-              <ArrowLeft size={18} color="#64748B" />
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={[styles.navNextBtn, step === 1 && styles.navNextBtnFull]}
-            onPress={handleNext}
-            activeOpacity={0.88}
-          >
-            <Text style={styles.navNextBtnText}>Continue</Text>
-            <ArrowRight size={16} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -919,389 +978,535 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  topBar: {
+
+  // ---------------------------------------------
+  // Tour Layout Styles
+  // ---------------------------------------------
+  tourHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
-  brandGroup: {
-    flexDirection: 'row',
+  navIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
   },
-  brandLogo: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
+  skipButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
   },
-  brandTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0F172A',
-    letterSpacing: -0.4,
-  },
-  skipBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: '#F1F5F9',
-  },
-  skipBtnText: {
-    fontSize: 12,
+  skipButtonText: {
+    fontSize: 13,
     fontWeight: '700',
     color: '#64748B',
   },
-  stepProgressBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 24,
-    gap: 6,
-    marginBottom: 8,
-  },
-  stepBarItem: {
+  centerVisualArea: {
     flex: 1,
-    height: 3,
-    borderRadius: 2,
-  },
-  stepBarItemActive: {
-    backgroundColor: '#6C47FF',
-  },
-  stepBarItemInactive: {
-    backgroundColor: '#E2E8F0',
-  },
-  scrollContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 24,
   },
-  centeredScrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  screenWrapper: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  imageContainer: {
-    borderRadius: 24,
-    overflow: 'hidden',
-    marginBottom: 16,
+  imageContainer1x1: {
     backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 4,
   },
-  onboardingImage: {
+  image1x1: {
     width: '100%',
     height: '100%',
-    borderRadius: 24,
   },
-  headlineText: {
+  tourContentArea: {
+    paddingHorizontal: 28,
+    paddingBottom: 24,
+  },
+  tourHeadline: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.8,
+    lineHeight: 32,
+    marginBottom: 10,
+  },
+  tourDescription: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#64748B',
+    lineHeight: 21,
+    marginBottom: 28,
+  },
+  tourFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dot: {
+    height: 6,
+    borderRadius: 3,
+  },
+  dotActive: {
+    width: 22,
+    backgroundColor: '#6C47FF',
+  },
+  dotInactive: {
+    width: 6,
+    backgroundColor: '#E2E8F0',
+  },
+  tourPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+    borderRadius: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  tourPrimaryBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  // ---------------------------------------------
+  // Slide 5: Auth & Gateway Styles
+  // ---------------------------------------------
+  authScrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  authTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  authVisualArea: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 12,
+  },
+  authHeader: {
+    alignItems: 'center',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  authTitle: {
     fontSize: 24,
     fontWeight: '900',
     color: '#0F172A',
-    letterSpacing: -0.5,
     textAlign: 'center',
+    letterSpacing: -0.6,
+    lineHeight: 30,
+    marginBottom: 8,
+  },
+  authSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 19,
+    paddingHorizontal: 16,
+  },
+  authButtonsStack: {
+    gap: 12,
+  },
+  googleBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 14,
+    borderRadius: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  btnContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleIconBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#4285F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  googleG: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  googleBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  githubBtn: {
+    backgroundColor: '#0F172A',
+    paddingVertical: 14,
+    borderRadius: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  githubBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  emailToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 13,
+    borderRadius: 100,
+  },
+  emailToggleText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  emailFormBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+  },
+  inputGroup: {
+    gap: 4,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  textInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  eyeBtn: {
+    padding: 4,
+  },
+  emailSubmitBtn: {
+    backgroundColor: '#6C47FF',
+    paddingVertical: 13,
+    borderRadius: 100,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  emailSubmitBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  switchAuthModeBtn: {
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  switchAuthModeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6C47FF',
+  },
+  guestLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  guestLinkText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6C47FF',
+  },
+  legalNotice: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  legalText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+
+  // ---------------------------------------------
+  // Step 6: Profile Setup Styles
+  // ---------------------------------------------
+  profileSetupScroll: {
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+  },
+  setupHeader: {
+    marginBottom: 24,
+  },
+  setupStepIndicator: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#6C47FF',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
     marginBottom: 6,
   },
-  subheadlineText: {
-    fontSize: 13,
-    color: '#64748B',
-    lineHeight: 18,
-    textAlign: 'center',
-    paddingHorizontal: 12,
-    marginBottom: 18,
+  setupTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.6,
+    marginBottom: 6,
   },
-  personaChipRow: {
-    width: '100%',
+  setupSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#64748B',
+    lineHeight: 19,
+  },
+  setupCard: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    borderRadius: 24,
+    padding: 20,
+  },
+  usernameInputRow: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingHorizontal: 14,
     marginTop: 8,
   },
-  personaChip: {
+  atSymbol: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#6C47FF',
+    marginRight: 6,
+  },
+  usernameInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  errorMessage: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#EF4444',
+    marginTop: 6,
+  },
+  roleTabsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  roleTab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#F8FAFC',
-    paddingVertical: 16,
-    borderRadius: 18,
-    borderWidth: 1.5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
     borderColor: '#E2E8F0',
+    paddingVertical: 12,
+    borderRadius: 14,
   },
-  personaChipActive: {
-    borderColor: '#6C47FF',
-    backgroundColor: '#6C47FF',
+  roleTabActive: {
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
   },
-  personaChipText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#334155',
+  roleTabText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#64748B',
   },
-  personaChipTextActive: {
+  roleTabTextActive: {
     color: '#FFFFFF',
   },
-  chipCheckBadge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  searchBox: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  formGroup: {
-    width: '100%',
-    marginBottom: 16,
-  },
-  formLabel: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#475569',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  formInput: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    borderWidth: 1.5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
     borderColor: '#E2E8F0',
+    borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    marginTop: 6,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 11,
     fontSize: 14,
     color: '#0F172A',
   },
   suggestionsBox: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    marginTop: 4,
+    borderRadius: 14,
+    marginTop: 6,
+    maxHeight: 180,
     overflow: 'hidden',
   },
   suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   suggestionText: {
     fontSize: 13,
-    color: '#1E293B',
     fontWeight: '600',
+    color: '#0F172A',
   },
-  addNewSuggestionItem: {
-    backgroundColor: '#FAF8FF',
-  },
-  addNewSuggestionText: {
-    fontSize: 13,
-    color: '#6C47FF',
-    fontWeight: '800',
-  },
-  yearWrap: {
-    flexDirection: 'row',
+  chipRow: {
     gap: 8,
+    paddingVertical: 6,
   },
-  yearPill: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-  },
-  yearPillActive: {
-    backgroundColor: '#6C47FF',
-    borderColor: '#6C47FF',
-  },
-  yearText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#475569',
-  },
-  yearTextActive: {
-    color: '#FFFFFF',
-  },
-  chipsContainer: {
-    width: '100%',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  chipItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 18,
-    backgroundColor: '#F8FAFC',
+    borderRadius: 100,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  chipItemActive: {
+  chipActive: {
     backgroundColor: '#6C47FF',
     borderColor: '#6C47FF',
   },
   chipText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#334155',
+    color: '#64748B',
   },
   chipTextActive: {
     color: '#FFFFFF',
   },
-  showMoreBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: 'rgba(108, 71, 255, 0.08)',
-  },
-  showMoreText: {
+  selectionCounter: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#6C47FF',
-  },
-  googleActionBtn: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 16,
-    paddingVertical: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
     marginBottom: 12,
   },
-  googleBtnLogo: {
-    width: 20,
-    height: 20,
+  selectionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  googleActionText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  secondaryActionsRow: {
+  gridChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    marginTop: 4,
-  },
-  secondaryActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-  },
-  secondaryActionText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#6C47FF',
-  },
-  guestActionText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  emailContainer: {
-    width: '100%',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 100,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    padding: 14,
-    gap: 10,
-    marginTop: 6,
   },
-  emailField: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  gridChipActive: {
+    backgroundColor: '#F3F0FF',
+    borderColor: '#6C47FF',
+  },
+  gridChipText: {
     fontSize: 13,
-    color: '#0F172A',
+    fontWeight: '600',
+    color: '#475569',
   },
-  passwordFieldRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  emailSubmitButton: {
-    backgroundColor: '#6C47FF',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  emailSubmitButtonText: {
-    fontSize: 14,
+  gridChipTextActive: {
+    color: '#6C47FF',
     fontWeight: '800',
-    color: '#FFFFFF',
   },
-  bottomNavigationBar: {
+  stepButtonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    backgroundColor: '#FFFFFF',
+    gap: 12,
+    marginTop: 24,
   },
-  navBackBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F1F5F9',
+  stepBackBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  navNextBtn: {
+  stepNextBtn: {
     flex: 1,
-    marginLeft: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#6C47FF',
+    backgroundColor: '#0F172A',
     paddingVertical: 14,
-    borderRadius: 16,
-    shadowColor: '#6C47FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  navNextBtnFull: {
-    marginLeft: 0,
-  },
-  navNextBtnText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    borderRadius: 100,
   },
 });

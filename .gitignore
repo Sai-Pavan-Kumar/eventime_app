@@ -38,3 +38,7 @@ yarn-error.log*
 release-builds/
 *.apk
 *.aab
+
+# Google Services & Firebase
+google-services.json
+android/app/google-services.json

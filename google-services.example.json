@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "944643273492",
-    "project_id": "eventime-a00e5",
-    "storage_bucket": "eventime-a00e5.firebasestorage.app"
+    "project_number": "YOUR_PROJECT_NUMBER",
+    "project_id": "YOUR_PROJECT_ID",
+    "storage_bucket": "YOUR_STORAGE_BUCKET"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:944643273492:android:a87433a65abb4704518801",
+        "mobilesdk_app_id": "YOUR_MOBILE_SDK_APP_ID",
         "android_client_info": {
           "package_name": "com.eventime.app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCIcKCMrldJ3qmJShD_FTpa1P1wvfEvWuQ"
+          "current_key": "YOUR_GOOGLE_API_KEY_HERE"
         }
       ],
       "services": {

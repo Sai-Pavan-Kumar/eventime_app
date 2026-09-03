@@ -28,6 +28,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
+import { APP_ASSETS } from '../lib/asset-registry';
+import { EmptyState } from '../components/EmptyState';
 import type { EventRow, RootStackParamList } from '../types';
 
 export default function MyPostedEventsScreen() {
@@ -208,19 +210,13 @@ export default function MyPostedEventsScreen() {
             </View>
           )}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Calendar size={48} color={theme.colors.textMuted} />
-              <Text style={styles.emptyTitle}>You haven't posted any events yet</Text>
-              <Text style={styles.emptySubtitle}>
-                Host or know about an exciting workshop, hackathon, or meetup? Share it with the community!
-              </Text>
-              <TouchableOpacity
-                style={styles.postNowBtn}
-                onPress={() => navigation.navigate('CreateEvent', {})}
-              >
-                <Text style={styles.postNowText}>+ Post Your First Event</Text>
-              </TouchableOpacity>
-            </View>
+            <EmptyState
+              illustration={APP_ASSETS.illustrations.empty}
+              title="You haven't posted any events yet"
+              message="Host or know about an exciting workshop, hackathon, or meetup? Share it with the community!"
+              buttonText="+ Post Your First Event"
+              onButtonPress={() => navigation.navigate('CreateEvent', {})}
+            />
           }
         />
       )}
