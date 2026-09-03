@@ -154,7 +154,7 @@ export default function AdminScreen() {
         if (error) throw error;
         setFeedbacks(data || []);
       } else if (activeTab === 'users') {
-        let q = supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(50);
+        let q = supabase.from('profiles').select('*').order('updated_at', { ascending: false }).limit(50);
         if (searchQuery.trim()) {
           q = q.or(`full_name.ilike.%${searchQuery.trim()}%,email.ilike.%${searchQuery.trim()}%,username.ilike.%${searchQuery.trim()}%`);
         }
@@ -830,6 +830,13 @@ export default function AdminScreen() {
                   data={usersList}
                   keyExtractor={(item) => item.id}
                   contentContainerStyle={styles.listContent}
+                  ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                      <Users size={40} color={theme.colors.textMuted} />
+                      <Text style={styles.emptyTitle}>No Curators Found</Text>
+                      <Text style={styles.emptySubtitle}>Try adjusting your search query.</Text>
+                    </View>
+                  }
                   renderItem={({ item }) => (
                     <View style={styles.userCard}>
                       <View style={styles.userRow}>

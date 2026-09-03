@@ -58,6 +58,8 @@ export default function SettingsScreen() {
   const [isSearchingColleges, setIsSearchingColleges] = useState(false);
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [branch, setBranch] = useState(profile?.branch || 'CSE');
+  const [branchSearch, setBranchSearch] = useState(profile?.branch || 'CSE');
+  const [branchesList, setBranchesList] = useState<string[]>([]);
   const [graduationYear, setGraduationYear] = useState(profile?.graduation_year || '2026');
 
   const [preferredCities, setPreferredCities] = useState<string[]>(profile?.preferred_cities || []);
@@ -156,6 +158,32 @@ export default function SettingsScreen() {
     setCollegeId(null);
     setCollegeSearch('');
     setCollegesList([]);
+  };
+
+  const handleBranchSearchChange = (t: string) => {
+    setBranchSearch(t);
+    setBranch(t);
+    const q = t.trim().toLowerCase();
+    if (!q) {
+      setBranchesList([]);
+      return;
+    }
+    const matches = INDIAN_COLLEGE_BRANCHES.filter((b) =>
+      b.toLowerCase().includes(q)
+    ).slice(0, 8);
+    setBranchesList(matches);
+  };
+
+  const handleSelectBranch = (b: string) => {
+    setBranch(b);
+    setBranchSearch(b);
+    setBranchesList([]);
+  };
+
+  const handleClearBranch = () => {
+    setBranch('');
+    setBranchSearch('');
+    setBranchesList([]);
   };
 
   const handleSave = async () => {
@@ -396,20 +424,53 @@ export default function SettingsScreen() {
                 )}
               </View>
 
-              {/* Branch / Stream */}
+              {/* Branch / Stream with Live Search & Autocomplete */}
               <View style={styles.inputGroup}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <Text style={styles.label}>Branch / Stream</Text>
                   <TouchableOpacity onPress={() => setShowBranchModal(true)}>
-                    <Text style={styles.browseAllText}>More Branches ›</Text>
+                    <Text style={styles.browseAllText}>Directory (170+) ›</Text>
                   </TouchableOpacity>
                 </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
+
+                <View style={styles.searchBox}>
+                  <Search size={16} color={theme.colors.textMuted} style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={styles.collegeSearchInput}
+                    value={branchSearch}
+                    onChangeText={handleBranchSearchChange}
+                    placeholder="Search 170+ branches (CSE, Mechanical, Biotech...)"
+                    placeholderTextColor={theme.colors.textMuted}
+                  />
+                  {branchSearch.length > 0 && (
+                    <TouchableOpacity onPress={handleClearBranch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <X size={16} color={theme.colors.textMuted} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Branch Suggestions Dropdown */}
+                {branchesList.length > 0 && (
+                  <View style={styles.suggestionsBox}>
+                    {branchesList.map((b) => (
+                      <TouchableOpacity
+                        key={b}
+                        style={styles.suggestionItem}
+                        onPress={() => handleSelectBranch(b)}
+                      >
+                        <Text style={styles.suggestionText}>{b}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Popular Quick-Select Chips */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.chipsScroll, { marginTop: 8 }]}>
                   {POPULAR_BRANCHES.map((b) => (
                     <TouchableOpacity
                       key={b}
                       style={[styles.smallChip, branch === b && styles.smallChipActive]}
-                      onPress={() => setBranch(b)}
+                      onPress={() => handleSelectBranch(b)}
                     >
                       <Text style={[styles.smallChipText, branch === b && styles.smallChipTextActive]}>{b}</Text>
                     </TouchableOpacity>
