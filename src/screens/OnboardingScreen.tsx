@@ -26,7 +26,6 @@ import {
   Check,
   Eye,
   EyeOff,
-  ImageIcon,
   Sparkles,
   ChevronDown,
   ChevronUp,
@@ -124,7 +123,7 @@ export default function OnboardingScreen() {
 
   // Responsive Dimensions
   const isSmallDevice = height < 700;
-  const placeholderSize = isSmallDevice
+  const imageSize = isSmallDevice
     ? Math.min(width * 0.42, 150)
     : step >= 4
     ? Math.min(width * 0.35, 130)
@@ -406,12 +405,16 @@ export default function OnboardingScreen() {
             <View style={styles.screenWrapper}>
               <View
                 style={[
-                  styles.imagePlaceholderBox,
-                  { width: placeholderSize, height: placeholderSize },
+                  styles.imageContainer,
+                  { width: imageSize, height: imageSize },
                 ]}
               >
-                <ImageIcon size={32} color="#94A3B8" />
-                <Text style={styles.placeholderLabel}>1:1 Image</Text>
+                <Image
+                  source={APP_ASSETS.onboarding.screen1}
+                  style={styles.onboardingImage}
+                  contentFit="cover"
+                  transition={200}
+                />
               </View>
 
               <Text style={styles.headlineText}>What is EvenTime?</Text>
@@ -428,12 +431,16 @@ export default function OnboardingScreen() {
             <View style={styles.screenWrapper}>
               <View
                 style={[
-                  styles.imagePlaceholderBox,
-                  { width: placeholderSize, height: placeholderSize },
+                  styles.imageContainer,
+                  { width: imageSize, height: imageSize },
                 ]}
               >
-                <ImageIcon size={32} color="#94A3B8" />
-                <Text style={styles.placeholderLabel}>1:1 Image</Text>
+                <Image
+                  source={APP_ASSETS.onboarding.screen2}
+                  style={styles.onboardingImage}
+                  contentFit="cover"
+                  transition={200}
+                />
               </View>
 
               <Text style={styles.headlineText}>Never Miss Out</Text>
@@ -450,12 +457,16 @@ export default function OnboardingScreen() {
             <View style={styles.screenWrapper}>
               <View
                 style={[
-                  styles.imagePlaceholderBox,
-                  { width: placeholderSize, height: placeholderSize },
+                  styles.imageContainer,
+                  { width: imageSize, height: imageSize },
                 ]}
               >
-                <ImageIcon size={28} color="#94A3B8" />
-                <Text style={styles.placeholderLabel}>1:1 Image</Text>
+                <Image
+                  source={APP_ASSETS.onboarding.screen3}
+                  style={styles.onboardingImage}
+                  contentFit="cover"
+                  transition={200}
+                />
               </View>
 
               <Text style={styles.headlineText}>Tell us who you are</Text>
@@ -507,12 +518,16 @@ export default function OnboardingScreen() {
             <View style={styles.screenWrapper}>
               <View
                 style={[
-                  styles.imagePlaceholderBox,
-                  { width: placeholderSize, height: placeholderSize },
+                  styles.imageContainer,
+                  { width: imageSize, height: imageSize },
                 ]}
               >
-                <GraduationCap size={28} color="#94A3B8" />
-                <Text style={styles.placeholderLabel}>1:1 Image</Text>
+                <Image
+                  source={APP_ASSETS.onboarding.screen4}
+                  style={styles.onboardingImage}
+                  contentFit="cover"
+                  transition={200}
+                />
               </View>
 
               <Text style={styles.headlineText}>Your Campus Details</Text>
@@ -649,12 +664,16 @@ export default function OnboardingScreen() {
             <View style={styles.screenWrapper}>
               <View
                 style={[
-                  styles.imagePlaceholderBox,
-                  { width: placeholderSize, height: placeholderSize },
+                  styles.imageContainer,
+                  { width: imageSize, height: imageSize },
                 ]}
               >
-                <MapPin size={26} color="#94A3B8" />
-                <Text style={styles.placeholderLabel}>1:1 Image</Text>
+                <Image
+                  source={APP_ASSETS.onboarding.screen5}
+                  style={styles.onboardingImage}
+                  contentFit="cover"
+                  transition={200}
+                />
               </View>
 
               <Text style={styles.headlineText}>Pick Your Cities</Text>
@@ -695,12 +714,16 @@ export default function OnboardingScreen() {
             <View style={styles.screenWrapper}>
               <View
                 style={[
-                  styles.imagePlaceholderBox,
-                  { width: placeholderSize, height: placeholderSize },
+                  styles.imageContainer,
+                  { width: imageSize, height: imageSize },
                 ]}
               >
-                <Sparkles size={26} color="#94A3B8" />
-                <Text style={styles.placeholderLabel}>1:1 Image</Text>
+                <Image
+                  source={APP_ASSETS.onboarding.screen6}
+                  style={styles.onboardingImage}
+                  contentFit="cover"
+                  transition={200}
+                />
               </View>
 
               <Text style={styles.headlineText}>What do you like?</Text>
@@ -761,12 +784,16 @@ export default function OnboardingScreen() {
             <View style={styles.screenWrapper}>
               <View
                 style={[
-                  styles.imagePlaceholderBox,
-                  { width: placeholderSize, height: placeholderSize },
+                  styles.imageContainer,
+                  { width: imageSize, height: imageSize },
                 ]}
               >
-                <ImageIcon size={32} color="#94A3B8" />
-                <Text style={styles.placeholderLabel}>1:1 Image</Text>
+                <Image
+                  source={APP_ASSETS.onboarding.screen7}
+                  style={styles.onboardingImage}
+                  contentFit="cover"
+                  transition={200}
+                />
               </View>
 
               <Text style={styles.headlineText}>Your Feed is Ready</Text>
@@ -957,22 +984,18 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
-  imagePlaceholderBox: {
+  imageContainer: {
     borderRadius: 24,
+    overflow: 'hidden',
+    marginBottom: 16,
     backgroundColor: '#F8FAFC',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-    gap: 6,
   },
-  placeholderLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
-    letterSpacing: 0.5,
+  onboardingImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
   },
   headlineText: {
     fontSize: 24,

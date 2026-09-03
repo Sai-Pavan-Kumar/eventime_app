@@ -440,6 +440,18 @@ export default function SettingsScreen() {
             </View>
             <Text style={styles.legalArrow}>›</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.legalRow, { borderBottomWidth: 0 }]}
+            onPress={() => (navigation as any).navigate('Onboarding')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.legalLeft}>
+              <Sparkles size={16} color={theme.colors.brand} />
+              <Text style={styles.legalText}>Replay Onboarding Tour</Text>
+            </View>
+            <Text style={styles.legalArrow}>›</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Save Button */}

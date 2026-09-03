@@ -14,6 +14,15 @@ export const APP_ASSETS = {
     emptyProfile: require('../../assets/empty-profile.webp'),
     throneEmpty: require('../../assets/throne-empty.webp'),
   },
+  onboarding: {
+    screen1: require('../../assets/onboarding/screen1.webp'),
+    screen2: require('../../assets/onboarding/screen2.webp'),
+    screen3: require('../../assets/onboarding/screen3.webp'),
+    screen4: require('../../assets/onboarding/screen4.webp'),
+    screen5: require('../../assets/onboarding/screen5.webp'),
+    screen6: require('../../assets/onboarding/screen6.webp'),
+    screen7: require('../../assets/onboarding/screen7.webp'),
+  },
 };
 
 const CATEGORY_ASSET_MAP: Record<string, any> = {
