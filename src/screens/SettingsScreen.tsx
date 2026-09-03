@@ -12,19 +12,37 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, CheckCircle2, Save, MapPin, User, Building, GraduationCap, Lock, Bell, Sparkles } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Save, MapPin, User, Building, GraduationCap, Lock, Bell, Sparkles, Search, X } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { CITIES } from '../lib/constants/cities';
 import { CATEGORIES_LIST, getCategoryMeta } from '../lib/category-config';
 import { INDIAN_COLLEGE_BRANCHES } from '../lib/constants/branches';
+import { SelectPickerModal } from '../components/SelectPickerModal';
 import {
   getNotificationPreferences,
   saveNotificationPreferences,
   type NotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
 } from '../lib/notifications';
+
+const GRAD_YEARS = ['2024', '2025', '2026', '2027', '2028', '2029', '2030'];
+
+const POPULAR_BRANCHES = [
+  'CSE',
+  'IT',
+  'AI & ML',
+  'Data Science',
+  'Cyber Security',
+  'ECE',
+  'EEE',
+  'Mechanical Engineering',
+  'Civil Engineering',
+  'Chemical Engineering',
+  'AERO',
+  'BIOTECH',
+];
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
@@ -34,6 +52,11 @@ export default function SettingsScreen() {
   const [username, setUsername] = useState(profile?.username || '');
   const [userType, setUserType] = useState<'student' | 'professional'>((profile?.user_type as any) || 'student');
   const [college, setCollege] = useState(profile?.college || '');
+  const [collegeId, setCollegeId] = useState<string | null>(profile?.college_id || null);
+  const [collegeSearch, setCollegeSearch] = useState(profile?.college || '');
+  const [collegesList, setCollegesList] = useState<Array<{ id: string; name: string }>>([]);
+  const [isSearchingColleges, setIsSearchingColleges] = useState(false);
+  const [showBranchModal, setShowBranchModal] = useState(false);
   const [branch, setBranch] = useState(profile?.branch || 'CSE');
   const [graduationYear, setGraduationYear] = useState(profile?.graduation_year || '2026');
 
@@ -92,6 +115,49 @@ export default function SettingsScreen() {
     }
   };
 
+  useEffect(() => {
+    if (userType !== 'student') return;
+    const q = collegeSearch.trim();
+    if (!q || (college && q === college)) {
+      setCollegesList([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingColleges(true);
+      try {
+        const { data } = await supabase
+          .from('colleges')
+          .select('id, name')
+          .ilike('name', `%${q}%`)
+          .limit(10);
+        if (data) {
+          setCollegesList(data);
+        }
+      } catch (err) {
+        console.error('[Settings] College search error:', err);
+      } finally {
+        setIsSearchingColleges(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [collegeSearch, userType, college]);
+
+  const handleSelectCollege = (col: { id: string; name: string }) => {
+    setCollege(col.name);
+    setCollegeId(col.id);
+    setCollegeSearch(col.name);
+    setCollegesList([]);
+  };
+
+  const handleClearCollege = () => {
+    setCollege('');
+    setCollegeId(null);
+    setCollegeSearch('');
+    setCollegesList([]);
+  };
+
   const handleSave = async () => {
     if (!user) return;
     const cleanUsername = username.trim().toLowerCase();
@@ -122,6 +188,7 @@ export default function SettingsScreen() {
         username: cleanUsername,
         user_type: userType,
         college: userType === 'student' ? college.trim() || null : null,
+        college_id: userType === 'student' ? collegeId : null,
         branch: userType === 'student' ? branch : null,
         graduation_year: userType === 'student' ? graduationYear : null,
         preferred_cities: isAdmin ? preferredCities : preferredCities.slice(0, 3),
@@ -250,8 +317,9 @@ export default function SettingsScreen() {
         </View>
 
         {/* Academic / Occupation */}
+        {/* Academic / Occupation -> "I am a..." */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Occupation & Education</Text>
+          <Text style={styles.sectionTitle}>I am a...</Text>
 
           <View style={styles.typeSelectorRow}>
             <TouchableOpacity
@@ -277,21 +345,67 @@ export default function SettingsScreen() {
 
           {userType === 'student' && (
             <>
+              {/* College Search Field */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>College Name</Text>
-                <TextInput
-                  style={styles.input}
-                  value={college}
-                  onChangeText={setCollege}
-                  placeholder="e.g. IIT Hyderabad"
-                  placeholderTextColor={theme.colors.textMuted}
-                />
+                <Text style={styles.label}>College / University</Text>
+                <View style={styles.searchBox}>
+                  <Search size={16} color={theme.colors.textMuted} style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={styles.collegeSearchInput}
+                    value={collegeSearch}
+                    onChangeText={(t) => {
+                      setCollegeSearch(t);
+                      if (!t.trim()) {
+                        setCollege('');
+                        setCollegeId(null);
+                      }
+                    }}
+                    placeholder="Search 52,000+ colleges across India..."
+                    placeholderTextColor={theme.colors.textMuted}
+                  />
+                  {isSearchingColleges && (
+                    <ActivityIndicator size="small" color={theme.colors.brand} style={{ marginRight: 6 }} />
+                  )}
+                  {collegeSearch.length > 0 && !isSearchingColleges && (
+                    <TouchableOpacity onPress={handleClearCollege} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <X size={16} color={theme.colors.textMuted} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* College Suggestions Dropdown */}
+                {collegesList.length > 0 && (
+                  <View style={styles.suggestionsBox}>
+                    {collegesList.map((col) => (
+                      <TouchableOpacity
+                        key={col.id}
+                        style={styles.suggestionItem}
+                        onPress={() => handleSelectCollege(col)}
+                      >
+                        <Text style={styles.suggestionText}>{col.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {Boolean(collegeId) && (
+                  <View style={styles.verifiedCollegeBadge}>
+                    <CheckCircle2 size={13} color="#059669" />
+                    <Text style={styles.verifiedCollegeText}>Verified Campus Feed Connected</Text>
+                  </View>
+                )}
               </View>
 
+              {/* Branch / Stream */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Branch</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={styles.label}>Branch / Stream</Text>
+                  <TouchableOpacity onPress={() => setShowBranchModal(true)}>
+                    <Text style={styles.browseAllText}>More Branches ›</Text>
+                  </TouchableOpacity>
+                </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
-                  {INDIAN_COLLEGE_BRANCHES.slice(0, 15).map((b) => (
+                  {POPULAR_BRANCHES.map((b) => (
                     <TouchableOpacity
                       key={b}
                       style={[styles.smallChip, branch === b && styles.smallChipActive]}
@@ -300,20 +414,28 @@ export default function SettingsScreen() {
                       <Text style={[styles.smallChipText, branch === b && styles.smallChipTextActive]}>{b}</Text>
                     </TouchableOpacity>
                   ))}
+                  {branch && !POPULAR_BRANCHES.includes(branch) && (
+                    <View style={[styles.smallChip, styles.smallChipActive]}>
+                      <Text style={[styles.smallChipText, styles.smallChipTextActive]}>{branch}</Text>
+                    </View>
+                  )}
                 </ScrollView>
               </View>
 
+              {/* Graduation Year */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Graduation Year</Text>
-                <TextInput
-                  style={styles.input}
-                  value={graduationYear}
-                  onChangeText={setGraduationYear}
-                  keyboardType="numeric"
-                  maxLength={4}
-                  placeholder="2026"
-                  placeholderTextColor={theme.colors.textMuted}
-                />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
+                  {GRAD_YEARS.map((y) => (
+                    <TouchableOpacity
+                      key={y}
+                      style={[styles.smallChip, graduationYear === y && styles.smallChipActive]}
+                      onPress={() => setGraduationYear(y)}
+                    >
+                      <Text style={[styles.smallChipText, graduationYear === y && styles.smallChipTextActive]}>{y}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
             </>
           )}
@@ -519,6 +641,20 @@ export default function SettingsScreen() {
           <Text style={styles.deleteAccountText}>Delete Account & Wipe Data</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Branch Selection Modal */}
+      <SelectPickerModal
+        visible={showBranchModal}
+        title="Select Branch / Stream"
+        items={INDIAN_COLLEGE_BRANCHES}
+        selectedItem={branch}
+        onSelect={(b) => {
+          setBranch(b);
+          setShowBranchModal(false);
+        }}
+        onClose={() => setShowBranchModal(false)}
+        searchPlaceholder="Search all 170+ college branches..."
+      />
     </SafeAreaView>
   );
 }
@@ -646,6 +782,59 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
     color: theme.colors.textPrimary,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: 12,
+  },
+  collegeSearchInput: {
+    fontFamily: 'Switzer-Regular',
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: theme.colors.textPrimary,
+  },
+  suggestionsBox: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    marginTop: 6,
+    maxHeight: 180,
+    overflow: 'hidden',
+    ...theme.shadows.sm,
+  },
+  suggestionItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.borderLight,
+  },
+  suggestionText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 13,
+    color: theme.colors.textPrimary,
+  },
+  verifiedCollegeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  verifiedCollegeText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 12,
+    color: '#059669',
+  },
+  browseAllText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 12,
+    color: theme.colors.brand,
   },
   typeSelectorRow: {
     flexDirection: 'row',

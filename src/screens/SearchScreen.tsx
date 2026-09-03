@@ -49,8 +49,24 @@ export default function SearchScreen() {
   const [keyword, setKeyword] = useState('');
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [priceFilter, setPriceFilter] = useState<'all' | 'free' | 'paid'>('all');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const getTodayStr = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const getTomorrowStr = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const y = tomorrow.getFullYear();
+    const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const d = String(tomorrow.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
 
   // Modals
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -200,7 +216,22 @@ export default function SearchScreen() {
   const filteredEvents = useMemo(() => {
     let pool = [...allEvents];
 
-    // 1. Keyword search (Event title, category, city, location, organizer, curator name/username, description)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 1. By default, strictly exclude past events (Matches HomeScreen parity)
+    // Only show past events if the user explicitly picked a past date via calendar
+    if (!selectedDate) {
+      pool = pool.filter((ev) => {
+        const parsed = parseEventDateString(ev.date_string || '');
+        if (!parsed) return true;
+        const evDate = new Date(parsed);
+        evDate.setHours(0, 0, 0, 0);
+        return evDate.getTime() >= today.getTime();
+      });
+    }
+
+    // 2. Keyword search (Event title, category, city, location, organizer, college, curator username/name, description)
     if (keyword.trim()) {
       const q = keyword.trim().toLowerCase();
       pool = pool.filter((ev: any) => {
@@ -228,26 +259,19 @@ export default function SearchScreen() {
       });
     }
 
-    // 2. City Filter
+    // 3. City Filter
     if (selectedCity) {
       const targetCity = selectedCity.toLowerCase().trim();
       pool = pool.filter((ev) => ev.city?.toLowerCase().trim() === targetCity);
     }
 
-    // 3. Category Filter
+    // 4. Category Filter
     if (selectedCategory) {
       const targetCat = selectedCategory.toLowerCase().trim();
       pool = pool.filter((ev) => ev.category?.toLowerCase().trim() === targetCat);
     }
 
-    // 4. Price Filter
-    if (priceFilter === 'free') {
-      pool = pool.filter((ev) => ev.is_free === true || ev.is_free === null);
-    } else if (priceFilter === 'paid') {
-      pool = pool.filter((ev) => ev.is_free === false);
-    }
-
-    // 5. Calendar Date Filter (Matches HomeScreen calendar logic)
+    // 5. Calendar Date Filter (Matches specific date)
     if (selectedDate) {
       pool = pool.filter((ev) => {
         const parsed = parseEventDateString(ev.date_string || '');
@@ -259,7 +283,7 @@ export default function SearchScreen() {
       });
     }
 
-    // Sort chronologically
+    // Sort chronologically (earliest upcoming first)
     pool.sort((a, b) => {
       const da = parseEventDateString(a.date_string)?.getTime() || 0;
       const db = parseEventDateString(b.date_string)?.getTime() || 0;
@@ -267,18 +291,17 @@ export default function SearchScreen() {
     });
 
     return pool;
-  }, [allEvents, keyword, selectedCity, selectedCategory, priceFilter, selectedDate]);
+  }, [allEvents, keyword, selectedCity, selectedCategory, selectedDate]);
 
   const clearAllFilters = () => {
     setKeyword('');
     setSelectedCity(null);
     setSelectedCategory(null);
-    setPriceFilter('all');
     setSelectedDate(null);
   };
 
   const hasActiveFilters = Boolean(
-    keyword || selectedCity || selectedCategory || priceFilter !== 'all' || selectedDate
+    keyword.trim() || selectedCity || selectedCategory || selectedDate
   );
 
   return (
@@ -323,7 +346,35 @@ export default function SearchScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* 2. City Dropdown */}
+          {/* 2. Today Filter */}
+          <TouchableOpacity
+            style={[styles.chip, selectedDate === getTodayStr() && styles.chipActive]}
+            onPress={() => {
+              const todayStr = getTodayStr();
+              setSelectedDate((prev) => (prev === todayStr ? null : todayStr));
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.chipText, selectedDate === getTodayStr() && styles.chipTextActive]}>
+              Today
+            </Text>
+          </TouchableOpacity>
+
+          {/* 3. Tomorrow Filter */}
+          <TouchableOpacity
+            style={[styles.chip, selectedDate === getTomorrowStr() && styles.chipActive]}
+            onPress={() => {
+              const tomorrowStr = getTomorrowStr();
+              setSelectedDate((prev) => (prev === tomorrowStr ? null : tomorrowStr));
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.chipText, selectedDate === getTomorrowStr() && styles.chipTextActive]}>
+              Tomorrow
+            </Text>
+          </TouchableOpacity>
+
+          {/* 4. City Dropdown */}
           <TouchableOpacity
             style={[styles.dropdownChip, selectedCity && styles.chipActive]}
             onPress={() => setShowCityModal(true)}
@@ -338,7 +389,7 @@ export default function SearchScreen() {
             <ChevronDown size={14} color={selectedCity ? '#FFF' : '#64748B'} />
           </TouchableOpacity>
 
-          {/* 3. Category Dropdown */}
+          {/* 5. Category Dropdown */}
           <TouchableOpacity
             style={[styles.dropdownChip, selectedCategory && styles.chipActive]}
             onPress={() => setShowCategoryModal(true)}
@@ -350,28 +401,6 @@ export default function SearchScreen() {
                 : 'Category'}
             </Text>
             <ChevronDown size={14} color={selectedCategory ? '#FFF' : '#64748B'} />
-          </TouchableOpacity>
-
-          {/* 4. Free Events Filter */}
-          <TouchableOpacity
-            style={[styles.chip, priceFilter === 'free' && styles.chipActive]}
-            onPress={() => setPriceFilter(priceFilter === 'free' ? 'all' : 'free')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.chipText, priceFilter === 'free' && styles.chipTextActive]}>
-              Free
-            </Text>
-          </TouchableOpacity>
-
-          {/* 5. Paid Events Filter */}
-          <TouchableOpacity
-            style={[styles.chip, priceFilter === 'paid' && styles.chipActive]}
-            onPress={() => setPriceFilter(priceFilter === 'paid' ? 'all' : 'paid')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.chipText, priceFilter === 'paid' && styles.chipTextActive]}>
-              Paid
-            </Text>
           </TouchableOpacity>
 
           {/* Clear Button if any filter is active */}
