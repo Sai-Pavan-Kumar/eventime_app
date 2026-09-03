@@ -838,7 +838,6 @@ export default function CreateEventScreen() {
         is_featured: isAdmin && isFeatured,
         college_only: isCollegeCategory ? collegeOnly : false,
         college_id: isCollegeCategory ? collegeId : null,
-        college_name: isCollegeCategory ? collegeName.trim() || null : null,
         college_branch: isCollegeCategory && collegeBranch !== 'All Branches' ? collegeBranch : null,
         branch_tags: isCollegeCategory && collegeBranch && collegeBranch !== 'All Branches' ? [collegeBranch] : null,
         college_year: isCollegeCategory && collegeYear !== 'All Years' ? collegeYear : null,
