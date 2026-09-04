@@ -92,8 +92,8 @@ android {
         applicationId 'com.eventime.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 2
+        versionName "1.0.1"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -121,10 +121,11 @@ android {
             crunchPngs enablePngCrunchInRelease.toBoolean()
         }
     }
+    def isBundleTask = gradle.startParameter.taskNames.any { it.toLowerCase().contains("bundle") }
     splits {
         abi {
             reset()
-            enable true
+            enable !isBundleTask
             universalApk true
             include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
         }

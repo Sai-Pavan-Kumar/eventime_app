@@ -38,7 +38,7 @@ export interface EventCardProps {
   onCityPress?: (city: string) => void;
 }
 
-export const EventCard: React.FC<EventCardProps> = (props) => {
+export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
   const navigation = useNavigation<any>();
   const { user, profile } = useAuth();
 
@@ -194,6 +194,8 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
           style={styles.posterImage}
           contentFit="cover"
           transition={200}
+          recyclingKey={id}
+          cachePolicy="memory-disk"
         />
 
         {/* Top Floating Badge Bar */}
@@ -340,7 +342,7 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
       </View>
     </TouchableOpacity>
   );
-};
+});
 
 const styles = StyleSheet.create({
   card: {
