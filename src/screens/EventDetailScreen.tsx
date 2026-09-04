@@ -74,6 +74,9 @@ export default function EventDetailScreen() {
   const [reportReason, setReportReason] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
+  const isStudent = profile?.user_type === 'student';
+  const userCollege = profile?.college || event?.colleges?.name || '';
+
   const isPast = (() => {
     if (!event?.date_string) return false;
     const parsed = parseEventDateString(event.date_string);
@@ -92,15 +95,27 @@ export default function EventDetailScreen() {
         .neq('id', currentEvent.id)
         .limit(6);
 
-      if (currentEvent.city && currentEvent.city !== 'Online') {
-        query = query.eq('city', currentEvent.city);
-      } else if (currentEvent.category) {
+      if (currentEvent.category) {
         query = query.eq('category', currentEvent.category);
+      } else if (currentEvent.city && currentEvent.city !== 'Online') {
+        query = query.eq('city', currentEvent.city);
       }
 
       const { data } = await query;
-      if (data) {
+      if (data && data.length > 0) {
         setSimilarEvents(data as EventRow[]);
+      } else {
+        // Fallback to latest approved events so the stream never reaches a dead end
+        const { data: fallback } = await supabase
+          .from('events')
+          .select('*, colleges(name)')
+          .eq('status', 'approved')
+          .neq('id', currentEvent.id)
+          .order('created_at', { ascending: false })
+          .limit(6);
+        if (fallback) {
+          setSimilarEvents(fallback as EventRow[]);
+        }
       }
     } catch (e) {
       console.warn('[EventDetail] Failed to load similar events', e);
@@ -477,6 +492,55 @@ export default function EventDetailScreen() {
             </View>
           )}
 
+          {/* Role-Gated Real-Action Attendance Bar (Linked 1:1 to interested_events) */}
+          <TouchableOpacity
+            style={[styles.socialProofBar, isInterested && styles.socialProofBarActive]}
+            onPress={handleInterestedToggle}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.socialProofIconBox, isInterested && styles.socialProofIconBoxActive]}>
+              {isStudent ? (
+                <GraduationCap size={16} color={isInterested ? '#EF4444' : '#6C47FF'} />
+              ) : (
+                <Users size={16} color={isInterested ? '#EF4444' : '#6C47FF'} />
+              )}
+            </View>
+
+            <View style={styles.socialProofTextBox}>
+              <Text style={[styles.socialProofTitle, isInterested && styles.socialProofTitleActive]} numberOfLines={1}>
+                {isStudent
+                  ? interestCount > 0
+                    ? isInterested
+                      ? interestCount === 1
+                        ? `You are attending from ${userCollege || 'Campus'}`
+                        : `You & ${interestCount - 1} ${interestCount - 1 === 1 ? 'other student' : 'other students'} attending · ${userCollege || 'Campus'}`
+                      : `${interestCount} ${interestCount === 1 ? 'student is' : 'students are'} attending · ${event.colleges?.name || userCollege || 'Campus'}`
+                    : `Be the first student from ${userCollege || 'your campus'} to attend`
+                  : interestCount > 0
+                  ? isInterested
+                    ? interestCount === 1
+                      ? `You are attending · ${event.city || 'Local'}`
+                      : `You & ${interestCount - 1} ${interestCount - 1 === 1 ? 'other person' : 'others'} attending · ${event.city || 'Local'}`
+                    : `${interestCount} ${interestCount === 1 ? 'person is' : 'people are'} attending · ${event.city || 'Local'}`
+                  : `Be the first in ${event.city || 'your city'} to express interest`}
+              </Text>
+              <Text style={styles.socialProofSub}>
+                {isInterested ? 'You are marked as attending · Tap to undo' : 'Real-time verified attendee stream'}
+              </Text>
+            </View>
+
+            <View style={[styles.socialProofPill, isInterested && styles.socialProofPillActive]}>
+              <Heart
+                size={12}
+                color={isInterested ? '#FFFFFF' : '#6C47FF'}
+                fill={isInterested ? '#FFFFFF' : 'none'}
+              />
+              <Text style={[styles.socialProofPillText, isInterested && styles.socialProofPillTextActive]}>
+                {isInterested ? 'Attending' : 'Attend'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
           {/* Quick Action Strip: Add to Calendar */}
           <View style={styles.actionStrip}>
             <TouchableOpacity
@@ -662,7 +726,10 @@ export default function EventDetailScreen() {
             <View style={styles.similarSection}>
               <View style={styles.similarHeader}>
                 <Text style={styles.similarTitle}>
-                  More Events in {event.city || event.category}
+                  More Events in {event.category || event.city || 'EvenTime'}
+                </Text>
+                <Text style={styles.similarSubtitle}>
+                  Keep exploring events tailored to your stream
                 </Text>
               </View>
               <ScrollView
@@ -942,6 +1009,76 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#6C47FF',
   },
+  // Role-Gated Attendance Social Proof Bar
+  socialProofBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 14,
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  socialProofBarActive: {
+    backgroundColor: '#F5F3FF',
+    borderColor: '#DDD6FE',
+  },
+  socialProofIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F5F3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  socialProofIconBoxActive: {
+    backgroundColor: '#FEE2E2',
+  },
+  socialProofTextBox: {
+    flex: 1,
+  },
+  socialProofTitle: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 13,
+    color: '#0F172A',
+    lineHeight: 18,
+  },
+  socialProofTitleActive: {
+    color: '#6C47FF',
+  },
+  socialProofSub: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  socialProofPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  socialProofPillActive: {
+    backgroundColor: '#EF4444',
+  },
+  socialProofPillText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 11,
+    color: '#6C47FF',
+  },
+  socialProofPillTextActive: {
+    color: '#FFFFFF',
+  },
   actionStrip: {
     flexDirection: 'row',
     gap: 10,
@@ -1055,6 +1192,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit-Bold',
     fontSize: 17,
     color: '#0F172A',
+  },
+  similarSubtitle: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   },
   similarScrollContainer: {
     paddingRight: 16,

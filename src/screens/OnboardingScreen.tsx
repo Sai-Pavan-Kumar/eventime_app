@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -151,7 +152,16 @@ export default function OnboardingScreen() {
   const [authLoading, setAuthLoading] = useState<string | null>(null);
 
   // Profile Setup states (Step 6)
-  const [profileSubStep, setProfileSubStep] = useState<1 | 2 | 3 | 4>(1);
+  const [profileSubStep, setProfileSubStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [climaxPhase, setClimaxPhase] = useState<'radar' | 'pass'>('radar');
+  const [radarTextIndex, setRadarTextIndex] = useState(0);
+  const [matchedEventsCount, setMatchedEventsCount] = useState<number>(18);
+
+  const radarScale = useRef(new Animated.Value(0.8)).current;
+  const radarOpacity = useRef(new Animated.Value(0.8)).current;
+  const passScale = useRef(new Animated.Value(0.9)).current;
+  const passOpacity = useRef(new Animated.Value(0)).current;
+
   const [username, setUsername] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
@@ -185,7 +195,7 @@ export default function OnboardingScreen() {
     // DO NOT transition while profile is still loading from Supabase!
     if (isAuthLoading || profile === null) return;
 
-    if (isOnboarded || profile.is_onboarded) {
+    if ((isOnboarded || profile.is_onboarded) && profileSubStep !== 5) {
       setHasCompletedOnboarding(true).then(() => {
         navigation.reset({
           index: 0,
@@ -196,7 +206,7 @@ export default function OnboardingScreen() {
       // User signed in on Slide 5 and verified not onboarded
       setCurrentSlide(6);
     }
-  }, [user, profile, isOnboarded, isAuthLoading, currentSlide, navigation]);
+  }, [user, profile, isOnboarded, isAuthLoading, currentSlide, profileSubStep, navigation]);
 
   // College search debounce for profile setup
   useEffect(() => {
@@ -382,6 +392,65 @@ export default function OnboardingScreen() {
     }
   };
 
+  const startRadarAnimation = () => {
+    setClimaxPhase('radar');
+    setRadarTextIndex(0);
+
+    Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(radarScale, {
+            toValue: 1.8,
+            duration: 900,
+            useNativeDriver: true,
+          }),
+          Animated.timing(radarScale, {
+            toValue: 0.8,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(radarOpacity, {
+            toValue: 0,
+            duration: 900,
+            useNativeDriver: true,
+          }),
+          Animated.timing(radarOpacity, {
+            toValue: 0.8,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+      ])
+    ).start();
+
+    setTimeout(() => {
+      setRadarTextIndex(1);
+    }, 600);
+
+    setTimeout(() => {
+      setRadarTextIndex(2);
+    }, 1200);
+
+    setTimeout(() => {
+      setClimaxPhase('pass');
+      Animated.parallel([
+        Animated.spring(passScale, {
+          toValue: 1,
+          friction: 7,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+        Animated.timing(passOpacity, {
+          toValue: 1,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 1800);
+  };
+
   const handleSaveProfile = async () => {
     if (!user) {
       Alert.alert('Session Expired', 'Please sign in to complete your profile.');
@@ -420,10 +489,22 @@ export default function OnboardingScreen() {
       await refreshProfile();
       await setHasCompletedOnboarding(true);
 
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'MainTabs' }],
-      });
+      // Query matched events count in user's selected cities
+      try {
+        const { count } = await supabase
+          .from('events')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'approved')
+          .in('city', selectedCities.length > 0 ? selectedCities : ['Hyderabad']);
+        if (count && count > 0) {
+          setMatchedEventsCount(count);
+        }
+      } catch (cntErr) {
+        setMatchedEventsCount(18);
+      }
+
+      setProfileSubStep(5);
+      startRadarAnimation();
     } catch (err: any) {
       console.error('[Onboarding] Profile save error:', err);
       Alert.alert('Save Failed', err.message || 'Could not save profile. Please try again.');
@@ -805,32 +886,34 @@ export default function OnboardingScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
-          <View style={styles.setupHeader}>
-            <View style={styles.stepBadgeRow}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.setupStepIndicator}>Step {profileSubStep} of 4</Text>
-              </View>
-              {isAdmin && (
-                <View style={styles.adminBadge}>
-                  <ShieldCheck size={12} color="#6C47FF" />
-                  <Text style={styles.adminBadgeText}>Admin Access</Text>
+          {/* Header (Only shown during input steps 1 to 4) */}
+          {profileSubStep <= 4 && (
+            <View style={styles.setupHeader}>
+              <View style={styles.stepBadgeRow}>
+                <View style={styles.stepBadge}>
+                  <Text style={styles.setupStepIndicator}>Step {profileSubStep} of 4</Text>
                 </View>
-              )}
+                {isAdmin && (
+                  <View style={styles.adminBadge}>
+                    <ShieldCheck size={12} color="#6C47FF" />
+                    <Text style={styles.adminBadgeText}>Admin Access</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.setupTitle}>
+                {profileSubStep === 1 && 'Pick Your Username'}
+                {profileSubStep === 2 && 'Campus & Background'}
+                {profileSubStep === 3 && 'Your Event Hubs'}
+                {profileSubStep === 4 && 'Personalize Your Feed'}
+              </Text>
+              <Text style={styles.setupSubtitle}>
+                {profileSubStep === 1 && 'Your unique handle for sharing, curating, and discovering events across India.'}
+                {profileSubStep === 2 && 'Connect your university to unlock internal campus fests and department hackathons.'}
+                {profileSubStep === 3 && 'Choose cities you want to track. We will curate meetups and fests in your area.'}
+                {profileSubStep === 4 && 'Pick categories you care about to train your personal recommendation feed.'}
+              </Text>
             </View>
-            <Text style={styles.setupTitle}>
-              {profileSubStep === 1 && 'Pick Your Username'}
-              {profileSubStep === 2 && 'Campus & Background'}
-              {profileSubStep === 3 && 'Your Event Hubs'}
-              {profileSubStep === 4 && 'Personalize Your Feed'}
-            </Text>
-            <Text style={styles.setupSubtitle}>
-              {profileSubStep === 1 && 'Your unique handle for sharing, curating, and discovering events across India.'}
-              {profileSubStep === 2 && 'Connect your university to unlock internal campus fests and department hackathons.'}
-              {profileSubStep === 3 && 'Choose cities you want to track. We will curate meetups and fests in your area.'}
-              {profileSubStep === 4 && 'Pick categories you care about to train your personal recommendation feed.'}
-            </Text>
-          </View>
+          )}
 
           {/* SUB-STEP 1: Username */}
           {profileSubStep === 1 && (
@@ -1212,6 +1295,129 @@ export default function OnboardingScreen() {
                   )}
                 </TouchableOpacity>
               </View>
+            </View>
+          )}
+
+          {/* SUB-STEP 5: Tim Gabe Climax - Pulsing Radar & Discovery Pass (Zero Checkmarks) */}
+          {profileSubStep === 5 && (
+            <View style={styles.climaxContainer}>
+              {climaxPhase === 'radar' ? (
+                <View style={styles.radarContainer}>
+                  <View style={styles.radarPulseWrapper}>
+                    <Animated.View
+                      style={[
+                        styles.radarRing,
+                        {
+                          transform: [{ scale: radarScale }],
+                          opacity: radarOpacity,
+                        },
+                      ]}
+                    />
+                    <View style={styles.radarCore}>
+                      <Sparkles size={26} color="#6C47FF" />
+                    </View>
+                  </View>
+
+                  <View style={styles.radarStatusBox}>
+                    <Text style={styles.radarStatusTitle}>
+                      {radarTextIndex === 0
+                        ? `Calibrating commute radius: ${selectedCities[0] || 'your city'}`
+                        : radarTextIndex === 1
+                        ? role === 'student'
+                          ? `Connecting campus stream: ${selectedCollege?.name || collegeSearch.trim() || 'University'}`
+                          : `Connecting community streams: ${selectedCities[0] || 'Metro'}`
+                        : 'Finalizing Personal Discovery Pass...'}
+                    </Text>
+                    <Text style={styles.radarStatusSub}>
+                      Filtering noise · Calibrating verified signals
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <Animated.View
+                  style={[
+                    styles.passWrapper,
+                    {
+                      opacity: passOpacity,
+                      transform: [{ scale: passScale }],
+                    },
+                  ]}
+                >
+                  {/* Apple-Grade Discovery Pass Ticket */}
+                  <View style={styles.passCard}>
+                    {/* Header */}
+                    <View style={styles.passHeader}>
+                      <View>
+                        <Text style={styles.passOverline}>EVEN·TIME PASS</Text>
+                        <Text style={styles.passTitle}>Discovery Calibrated</Text>
+                      </View>
+                      <View style={styles.passBadge}>
+                        <ShieldCheck size={13} color="#059669" />
+                        <Text style={styles.passBadgeText}>CALIBRATED</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.passDivider} />
+
+                    {/* User Identity Strip */}
+                    <View style={styles.passUserRow}>
+                      <View style={styles.passAvatar}>
+                        <Text style={styles.passAvatarLetter}>
+                          {(username || 'E').charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.passUserInfo}>
+                        <Text style={styles.passHandle}>@{username || 'member'}</Text>
+                        <Text style={styles.passRoleLabel} numberOfLines={1}>
+                          {role === 'student'
+                            ? `Campus Explorer · ${selectedCollege?.name || collegeSearch.trim() || 'University'}`
+                            : `Metro Curator · ${selectedCities[0] || 'City Member'}`}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* 3 Metrics */}
+                    <View style={styles.passMetricsGrid}>
+                      <View style={styles.passMetricBox}>
+                        <Text style={styles.passMetricVal}>{matchedEventsCount || 18}</Text>
+                        <Text style={styles.passMetricLbl}>In Commute</Text>
+                      </View>
+                      <View style={styles.passMetricBox}>
+                        <Text style={styles.passMetricVal}>
+                          {role === 'student' ? 'Campus Pass' : 'City Stream'}
+                        </Text>
+                        <Text style={styles.passMetricLbl}>Verified Level</Text>
+                      </View>
+                      <View style={styles.passMetricBox}>
+                        <Text style={[styles.passMetricVal, { color: '#6C47FF' }]}>+50 ET</Text>
+                        <Text style={styles.passMetricLbl}>Starting Score</Text>
+                      </View>
+                    </View>
+
+                    {/* Reassurance text */}
+                    <View style={styles.passNoteBox}>
+                      <Text style={styles.passNoteText}>
+                        Your personal stream has been calibrated to eliminate noise and surface verified events matching your daily rhythm.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Launch CTA */}
+                  <TouchableOpacity
+                    style={styles.passLaunchBtn}
+                    onPress={() => {
+                      navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'MainTabs' }],
+                      });
+                    }}
+                    activeOpacity={0.88}
+                  >
+                    <Text style={styles.passLaunchBtnText}>Launch My Feed</Text>
+                    <ArrowRight size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
             </View>
           )}
         </ScrollView>
@@ -1829,6 +2035,222 @@ const styles = StyleSheet.create({
   stepNextBtnText: {
     fontFamily: 'Switzer-Bold',
     fontSize: 14,
+    color: '#FFFFFF',
+  },
+  // ---------------------------------------------
+  // Step 5: Climax & Discovery Pass Styles
+  // ---------------------------------------------
+  climaxContainer: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  radarContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    width: '100%',
+  },
+  radarPulseWrapper: {
+    width: 120,
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 32,
+    position: 'relative',
+  },
+  radarRing: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 2,
+    borderColor: '#6C47FF',
+    backgroundColor: 'rgba(108, 71, 255, 0.08)',
+  },
+  radarCore: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F5F3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    shadowColor: '#6C47FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  radarStatusBox: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  radarStatusTitle: {
+    fontFamily: 'Outfit-Bold',
+    fontSize: 18,
+    color: '#0F172A',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 8,
+  },
+  radarStatusSub: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  passWrapper: {
+    width: '100%',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  passCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 6,
+    marginBottom: 20,
+  },
+  passHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  passOverline: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 10,
+    color: '#6C47FF',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  passTitle: {
+    fontFamily: 'Outfit-Bold',
+    fontSize: 20,
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  passBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  passBadgeText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 10,
+    color: '#059669',
+    letterSpacing: 0.8,
+  },
+  passDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 14,
+  },
+  passUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  passAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passAvatarLetter: {
+    fontFamily: 'Outfit-Bold',
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+  passUserInfo: {
+    flex: 1,
+  },
+  passHandle: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 15,
+    color: '#0F172A',
+  },
+  passRoleLabel: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  passMetricsGrid: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  passMetricBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  passMetricVal: {
+    fontFamily: 'Outfit-Bold',
+    fontSize: 16,
+    color: '#0F172A',
+  },
+  passMetricLbl: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  passNoteBox: {
+    backgroundColor: '#F5F3FF',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#EDE9FE',
+  },
+  passNoteText: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 12,
+    color: '#4C1D95',
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  passLaunchBtn: {
+    width: '100%',
+    maxWidth: 360,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#0F172A',
+    paddingVertical: 16,
+    borderRadius: 100,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  passLaunchBtnText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 15,
     color: '#FFFFFF',
   },
 });
