@@ -66,6 +66,39 @@ export default function SettingsScreen() {
   const [goals, setGoals] = useState<string[]>(profile?.goals || []);
   const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
   const [isSaving, setIsSaving] = useState(false);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+  const [cityCounts, setCityCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('category, city')
+          .eq('status', 'approved');
+
+        if (!error && data) {
+          const catMap: Record<string, number> = {};
+          const cityMap: Record<string, number> = {};
+          data.forEach((ev) => {
+            if (ev.category) {
+              const cat = ev.category.trim();
+              catMap[cat] = (catMap[cat] || 0) + 1;
+            }
+            if (ev.city) {
+              const cTrim = ev.city.trim();
+              const matchedCity = CITIES.find((c) => c.toLowerCase() === cTrim.toLowerCase()) || cTrim;
+              cityMap[matchedCity] = (cityMap[matchedCity] || 0) + 1;
+            }
+          });
+          setCategoryCounts(catMap);
+          setCityCounts(cityMap);
+        }
+      } catch (err) {
+        console.warn('[SettingsScreen] Event counts load error:', err);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     getNotificationPreferences(user?.id).then(setNotifPrefs);
@@ -504,32 +537,41 @@ export default function SettingsScreen() {
 
         {/* Preferred Cities */}
         <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Preferred Cities</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {isAdmin && (
+          <View style={styles.sectionHeaderContainer}>
+            <View style={styles.sectionHeaderTop}>
+              <Text style={styles.sectionTitle}>Preferred Cities</Text>
+              <View style={styles.limitBadge}>
+                <Text style={styles.limitBadgeText}>
+                  {preferredCities.length} {isAdmin ? 'Unlocked' : '/ 3 Max'}
+                </Text>
+              </View>
+            </View>
+            {isAdmin && (
+              <View style={styles.adminControlsRow}>
+                <Text style={styles.adminNoticeText}>Admin Access: All 32 Cities Unlocked</Text>
                 <TouchableOpacity onPress={selectAllCities} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Text style={styles.adminSelectAllText}>
                     {preferredCities.length === CITIES.length ? 'Deselect All' : 'Select All'}
                   </Text>
                 </TouchableOpacity>
-              )}
-              <Text style={styles.limitBadge}>
-                {preferredCities.length} {isAdmin ? '(Unlimited)' : '/ 3 Max'}
-              </Text>
-            </View>
+              </View>
+            )}
           </View>
 
           <View style={styles.chipGrid}>
             {CITIES.map((c) => {
               const isSelected = preferredCities.includes(c);
+              const count = cityCounts[c] || 0;
               return (
                 <TouchableOpacity
                   key={c}
                   style={[styles.chip, isSelected && styles.chipActive]}
                   onPress={() => toggleCity(c)}
                 >
-                  <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>{c}</Text>
+                  <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
+                    {c}
+                    {count > 0 ? ` (${count})` : ''}
+                  </Text>
                   {isSelected && <CheckCircle2 size={13} color="#FFF" style={{ marginLeft: 4 }} />}
                 </TouchableOpacity>
               );
@@ -539,26 +581,32 @@ export default function SettingsScreen() {
 
         {/* Category Interests */}
         <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Category Interests</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {isAdmin && (
+          <View style={styles.sectionHeaderContainer}>
+            <View style={styles.sectionHeaderTop}>
+              <Text style={styles.sectionTitle}>Category Interests</Text>
+              <View style={styles.limitBadge}>
+                <Text style={styles.limitBadgeText}>
+                  {goals.length} {isAdmin ? 'Unlocked' : '/ 6 Max'}
+                </Text>
+              </View>
+            </View>
+            {isAdmin && (
+              <View style={styles.adminControlsRow}>
+                <Text style={styles.adminNoticeText}>Admin Access: All 36 Categories Unlocked</Text>
                 <TouchableOpacity onPress={selectAllCategories} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Text style={styles.adminSelectAllText}>
                     {goals.length === CATEGORIES_LIST.length ? 'Deselect All' : 'Select All'}
                   </Text>
                 </TouchableOpacity>
-              )}
-              <Text style={styles.limitBadge}>
-                {goals.length} {isAdmin ? '(Unlimited)' : '/ 6 Max'}
-              </Text>
-            </View>
+              </View>
+            )}
           </View>
 
           <View style={styles.chipGrid}>
             {CATEGORIES_LIST.map((cat) => {
               const isSelected = goals.includes(cat);
               const meta = getCategoryMeta(cat);
+              const count = categoryCounts[cat] || 0;
               return (
                 <TouchableOpacity
                   key={cat}
@@ -568,7 +616,10 @@ export default function SettingsScreen() {
                   ]}
                   onPress={() => toggleCategory(cat)}
                 >
-                  <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>{cat}</Text>
+                  <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
+                    {cat}
+                    {count > 0 ? ` (${count})` : ''}
+                  </Text>
                   {isSelected && <CheckCircle2 size={13} color="#FFF" style={{ marginLeft: 4 }} />}
                 </TouchableOpacity>
               );
@@ -770,6 +821,31 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.lg,
     ...theme.shadows.sm,
   },
+  sectionHeaderContainer: {
+    marginBottom: 12,
+  },
+  sectionHeaderTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  adminControlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.borderLight,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  adminNoticeText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 11,
+    color: theme.colors.brand,
+  },
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -780,7 +856,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit-Bold',
     fontSize: 16,
     color: theme.colors.textPrimary,
-    marginBottom: 12,
+    flexShrink: 1,
   },
   missingBanner: {
     backgroundColor: '#FEF3C7',
@@ -809,13 +885,16 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   limitBadge: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 12,
-    color: theme.colors.brand,
     backgroundColor: theme.colors.brandLight,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: theme.borderRadius.sm,
+    flexShrink: 0,
+  },
+  limitBadgeText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 12,
+    color: theme.colors.brand,
   },
   adminSelectAllText: {
     fontFamily: 'Switzer-Bold',

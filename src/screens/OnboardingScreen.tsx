@@ -74,6 +74,17 @@ const POPULAR_CATEGORIES = [
 
 const GRAD_YEARS = ['2024', '2025', '2026', '2027', '2028', '2029', '2030'];
 
+const POPULAR_BRANCHES = [
+  'CSE',
+  'IT',
+  'AI & ML',
+  'Data Science',
+  'ECE',
+  'Mechanical',
+  'Civil',
+  'Electrical',
+] as const;
+
 // Tour slides data (Pure Apple-level UX writing, no AI badges)
 const TOUR_SLIDES = [
   {
@@ -114,6 +125,7 @@ export default function OnboardingScreen() {
   const {
     user,
     profile,
+    isAdmin,
     isOnboarded,
     isLoading: isAuthLoading,
     refreshProfile,
@@ -151,9 +163,19 @@ export default function OnboardingScreen() {
   const [isSearchingColleges, setIsSearchingColleges] = useState(false);
   const [gradYear, setGradYear] = useState('');
   const [branch, setBranch] = useState('');
+  const [branchSearch, setBranchSearch] = useState('');
+  const [branchesList, setBranchesList] = useState<string[]>([]);
 
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [showAllCities, setShowAllCities] = useState(false);
+  const [cityFilterQuery, setCityFilterQuery] = useState('');
+
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const [categoryFilterQuery, setCategoryFilterQuery] = useState('');
+
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+  const [cityCounts, setCityCounts] = useState<Record<string, number>>({});
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // 1. Cross-Platform Parity: If user logs in and already has completed onboarding on website
@@ -205,6 +227,38 @@ export default function OnboardingScreen() {
 
     return () => clearTimeout(timer);
   }, [collegeSearch, role, currentSlide, profileSubStep]);
+
+  // Load live active event counts for categories and cities
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('category, city')
+          .eq('status', 'approved');
+
+        if (!error && data) {
+          const catMap: Record<string, number> = {};
+          const cityMap: Record<string, number> = {};
+          data.forEach((ev) => {
+            if (ev.category) {
+              const cat = ev.category.trim();
+              catMap[cat] = (catMap[cat] || 0) + 1;
+            }
+            if (ev.city) {
+              const cTrim = ev.city.trim();
+              const matchedCity = CITIES.find((c) => c.toLowerCase() === cTrim.toLowerCase()) || cTrim;
+              cityMap[matchedCity] = (cityMap[matchedCity] || 0) + 1;
+            }
+          });
+          setCategoryCounts(catMap);
+          setCityCounts(cityMap);
+        }
+      } catch (err) {
+        console.warn('[OnboardingScreen] Event counts load error:', err);
+      }
+    })();
+  }, []);
 
   // 1:1 image size calculation
   const imageSize = Math.min(width - 64, 280);
@@ -346,7 +400,7 @@ export default function OnboardingScreen() {
         graduation_year: role === 'student' ? gradYear || null : null,
         branch: role === 'student' ? branch || null : null,
         preferred_cities: selectedCities,
-        goals: selectedGoals.slice(0, 6),
+        goals: selectedGoals.slice(0, isAdmin ? undefined : 6),
         is_onboarded: true,
       };
 
@@ -378,24 +432,79 @@ export default function OnboardingScreen() {
     }
   };
 
+  // Branch search & autocomplete handlers
+  const handleBranchSearchChange = (text: string) => {
+    setBranchSearch(text);
+    setBranch(text);
+    const q = text.trim().toLowerCase();
+    if (!q) {
+      setBranchesList([]);
+      return;
+    }
+    const matches = INDIAN_COLLEGE_BRANCHES.filter((b) =>
+      b.toLowerCase().includes(q)
+    ).slice(0, 8);
+    setBranchesList(matches);
+  };
+
+  const handleSelectBranch = (b: string) => {
+    setBranch(b);
+    setBranchSearch(b);
+    setBranchesList([]);
+  };
+
+  const handleClearBranch = () => {
+    setBranch('');
+    setBranchSearch('');
+    setBranchesList([]);
+  };
+
+  // Filtered Cities list for step 3
+  const filteredCities = useMemo(() => {
+    if (!showAllCities) {
+      return POPULAR_CITIES;
+    }
+    if (!cityFilterQuery.trim()) {
+      return CITIES;
+    }
+    const q = cityFilterQuery.trim().toLowerCase();
+    return CITIES.filter((c) => c.toLowerCase().includes(q));
+  }, [showAllCities, cityFilterQuery]);
+
+  // Filtered Categories list for step 4
+  const filteredCategories = useMemo(() => {
+    if (!showAllCategories) {
+      return POPULAR_CATEGORIES;
+    }
+    if (!categoryFilterQuery.trim()) {
+      return CATEGORIES_LIST;
+    }
+    const q = categoryFilterQuery.trim().toLowerCase();
+    return CATEGORIES_LIST.filter((cat) => cat.toLowerCase().includes(q));
+  }, [showAllCategories, categoryFilterQuery]);
+
   // Toggle helpers for multi-select
   const toggleCity = (city: string) => {
     if (selectedCities.includes(city)) {
       setSelectedCities(selectedCities.filter((c) => c !== city));
-    } else if (selectedCities.length < 3) {
-      setSelectedCities([...selectedCities, city]);
     } else {
-      Alert.alert('Limit Reached', 'You can pick up to 3 primary cities.');
+      if (!isAdmin && selectedCities.length >= 3) {
+        Alert.alert('Limit Reached', 'You can pick up to 3 primary cities.');
+        return;
+      }
+      setSelectedCities([...selectedCities, city]);
     }
   };
 
   const toggleGoal = (cat: string) => {
     if (selectedGoals.includes(cat)) {
       setSelectedGoals(selectedGoals.filter((g) => g !== cat));
-    } else if (selectedGoals.length < 6) {
-      setSelectedGoals([...selectedGoals, cat]);
     } else {
-      Alert.alert('Limit Reached', 'You can pick up to 6 interests.');
+      if (!isAdmin && selectedGoals.length >= 6) {
+        Alert.alert('Limit Reached', 'You can pick up to 6 interests.');
+        return;
+      }
+      setSelectedGoals([...selectedGoals, cat]);
     }
   };
 
@@ -698,18 +807,28 @@ export default function OnboardingScreen() {
         >
           {/* Header */}
           <View style={styles.setupHeader}>
-            <Text style={styles.setupStepIndicator}>Step {profileSubStep} of 4</Text>
+            <View style={styles.stepBadgeRow}>
+              <View style={styles.stepBadge}>
+                <Text style={styles.setupStepIndicator}>Step {profileSubStep} of 4</Text>
+              </View>
+              {isAdmin && (
+                <View style={styles.adminBadge}>
+                  <ShieldCheck size={12} color="#6C47FF" />
+                  <Text style={styles.adminBadgeText}>Admin Access</Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.setupTitle}>
               {profileSubStep === 1 && 'Pick Your Username'}
-              {profileSubStep === 2 && 'Tell Us About Yourself'}
-              {profileSubStep === 3 && 'Pick Your Primary Cities'}
-              {profileSubStep === 4 && 'Select Your Interests'}
+              {profileSubStep === 2 && 'Campus & Background'}
+              {profileSubStep === 3 && 'Your Event Hubs'}
+              {profileSubStep === 4 && 'Personalize Your Feed'}
             </Text>
             <Text style={styles.setupSubtitle}>
-              {profileSubStep === 1 && 'Your unique handle on EvenTime. Maximum 12 characters.'}
-              {profileSubStep === 2 && 'Connect your university to unlock exclusive campus fests.'}
-              {profileSubStep === 3 && 'Choose up to 3 cities you want to see events from.'}
-              {profileSubStep === 4 && 'Pick up to 6 categories to personalize your feed.'}
+              {profileSubStep === 1 && 'Your unique handle for sharing, curating, and discovering events across India.'}
+              {profileSubStep === 2 && 'Connect your university to unlock internal campus fests and department hackathons.'}
+              {profileSubStep === 3 && 'Choose cities you want to track. We will curate meetups and fests in your area.'}
+              {profileSubStep === 4 && 'Pick categories you care about to train your personal recommendation feed.'}
             </Text>
           </View>
 
@@ -834,19 +953,58 @@ export default function OnboardingScreen() {
                     ))}
                   </ScrollView>
 
-                  {/* Branch */}
+                  {/* Branch / Stream with Live Search & Autocomplete */}
                   <Text style={[styles.inputLabel, { marginTop: 16 }]}>Branch / Stream</Text>
+                  <View style={styles.searchBox}>
+                    <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Search 170+ branches (CSE, Biotech, Civil...)"
+                      placeholderTextColor="#94A3B8"
+                      value={branchSearch || branch}
+                      onChangeText={handleBranchSearchChange}
+                    />
+                    {Boolean(branchSearch || branch) && (
+                      <TouchableOpacity onPress={handleClearBranch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <X size={16} color="#94A3B8" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Branch suggestions dropdown */}
+                  {branchesList.length > 0 && (
+                    <View style={styles.suggestionsBox}>
+                      {branchesList.map((b) => (
+                        <TouchableOpacity
+                          key={b}
+                          style={styles.suggestionItem}
+                          onPress={() => handleSelectBranch(b)}
+                        >
+                          <Text style={styles.suggestionText}>{b}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Popular Branch Chips */}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                    {INDIAN_COLLEGE_BRANCHES.slice(0, 10).map((b) => (
+                    {POPULAR_BRANCHES.map((b) => (
                       <TouchableOpacity
                         key={b}
                         style={[styles.chip, branch === b && styles.chipActive]}
-                        onPress={() => setBranch(b)}
+                        onPress={() => handleSelectBranch(b)}
                       >
                         <Text style={[styles.chipText, branch === b && styles.chipTextActive]}>{b}</Text>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
+
+                  {Boolean(branch) && (
+                    <View style={styles.selectedBranchBadge}>
+                      <Check size={13} color="#059669" />
+                      <Text style={styles.selectedBranchText}>Selected: {branch}</Text>
+                    </View>
+                  )}
                 </View>
               ) : null}
 
@@ -864,7 +1022,7 @@ export default function OnboardingScreen() {
                   onPress={() => setProfileSubStep(3)}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.tourPrimaryBtnText}>Next: Cities</Text>
+                  <Text style={styles.stepNextBtnText}>Next: Cities</Text>
                   <ArrowRight size={18} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
@@ -874,13 +1032,47 @@ export default function OnboardingScreen() {
           {/* SUB-STEP 3: Cities Selection */}
           {profileSubStep === 3 && (
             <View style={styles.setupCard}>
-              <Text style={styles.selectionCounter}>
-                {selectedCities.length} of 3 cities selected
-              </Text>
+              <View style={styles.selectionHeaderRow}>
+                <Text style={styles.selectionCounter}>
+                  {selectedCities.length} {isAdmin ? 'Selected (Unlimited)' : 'of 3 cities selected'}
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.toggleAllBtn}
+                  onPress={() => {
+                    setShowAllCities((prev) => !prev);
+                    setCityFilterQuery('');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.toggleAllBtnText}>
+                    {showAllCities ? 'Show Top Cities ▴' : 'Show All (32 Cities) ▾'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {showAllCities && (
+                <View style={[styles.searchBox, { marginBottom: 12 }]}>
+                  <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search 32 cities across India..."
+                    placeholderTextColor="#94A3B8"
+                    value={cityFilterQuery}
+                    onChangeText={setCityFilterQuery}
+                  />
+                  {Boolean(cityFilterQuery) && (
+                    <TouchableOpacity onPress={() => setCityFilterQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <X size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
 
               <View style={styles.selectionGrid}>
-                {POPULAR_CITIES.map((c) => {
+                {filteredCities.map((c) => {
                   const isSelected = selectedCities.includes(c);
+                  const count = cityCounts[c] || 0;
                   return (
                     <TouchableOpacity
                       key={c}
@@ -890,6 +1082,7 @@ export default function OnboardingScreen() {
                     >
                       <Text style={[styles.gridChipText, isSelected && styles.gridChipTextActive]}>
                         {c}
+                        {count > 0 ? ` (${count})` : ''}
                       </Text>
                       {isSelected && <Check size={14} color="#6C47FF" style={{ marginLeft: 6 }} />}
                     </TouchableOpacity>
@@ -908,10 +1101,16 @@ export default function OnboardingScreen() {
 
                 <TouchableOpacity
                   style={styles.stepNextBtn}
-                  onPress={() => setProfileSubStep(4)}
+                  onPress={() => {
+                    if (selectedCities.length === 0) {
+                      Alert.alert('Selection Required', 'Please select at least 1 city to discover local events.');
+                      return;
+                    }
+                    setProfileSubStep(4);
+                  }}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.tourPrimaryBtnText}>Next: Interests</Text>
+                  <Text style={styles.stepNextBtnText}>Next: Interests</Text>
                   <ArrowRight size={18} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
@@ -921,13 +1120,47 @@ export default function OnboardingScreen() {
           {/* SUB-STEP 4: Interests & Goals */}
           {profileSubStep === 4 && (
             <View style={styles.setupCard}>
-              <Text style={styles.selectionCounter}>
-                {selectedGoals.length} of 6 interests selected
-              </Text>
+              <View style={styles.selectionHeaderRow}>
+                <Text style={styles.selectionCounter}>
+                  {selectedGoals.length} {isAdmin ? 'Selected (Unlimited)' : 'of 6 interests selected'}
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.toggleAllBtn}
+                  onPress={() => {
+                    setShowAllCategories((prev) => !prev);
+                    setCategoryFilterQuery('');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.toggleAllBtnText}>
+                    {showAllCategories ? 'Show Top Categories ▴' : 'Show All (36 Categories) ▾'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {showAllCategories && (
+                <View style={[styles.searchBox, { marginBottom: 12 }]}>
+                  <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search 36 categories..."
+                    placeholderTextColor="#94A3B8"
+                    value={categoryFilterQuery}
+                    onChangeText={setCategoryFilterQuery}
+                  />
+                  {Boolean(categoryFilterQuery) && (
+                    <TouchableOpacity onPress={() => setCategoryFilterQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <X size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
 
               <View style={styles.selectionGrid}>
-                {POPULAR_CATEGORIES.map((cat) => {
+                {filteredCategories.map((cat) => {
                   const isSelected = selectedGoals.includes(cat);
+                  const count = categoryCounts[cat] || 0;
                   return (
                     <TouchableOpacity
                       key={cat}
@@ -937,6 +1170,7 @@ export default function OnboardingScreen() {
                     >
                       <Text style={[styles.gridChipText, isSelected && styles.gridChipTextActive]}>
                         {cat}
+                        {count > 0 ? ` (${count})` : ''}
                       </Text>
                       {isSelected && <Check size={14} color="#6C47FF" style={{ marginLeft: 6 }} />}
                     </TouchableOpacity>
@@ -955,7 +1189,13 @@ export default function OnboardingScreen() {
 
                 <TouchableOpacity
                   style={[styles.stepNextBtn, { backgroundColor: '#6C47FF' }]}
-                  onPress={handleSaveProfile}
+                  onPress={() => {
+                    if (selectedGoals.length === 0) {
+                      Alert.alert('Selection Required', 'Please select at least 1 category to personalize your feed.');
+                      return;
+                    }
+                    handleSaveProfile();
+                  }}
                   disabled={isSavingProfile}
                   activeOpacity={0.85}
                 >
@@ -963,8 +1203,11 @@ export default function OnboardingScreen() {
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
                     <>
-                      <Text style={styles.tourPrimaryBtnText}>Finish & Claim +50 ET</Text>
                       <Sparkles size={16} color="#FFFFFF" />
+                      <Text style={styles.stepNextBtnText}>Complete Profile</Text>
+                      <View style={styles.claimEtBadge}>
+                        <Text style={styles.claimEtBadgeText}>+50 ET</Text>
+                      </View>
                     </>
                   )}
                 </TouchableOpacity>
@@ -1302,13 +1545,40 @@ const styles = StyleSheet.create({
   setupHeader: {
     marginBottom: 24,
   },
+  stepBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  stepBadge: {
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 100,
+  },
   setupStepIndicator: {
     fontFamily: 'Switzer-Bold',
-    fontSize: 12,
+    fontSize: 11,
     color: '#6C47FF',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
-    marginBottom: 6,
+  },
+  adminBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  adminBadgeText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 11,
+    color: '#059669',
   },
   setupTitle: {
     fontFamily: 'Outfit-Bold',
@@ -1448,11 +1718,58 @@ const styles = StyleSheet.create({
   chipTextActive: {
     color: '#FFFFFF',
   },
+  selectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   selectionCounter: {
     fontFamily: 'Switzer-Bold',
     fontSize: 12,
     color: '#6C47FF',
-    marginBottom: 12,
+  },
+  toggleAllBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 100,
+  },
+  toggleAllBtnText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 11,
+    color: '#6C47FF',
+  },
+  selectedBranchBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  selectedBranchText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 12,
+    color: '#059669',
+  },
+  claimEtBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
+    marginLeft: 4,
+  },
+  claimEtBadgeText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 11,
+    color: '#FFFFFF',
   },
   selectionGrid: {
     flexDirection: 'row',
@@ -1485,7 +1802,6 @@ const styles = StyleSheet.create({
   stepButtonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 12,
     marginTop: 24,
   },
@@ -1501,17 +1817,18 @@ const styles = StyleSheet.create({
   },
   stepNextBtn: {
     flex: 1,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    backgroundColor: '#0F172A',
-    paddingVertical: 14,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
     borderRadius: 100,
+    backgroundColor: '#0F172A',
+    gap: 8,
   },
   stepNextBtnText: {
     fontFamily: 'Switzer-Bold',
-    fontSize: 15,
+    fontSize: 14,
     color: '#FFFFFF',
   },
 });
