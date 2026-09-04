@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   ScrollView,
   Dimensions,
   Platform,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -26,7 +27,6 @@ import {
   X,
   Clock,
   Sparkles,
-  GraduationCap,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -105,8 +105,44 @@ export default function HomeScreen() {
     (guestPrefs?.goals && guestPrefs.goals.length > 0)
   );
 
-  // Active Feed Pill: 'for_you' | 'around_you' | 'campus'
-  const [activeFeedPill, setActiveFeedPill] = useState<'for_you' | 'around_you' | 'campus'>('for_you');
+  const pagerRef = useRef<ScrollView>(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const [activeTabIdx, setActiveTabIdx] = useState(0);
+
+  const tabs = useMemo(() => {
+    return isStudent
+      ? [
+          { key: 'for_you' as const, label: 'For You' },
+          { key: 'around_you' as const, label: 'Around You' },
+          { key: 'campus' as const, label: 'Your Campus' },
+        ]
+      : [
+          { key: 'for_you' as const, label: 'For You' },
+          { key: 'around_you' as const, label: 'Around You' },
+        ];
+  }, [isStudent]);
+
+  const trackWidth = width - 32;
+  const tabWidth = (trackWidth - 6) / tabs.length;
+
+  const translateX = scrollX.interpolate({
+    inputRange: tabs.map((_, i) => i * width),
+    outputRange: tabs.map((_, i) => i * tabWidth),
+    extrapolate: 'clamp',
+  });
+
+  const handleSelectTab = (idx: number) => {
+    setActiveTabIdx(idx);
+    pagerRef.current?.scrollTo({ x: idx * width, animated: true });
+  };
+
+  const onMomentumScrollEnd = (e: any) => {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const newIdx = Math.round(offsetX / width);
+    if (newIdx >= 0 && newIdx < tabs.length && newIdx !== activeTabIdx) {
+      setActiveTabIdx(newIdx);
+    }
+  };
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
@@ -321,21 +357,13 @@ export default function HomeScreen() {
     fetchPlatformStats();
   };
 
-  // Filtered Events based on Active Tab, Preferred Cities/Goals, and Calendar Date
-  const displayedEvents = useMemo(() => {
+  // 1. Base date-filtered pool
+  const basePool = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let source = events;
-
-    // 1. Campus Feed
-    if (activeFeedPill === 'campus') {
-      source = campusEvents;
-    }
-
-    // 2. Specific Date Selected (Calendar Filter)
     if (selectedDate) {
-      return source.filter((ev) => {
+      return events.filter((ev) => {
         const parsed = parseEventDateString(ev.date_string || '');
         if (!parsed) return false;
         const y = parsed.getFullYear();
@@ -345,73 +373,108 @@ export default function HomeScreen() {
       });
     }
 
-    // 3. Default Feed: Strictly Today & Upcoming Events Only (No past events on home feed)
-    let pool = source.filter((ev) => {
+    return events.filter((ev) => {
       const parsed = parseEventDateString(ev.date_string || '');
       if (!parsed) return true;
       const evDate = new Date(parsed);
       evDate.setHours(0, 0, 0, 0);
       return evDate.getTime() >= today.getTime();
     });
+  }, [events, selectedDate]);
 
-    // 4. Personalized Tab Filters
-    const preferredCities: string[] = profile?.preferred_cities?.length
+  const preferredCities: string[] = useMemo(() => {
+    return profile?.preferred_cities?.length
       ? profile.preferred_cities
       : (guestPrefs?.preferredCities || []);
-    const preferredGoals: string[] = profile?.goals?.length
+  }, [profile?.preferred_cities, guestPrefs?.preferredCities]);
+
+  const preferredGoals: string[] = useMemo(() => {
+    return profile?.goals?.length
       ? profile.goals
       : (guestPrefs?.goals || []);
+  }, [profile?.goals, guestPrefs?.goals]);
 
-    if (activeFeedPill === 'for_you') {
-      // Both city AND category must be set; events must strictly match both
-      if (preferredCities.length === 0 || preferredGoals.length === 0) {
-        return [];
-      }
-
-      const goalSet = new Set(preferredGoals.map((g) => g.toLowerCase().trim()));
-      const citySet = new Set(preferredCities.map((c) => c.toLowerCase().trim()));
-
-      pool = pool.filter((e) => {
-        const matchesCity =
-          Boolean(e.is_virtual) ||
-          (e.city ? citySet.has(e.city.toLowerCase().trim()) : false);
-        const matchesCategory =
-          e.category ? goalSet.has(e.category.toLowerCase().trim()) : false;
-        return matchesCity && matchesCategory;
-      });
-    } else if (activeFeedPill === 'around_you') {
-      // Must match preferred city, but EXCLUDES events already displayed in "For You"
-      if (preferredCities.length === 0) {
-        return [];
-      }
-
-      const citySet = new Set(preferredCities.map((c) => c.toLowerCase().trim()));
-      const goalSet = new Set(preferredGoals.map((g) => g.toLowerCase().trim()));
-
-      pool = pool.filter((e) => {
-        const matchesCity =
-          Boolean(e.is_virtual) ||
-          (e.city ? citySet.has(e.city.toLowerCase().trim()) : false);
-        if (!matchesCity) return false;
-
-        // If event matches the user's category interests, it is in "For You", so exclude from "Around You"
-        if (goalSet.size > 0 && e.category && goalSet.has(e.category.toLowerCase().trim())) {
-          return false;
-        }
-
-        return true;
-      });
+  // Tab 0: For You Events
+  const forYouEvents = useMemo(() => {
+    if (preferredCities.length === 0 || preferredGoals.length === 0) {
+      return [];
     }
+    const goalSet = new Set(preferredGoals.map((g) => g.toLowerCase().trim()));
+    const citySet = new Set(preferredCities.map((c) => c.toLowerCase().trim()));
 
-    // 5. Sort upcoming chronologically (soonest first)
-    pool.sort((a, b) => {
+    const filtered = basePool.filter((e) => {
+      const matchesCity =
+        Boolean(e.is_virtual) ||
+        (e.city ? citySet.has(e.city.toLowerCase().trim()) : false);
+      const matchesCategory =
+        e.category ? goalSet.has(e.category.toLowerCase().trim()) : false;
+      return matchesCity && matchesCategory;
+    });
+
+    return filtered.sort((a, b) => {
       const da = parseEventDateString(a.date_string)?.getTime() || 0;
       const db = parseEventDateString(b.date_string)?.getTime() || 0;
       return da - db;
     });
+  }, [basePool, preferredCities, preferredGoals]);
 
-    return pool;
-  }, [events, campusEvents, selectedDate, activeFeedPill, profile, guestPrefs]);
+  // Tab 1: Around You Events
+  const aroundYouEvents = useMemo(() => {
+    if (preferredCities.length === 0) {
+      return [];
+    }
+    const citySet = new Set(preferredCities.map((c) => c.toLowerCase().trim()));
+    const goalSet = new Set(preferredGoals.map((g) => g.toLowerCase().trim()));
+
+    const filtered = basePool.filter((e) => {
+      const matchesCity =
+        Boolean(e.is_virtual) ||
+        (e.city ? citySet.has(e.city.toLowerCase().trim()) : false);
+      if (!matchesCity) return false;
+      if (goalSet.size > 0 && e.category && goalSet.has(e.category.toLowerCase().trim())) {
+        return false;
+      }
+      return true;
+    });
+
+    return filtered.sort((a, b) => {
+      const da = parseEventDateString(a.date_string)?.getTime() || 0;
+      const db = parseEventDateString(b.date_string)?.getTime() || 0;
+      return da - db;
+    });
+  }, [basePool, preferredCities, preferredGoals]);
+
+  // Tab 2: Campus Feed Events (Students only)
+  const campusFeedEvents = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let list = campusEvents;
+    if (selectedDate) {
+      list = list.filter((ev) => {
+        const parsed = parseEventDateString(ev.date_string || '');
+        if (!parsed) return false;
+        const y = parsed.getFullYear();
+        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+        const d = String(parsed.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}` === selectedDate;
+      });
+    } else {
+      list = list.filter((ev) => {
+        const parsed = parseEventDateString(ev.date_string || '');
+        if (!parsed) return true;
+        const evDate = new Date(parsed);
+        evDate.setHours(0, 0, 0, 0);
+        return evDate.getTime() >= today.getTime();
+      });
+    }
+
+    return list.sort((a, b) => {
+      const da = parseEventDateString(a.date_string)?.getTime() || 0;
+      const db = parseEventDateString(b.date_string)?.getTime() || 0;
+      return da - db;
+    });
+  }, [campusEvents, selectedDate]);
 
   // Calendar calculations
   const calendarDays = useMemo(() => {
@@ -469,266 +532,375 @@ export default function HomeScreen() {
     setShowDateModal(false);
   };
 
-  const showPersonalizedPills = Boolean(user && profile?.is_onboarded && (hasGoals || isStudent));
-
-  const renderHeader = () => (
-    <View style={styles.headerContainer}>
-      {/* Top Bar with Brand Logo and Action Icons */}
-      <View style={styles.topBar}>
-        <View style={styles.brandRow}>
-          <Image
-            source={APP_ASSETS.logo}
-            style={styles.brandLogo}
-            contentFit="contain"
-          />
-          <Text style={styles.brandNameText}>EvenTime</Text>
-        </View>
-
-        <View style={styles.topActions}>
-          {/* Top Calendar Date Button */}
-          <TouchableOpacity
-            style={[styles.topCalendarBtn, Boolean(selectedDate) && styles.topCalendarBtnActive]}
-            onPress={() => setShowDateModal(true)}
-            activeOpacity={0.8}
-          >
-            <CalendarDays size={15} color={selectedDate ? '#6C47FF' : '#475569'} />
-            <Text style={[styles.topCalendarBtnText, Boolean(selectedDate) && styles.topCalendarBtnTextActive]}>
-              {selectedDate
-                ? new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
-                : new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Leaderboard Trophy Icon */}
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => navigation.navigate('Leaderboard')}
-            activeOpacity={0.8}
-          >
-            <Trophy size={18} color="#D97706" />
-          </TouchableOpacity>
-        </View>
+  const renderEventItem = useCallback(
+    ({ item }: { item: EventRow }) => (
+      <View style={styles.cardContainer}>
+        <EventCard
+          event={item}
+          id={item.id}
+          slug={item.slug || item.id}
+          title={item.title}
+          category={item.category || 'General'}
+          dateString={item.date_string || ''}
+          startTime={item.start_time || undefined}
+          location={item.location || ''}
+          city={item.city || ''}
+          organizerName={(item as any).profiles?.full_name || item.organizer_name || 'Organizer'}
+          organizerUsername={(item as any).profiles?.username || undefined}
+          isFree={item.is_free ?? true}
+          isFeatured={item.is_featured ?? false}
+          posterUrl={item.poster_url || undefined}
+          interestedCount={(item as any).interested_events?.[0]?.count ?? item.interested_count ?? 0}
+          isSaved={savedEventIds.has(item.id)}
+          onSaveToggle={(id, isSaved) => {
+            setSavedEventIds((prev) => {
+              const next = new Set(prev);
+              if (isSaved) next.add(id);
+              else next.delete(id);
+              return next;
+            });
+          }}
+        />
       </View>
-
-      {/* Dynamic Time-of-Day Greeting for Everyone */}
-      <View style={styles.greetingContainer}>
-        <Text style={styles.greetingText} numberOfLines={1} ellipsizeMode="tail">
-          {getTimeOfDayGreeting(profile?.username?.trim().slice(0, 12) || profile?.full_name?.split(' ')[0]?.trim().slice(0, 12) || (user ? undefined : 'explorer'))}
-        </Text>
-      </View>
-
-      {/* Live Stats Bar (Matching Website Parity) */}
-      <View style={styles.statsBar}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{platformStats.event_count || events.length || 0}</Text>
-          <Text style={styles.statLabel}>EVENTS</Text>
-        </View>
-        <View style={styles.statDivider} />
-
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{platformStats.city_count || 12}</Text>
-          <Text style={styles.statLabel}>CITIES</Text>
-        </View>
-        <View style={styles.statDivider} />
-
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{platformStats.category_count || 36}</Text>
-          <Text style={styles.statLabel}>CATEGORIES</Text>
-        </View>
-        <View style={styles.statDivider} />
-
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{platformStats.user_count || 50}</Text>
-          <Text style={styles.statLabel}>USERS</Text>
-        </View>
-      </View>
-
-      {/* Segment Feed Pills (For You | Around You | Your Campus for students) */}
-      <View style={styles.filterBar}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScrollContent}
-        >
-          <TouchableOpacity
-            style={[styles.feedPill, activeFeedPill === 'for_you' && !selectedDate && styles.feedPillActive]}
-            onPress={() => {
-              setActiveFeedPill('for_you');
-              setSelectedDate(null);
-            }}
-          >
-            <Text style={[styles.feedPillText, activeFeedPill === 'for_you' && !selectedDate && styles.feedPillTextActive]}>
-              For You
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.feedPill, activeFeedPill === 'around_you' && !selectedDate && styles.feedPillActive]}
-            onPress={() => {
-              setActiveFeedPill('around_you');
-              setSelectedDate(null);
-            }}
-          >
-            <Text style={[styles.feedPillText, activeFeedPill === 'around_you' && !selectedDate && styles.feedPillTextActive]}>
-              Around You
-            </Text>
-          </TouchableOpacity>
-
-          {isStudent && (
-            <TouchableOpacity
-              style={[styles.feedPill, activeFeedPill === 'campus' && !selectedDate && styles.feedPillActive]}
-              onPress={() => {
-                setActiveFeedPill('campus');
-                setSelectedDate(null);
-              }}
-            >
-              <GraduationCap size={14} color={activeFeedPill === 'campus' && !selectedDate ? '#FFF' : '#64748B'} />
-              <Text style={[styles.feedPillText, activeFeedPill === 'campus' && !selectedDate && styles.feedPillTextActive]}>
-                Your Campus
-              </Text>
-            </TouchableOpacity>
-          )}
-        </ScrollView>
-      </View>
-
-      {/* If Calendar Date is selected from top button, show an active date badge */}
-      {selectedDate && (
-        <View style={styles.activeDateBanner}>
-          <Text style={styles.activeDateBannerText}>
-            Showing events for {new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
-          </Text>
-          <TouchableOpacity onPress={() => setSelectedDate(null)} style={styles.clearActiveDateBtn}>
-            <X size={14} color="#EF4444" />
-            <Text style={styles.clearActiveDateBtnText}>Clear</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Section Title */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>
-          {selectedDate
-            ? `Events on ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
-            : activeFeedPill === 'campus'
-            ? 'Your Campus'
-            : activeFeedPill === 'around_you'
-            ? 'Around You'
-            : 'For You'}
-        </Text>
-        <Text style={styles.eventCountText}>{displayedEvents.length} events</Text>
-      </View>
-    </View>
+    ),
+    [savedEventIds]
   );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Stationary Top Header Container */}
+      <View style={styles.headerFixedContainer}>
+        {/* Top Bar with Brand Logo and Action Icons */}
+        <View style={styles.topBar}>
+          <View style={styles.brandRow}>
+            <Image
+              source={APP_ASSETS.logo}
+              style={styles.brandLogo}
+              contentFit="contain"
+            />
+            <Text style={styles.brandNameText}>EvenTime</Text>
+          </View>
+
+          <View style={styles.topActions}>
+            {/* Top Calendar Date Button */}
+            <TouchableOpacity
+              style={[styles.topCalendarBtn, Boolean(selectedDate) && styles.topCalendarBtnActive]}
+              onPress={() => setShowDateModal(true)}
+              activeOpacity={0.8}
+            >
+              <CalendarDays size={15} color={selectedDate ? '#6C47FF' : '#475569'} />
+              <Text style={[styles.topCalendarBtnText, Boolean(selectedDate) && styles.topCalendarBtnTextActive]}>
+                {selectedDate
+                  ? new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
+                  : new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Leaderboard Trophy Icon */}
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => navigation.navigate('Leaderboard')}
+              activeOpacity={0.8}
+            >
+              <Trophy size={18} color="#D97706" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Dynamic Time-of-Day Greeting for Everyone */}
+        <View style={styles.greetingContainer}>
+          <Text style={styles.greetingText} numberOfLines={1} ellipsizeMode="tail">
+            {getTimeOfDayGreeting(profile?.username?.trim().slice(0, 12) || profile?.full_name?.split(' ')[0]?.trim().slice(0, 12) || (user ? undefined : 'explorer'))}
+          </Text>
+        </View>
+
+        {/* Live Stats Bar (Matching Website Parity) */}
+        <View style={styles.statsBar}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{platformStats.event_count || events.length || 0}</Text>
+            <Text style={styles.statLabel}>EVENTS</Text>
+          </View>
+          <View style={styles.statDivider} />
+
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{platformStats.city_count || 12}</Text>
+            <Text style={styles.statLabel}>CITIES</Text>
+          </View>
+          <View style={styles.statDivider} />
+
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{platformStats.category_count || 36}</Text>
+            <Text style={styles.statLabel}>CATEGORIES</Text>
+          </View>
+          <View style={styles.statDivider} />
+
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{platformStats.user_count || 50}</Text>
+            <Text style={styles.statLabel}>USERS</Text>
+          </View>
+        </View>
+
+        {/* Tactile Segmented Track with Elevated Sliding Thumb */}
+        <View style={styles.segmentedTrackContainer}>
+          <View style={styles.segmentedTrack}>
+            <Animated.View
+              style={[
+                styles.slidingThumb,
+                {
+                  width: tabWidth,
+                  transform: [{ translateX }],
+                },
+              ]}
+            />
+            <View style={styles.segmentBtnsRow}>
+              {tabs.map((tab, idx) => {
+                const isActive = activeTabIdx === idx;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    style={[styles.segmentBtn, { width: tabWidth }]}
+                    onPress={() => handleSelectTab(idx)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentBtnText,
+                        isActive && styles.segmentBtnTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
+        {/* If Calendar Date is selected from top button, show an active date badge */}
+        {selectedDate && (
+          <View style={styles.activeDateBanner}>
+            <Text style={styles.activeDateBannerText}>
+              Showing events for {new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+            </Text>
+            <TouchableOpacity onPress={() => setSelectedDate(null)} style={styles.clearActiveDateBtn}>
+              <X size={14} color="#EF4444" />
+              <Text style={styles.clearActiveDateBtnText}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {/* Horizontally Swipeable Feeds Container */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.brand} />
         </View>
       ) : (
-        <FlatList
-          data={displayedEvents}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.cardContainer}>
-              <EventCard
-                event={item}
-                id={item.id}
-                slug={item.slug || item.id}
-                title={item.title}
-                category={item.category || 'General'}
-                dateString={item.date_string || ''}
-                startTime={item.start_time || undefined}
-                location={item.location || ''}
-                city={item.city || ''}
-                organizerName={(item as any).profiles?.full_name || item.organizer_name || 'Organizer'}
-                organizerUsername={(item as any).profiles?.username || undefined}
-                isFree={item.is_free ?? true}
-                isFeatured={item.is_featured ?? false}
-                posterUrl={item.poster_url || undefined}
-                interestedCount={(item as any).interested_events?.[0]?.count ?? item.interested_count ?? 0}
-                isSaved={savedEventIds.has(item.id)}
-                onSaveToggle={(id, isSaved) => {
-                  setSavedEventIds((prev) => {
-                    const next = new Set(prev);
-                    if (isSaved) next.add(id);
-                    else next.delete(id);
-                    return next;
-                  });
-                }}
+        <Animated.ScrollView
+          ref={pagerRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          directionalLockEnabled={true}
+          nestedScrollEnabled={true}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+            { useNativeDriver: true }
+          )}
+          scrollEventThrottle={16}
+          onMomentumScrollEnd={onMomentumScrollEnd}
+          style={{ flex: 1 }}
+        >
+          {/* Page 0: For You Feed */}
+          <View style={styles.pageContainer}>
+            <FlatList
+              data={forYouEvents}
+              keyExtractor={(item) => item.id}
+              renderItem={renderEventItem}
+              ListHeaderComponent={
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>
+                    {selectedDate
+                      ? `Events on ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
+                      : 'For You'}
+                  </Text>
+                  <Text style={styles.eventCountText}>{forYouEvents.length} events</Text>
+                </View>
+              }
+              ListEmptyComponent={
+                <EmptyState
+                  illustration={APP_ASSETS.illustrations.empty}
+                  title={selectedDate ? 'No Events Scheduled' : 'No Matching Events For You'}
+                  message={
+                    selectedDate
+                      ? `There are no events scheduled for ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}. Be the first to host one!`
+                      : 'No upcoming events match both your selected cities and categories. Update your preferences in Profile or explore all events in Around You!'
+                  }
+                  buttonText={selectedDate ? 'Clear Date' : 'Explore Around You'}
+                  onButtonPress={() => {
+                    if (selectedDate) {
+                      setSelectedDate(null);
+                    } else {
+                      handleSelectTab(1);
+                    }
+                  }}
+                />
+              }
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={onRefresh}
+                  colors={[theme.colors.brand]}
+                  tintColor={theme.colors.brand}
+                />
+              }
+              initialNumToRender={6}
+              maxToRenderPerBatch={8}
+              windowSize={5}
+              removeClippedSubviews={Platform.OS === 'android'}
+              updateCellsBatchingPeriod={50}
+              onEndReached={loadMoreEvents}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={
+                isFetchingMore ? (
+                  <View style={{ paddingVertical: 20 }}>
+                    <ActivityIndicator size="small" color={theme.colors.brand} />
+                  </View>
+                ) : null
+              }
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+
+          {/* Page 1: Around You Feed */}
+          <View style={styles.pageContainer}>
+            <FlatList
+              data={aroundYouEvents}
+              keyExtractor={(item) => item.id}
+              renderItem={renderEventItem}
+              ListHeaderComponent={
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>
+                    {selectedDate
+                      ? `Events on ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
+                      : 'Around You'}
+                  </Text>
+                  <Text style={styles.eventCountText}>{aroundYouEvents.length} events</Text>
+                </View>
+              }
+              ListEmptyComponent={
+                <EmptyState
+                  illustration={APP_ASSETS.illustrations.empty}
+                  title={selectedDate ? 'No Events Scheduled' : 'No Events In Your Cities'}
+                  message={
+                    selectedDate
+                      ? `There are no events scheduled for ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}. Be the first to host one!`
+                      : 'No upcoming events found in your preferred cities. Add more cities in your Profile or host an event yourself!'
+                  }
+                  buttonText={selectedDate ? 'Clear Date' : 'Update Cities'}
+                  onButtonPress={() => {
+                    if (selectedDate) {
+                      setSelectedDate(null);
+                    } else {
+                      (navigation as any).navigate('ProfileTab');
+                    }
+                  }}
+                />
+              }
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={onRefresh}
+                  colors={[theme.colors.brand]}
+                  tintColor={theme.colors.brand}
+                />
+              }
+              initialNumToRender={6}
+              maxToRenderPerBatch={8}
+              windowSize={5}
+              removeClippedSubviews={Platform.OS === 'android'}
+              updateCellsBatchingPeriod={50}
+              onEndReached={loadMoreEvents}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={
+                isFetchingMore ? (
+                  <View style={{ paddingVertical: 20 }}>
+                    <ActivityIndicator size="small" color={theme.colors.brand} />
+                  </View>
+                ) : null
+              }
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+
+          {/* Page 2: Your Campus Feed (Students only) */}
+          {isStudent && (
+            <View style={styles.pageContainer}>
+              <FlatList
+                data={campusFeedEvents}
+                keyExtractor={(item) => item.id}
+                renderItem={renderEventItem}
+                ListHeaderComponent={
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>
+                      {selectedDate
+                        ? `Events on ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
+                        : 'Your Campus'}
+                    </Text>
+                    <Text style={styles.eventCountText}>{campusFeedEvents.length} events</Text>
+                  </View>
+                }
+                ListEmptyComponent={
+                  <EmptyState
+                    illustration={APP_ASSETS.illustrations.empty}
+                    title={selectedDate ? 'No Events Scheduled' : 'No Campus Events'}
+                    message={
+                      selectedDate
+                        ? `There are no events scheduled for ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}. Be the first to host one!`
+                        : 'There are no private events currently listed for your campus. Host one for your college!'
+                    }
+                    buttonText={selectedDate ? 'Clear Date' : 'Host an Event'}
+                    onButtonPress={() => {
+                      if (selectedDate) {
+                        setSelectedDate(null);
+                      } else {
+                        navigation.navigate('CreateEvent', {});
+                      }
+                    }}
+                  />
+                }
+                refreshControl={
+                  <RefreshControl
+                    refreshing={isRefreshing}
+                    onRefresh={onRefresh}
+                    colors={[theme.colors.brand]}
+                    tintColor={theme.colors.brand}
+                  />
+                }
+                initialNumToRender={6}
+                maxToRenderPerBatch={8}
+                windowSize={5}
+                removeClippedSubviews={Platform.OS === 'android'}
+                updateCellsBatchingPeriod={50}
+                onEndReached={loadMoreEvents}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                  isFetchingMore ? (
+                    <View style={{ paddingVertical: 20 }}>
+                      <ActivityIndicator size="small" color={theme.colors.brand} />
+                    </View>
+                  ) : null
+                }
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
               />
             </View>
           )}
-          ListHeaderComponent={renderHeader}
-          ListEmptyComponent={
-            <EmptyState
-              illustration={APP_ASSETS.illustrations.empty}
-              title={
-                selectedDate
-                  ? 'No Events Scheduled'
-                  : activeFeedPill === 'for_you'
-                  ? 'No Matching Events For You'
-                  : activeFeedPill === 'around_you'
-                  ? 'No Events In Your Cities'
-                  : activeFeedPill === 'campus'
-                  ? 'No Campus Events'
-                  : 'No Events Found'
-              }
-              message={
-                selectedDate
-                  ? `There are no events scheduled for ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}. Be the first to host one!`
-                  : activeFeedPill === 'for_you'
-                  ? 'No upcoming events match both your selected cities and categories. Update your preferences in Profile or explore all events in Around You!'
-                  : activeFeedPill === 'around_you'
-                  ? 'No upcoming events found in your preferred cities. Add more cities in your Profile or host an event yourself!'
-                  : activeFeedPill === 'campus'
-                  ? 'There are no private events currently listed for your campus. Host one for your college!'
-                  : 'No events match your current filters. Explore other categories or host one yourself!'
-              }
-              buttonText={
-                activeFeedPill === 'for_you'
-                  ? 'Explore Around You'
-                  : activeFeedPill === 'around_you'
-                  ? 'Update Cities'
-                  : 'Host an Event'
-              }
-              onButtonPress={() => {
-                if (activeFeedPill === 'for_you') {
-                  setActiveFeedPill('around_you');
-                } else if (activeFeedPill === 'around_you') {
-                  (navigation as any).navigate('ProfileTab');
-                } else {
-                  navigation.navigate('CreateEvent', {});
-                }
-              }}
-            />
-          }
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={onRefresh}
-              colors={[theme.colors.brand]}
-              tintColor={theme.colors.brand}
-            />
-          }
-          initialNumToRender={6}
-          maxToRenderPerBatch={8}
-          windowSize={5}
-          removeClippedSubviews={Platform.OS === 'android'}
-          updateCellsBatchingPeriod={50}
-          onEndReached={loadMoreEvents}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            isFetchingMore ? (
-              <View style={{ paddingVertical: 20 }}>
-                <ActivityIndicator size="small" color={theme.colors.brand} />
-              </View>
-            ) : null
-          }
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
+        </Animated.ScrollView>
       )}
 
       {/* Calendar Month Grid Modal */}
@@ -860,8 +1032,11 @@ const styles = StyleSheet.create({
   cardContainer: {
     paddingHorizontal: 16,
   },
-  headerContainer: {
-    paddingBottom: 8,
+  headerFixedContainer: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    zIndex: 10,
   },
   topBar: {
     flexDirection: 'row',
@@ -964,36 +1139,59 @@ const styles = StyleSheet.create({
     height: 14,
     backgroundColor: '#E2E8F0',
   },
-  filterBar: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  filterScrollContent: {
+  segmentedTrackContainer: {
     paddingHorizontal: 16,
-    gap: 8,
-    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 10,
+    backgroundColor: '#FFFFFF',
   },
-  feedPill: {
+  segmentedTrack: {
+    height: 42,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 100,
+    padding: 3,
+    position: 'relative',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  slidingThumb: {
+    position: 'absolute',
+    left: 3,
+    top: 3,
+    bottom: 3,
+    backgroundColor: '#0F172A',
+    borderRadius: 100,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  segmentBtnsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
+    width: '100%',
+    height: '100%',
   },
-  feedPillActive: {
-    backgroundColor: '#0F172A',
+  segmentBtn: {
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
   },
-  feedPillText: {
+  segmentBtnText: {
     fontFamily: 'Switzer-Bold',
-    fontSize: 12,
+    fontSize: 13,
     color: '#64748B',
+    letterSpacing: -0.2,
   },
-  feedPillTextActive: {
+  segmentBtnTextActive: {
     color: '#FFFFFF',
+  },
+  pageContainer: {
+    width,
+    flex: 1,
   },
   filterPill: {
     flexDirection: 'row',
