@@ -55,6 +55,7 @@ import { CITIES } from '../lib/constants/cities';
 import { INDIAN_COLLEGE_BRANCHES } from '../lib/constants/branches';
 import { CATEGORY_TEMPLATES, teamOptions } from '../lib/constants/event-options';
 import { uploadEventPoster } from '../lib/storage';
+import { CuratorCelebrationModal, CelebrationEventData } from '../components/CuratorCelebrationModal';
 import type { RootStackParamList } from '../types';
 
 const COLLEGE_YEAR_OPTIONS = ['All Years', '1st Year', '2nd Year', '3rd Year', '4th Year'];
@@ -492,6 +493,10 @@ export default function CreateEventScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState(Boolean(editId && !initialEvent));
 
+  // Curator celebration pop modal state
+  const [showCelebrationModal, setShowCelebrationModal] = useState(false);
+  const [publishedEventData, setPublishedEventData] = useState<CelebrationEventData | null>(null);
+
   // Determine if selected category is a college category
   const isCollegeCategory = category === 'College Event' || category === 'College Fest';
 
@@ -874,7 +879,12 @@ export default function CreateEventScreen() {
         payload.creator_id = user.id;
         payload.status = status;
 
-        const { error } = await supabase.from('events').insert(payload);
+        const { data: insertedEvent, error } = await supabase
+          .from('events')
+          .insert(payload)
+          .select('id, slug')
+          .maybeSingle();
+
         if (error) throw error;
 
         // Award +100 ET points if approved live
@@ -887,17 +897,22 @@ export default function CreateEventScreen() {
           } catch {}
         }
 
-        const successMessage =
-          status === 'approved'
-            ? 'Event posted live! (+100 ET Score earned)'
-            : "Event submitted! It'll go live once approved.";
+        const insertedId = insertedEvent?.id;
 
-        Alert.alert('Success', successMessage, [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('MainTabs'),
-          },
-        ]);
+        // Trigger Apple-grade Curator Celebration Pop Modal
+        setPublishedEventData({
+          id: insertedId,
+          slug: uniqueSlug,
+          title: payload.title,
+          category: payload.category,
+          dateString: payload.date_string,
+          city: payload.city,
+          location: payload.location,
+          posterUrl: payload.poster_url,
+          status: payload.status,
+          isTrusted: isTrusted || isAdmin,
+        });
+        setShowCelebrationModal(true);
       }
     } catch (err: any) {
       console.error('[CreateEvent] Error:', err);
@@ -1715,6 +1730,29 @@ export default function CreateEventScreen() {
         currentTimeString={endTime}
         onSelect={setEndTime}
         onClose={() => setShowEndTimePicker(false)}
+      />
+
+      {/* Apple-grade Curator Celebration Pop Modal */}
+      <CuratorCelebrationModal
+        visible={showCelebrationModal}
+        event={publishedEventData}
+        curatorUsername={
+          profile?.username ||
+          user?.user_metadata?.username ||
+          profile?.full_name?.split(' ')[0] ||
+          'curator'
+        }
+        onClose={() => {
+          setShowCelebrationModal(false);
+          navigation.navigate('MainTabs');
+        }}
+        onViewEvent={(eventId, slug) => {
+          setShowCelebrationModal(false);
+          navigation.navigate('EventDetail', {
+            id: eventId || slug,
+            slug,
+          });
+        }}
       />
     </SafeAreaView>
   );
