@@ -35,10 +35,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
-# Release build binaries
+# Release build binaries and Android build caches
 release-builds/
 *.apk
 *.aab
+android/app/build/
+android/.gradle/
+android/build/
+*.jks
+*.keystore
+!android/app/debug.keystore
 
 # Google Services & Firebase
 google-services.json
