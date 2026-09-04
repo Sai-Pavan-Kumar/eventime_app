@@ -18,6 +18,7 @@ import { Image } from 'expo-image';
 import {
   ArrowLeft,
   Shield,
+  ShieldAlert,
   CheckCircle2,
   XCircle,
   Trash2,
@@ -422,6 +423,16 @@ export default function AdminScreen() {
 
             await supabase.from('events').update({ status: 'rejected', admin_notes: 'Taken down due to user reports' }).eq('id', eventId);
             await supabase.from('event_reports').update({ status: 'resolved' }).eq('id', reportId);
+
+            // Notify curator about removal
+            if (report.curator_id) {
+              sendRemotePushNotification({
+                userIds: [report.curator_id],
+                title: 'Event Submission Update',
+                body: 'Your event was removed by moderators following community reports.',
+                channelId: 'default',
+              });
+            }
 
             if ((alreadyResolvedCount ?? 0) > 0) {
               Alert.alert('Resolved', 'Event taken down. Penalty already applied earlier.');
@@ -932,42 +943,81 @@ export default function AdminScreen() {
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={
                   <View style={styles.emptyContainer}>
-                    <CheckCircle2 size={40} color={theme.colors.success} />
-                    <Text style={styles.emptyTitle}>Zero Open Reports</Text>
+                    <View style={styles.emptyReportIconCircle}>
+                      <ShieldAlert size={36} color="#64748B" />
+                    </View>
+                    <Text style={styles.emptyTitle}>No Active Reports</Text>
+                    <Text style={styles.emptySubtitle}>The EvenTime community is clean and safe.</Text>
                   </View>
                 }
-                renderItem={({ item }) => (
-                  <View style={styles.reportCard}>
-                    <TouchableOpacity
-                      onPress={() => item.event_id && navigation.navigate('EventDetail', { id: item.event_id })}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.reportEventTitle}>{item.events?.title || 'Unknown Event'} →</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.reportReason}>Reason: "{item.reason}"</Text>
-                    <Text style={styles.reporterInfo}>
-                      Reported by: {item.reporter?.full_name || 'User'} ({item.reporter?.email || 'N/A'})
-                    </Text>
+                renderItem={({ item }) => {
+                  const reportDate = item.created_at
+                    ? new Date(item.created_at).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })
+                    : 'Recently';
 
-                    {item.status === 'pending' && (
-                      <View style={styles.reportActionRow}>
-                        <TouchableOpacity
-                          style={styles.dismissReportBtn}
-                          onPress={() => handleDismissReport(item.id)}
+                  return (
+                    <View style={styles.reportCard}>
+                      <View style={styles.reportHeaderRow}>
+                        <View style={styles.reportBadge}>
+                          <Text style={styles.reportBadgeText}>{item.reason}</Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.reportStatusPill,
+                            item.status === 'resolved' && styles.reportStatusResolved,
+                            item.status === 'dismissed' && styles.reportStatusDismissed,
+                          ]}
                         >
-                          <Text style={styles.dismissReportText}>Dismiss</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={styles.takeDownBtn}
-                          onPress={() => handleTakeDownReportedEvent(item.id, item.event_id)}
-                        >
-                          <Text style={styles.takeDownText}>Take Down Event</Text>
-                        </TouchableOpacity>
+                          <Text
+                            style={[
+                              styles.reportStatusText,
+                              item.status === 'resolved' && styles.reportStatusResolvedText,
+                              item.status === 'dismissed' && styles.reportStatusDismissedText,
+                            ]}
+                          >
+                            {item.status ? item.status.toUpperCase() : 'PENDING'}
+                          </Text>
+                        </View>
                       </View>
-                    )}
-                  </View>
-                )}
+
+                      <TouchableOpacity
+                        onPress={() => item.event_id && navigation.navigate('EventDetail', { id: item.event_id })}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.reportEventTitle}>{item.events?.title || 'Unknown Event'} →</Text>
+                      </TouchableOpacity>
+
+                      <Text style={styles.reportDateText}>Reported on: {reportDate}</Text>
+                      <Text style={styles.reporterInfo}>
+                        Reported by: {item.reporter?.full_name || 'User'} ({item.reporter?.email || 'N/A'})
+                      </Text>
+
+                      {item.status === 'pending' && (
+                        <View style={styles.reportActionRow}>
+                          <TouchableOpacity
+                            style={styles.dismissReportBtn}
+                            onPress={() => handleDismissReport(item.id)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.dismissReportText}>Dismiss (Safe)</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={styles.takeDownBtn}
+                            onPress={() => handleTakeDownReportedEvent(item.id, item.event_id)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.takeDownText}>Take Down & Punish</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  );
+                }}
               />
             )}
 
@@ -1430,27 +1480,78 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
   },
+  emptyReportIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
   reportCard: {
     backgroundColor: '#FFFFFF',
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     gap: 8,
   },
+  reportHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  reportBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  reportBadgeText: {
+    color: '#EF4444',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  reportStatusPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  reportStatusResolved: {
+    backgroundColor: '#ECFDF5',
+  },
+  reportStatusDismissed: {
+    backgroundColor: '#F8FAFC',
+  },
+  reportStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  reportStatusResolvedText: {
+    color: '#10B981',
+  },
+  reportStatusDismissedText: {
+    color: '#94A3B8',
+  },
   reportEventTitle: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#0F172A',
   },
-  reportReason: {
-    fontSize: 13,
-    color: '#DC2626',
-    fontWeight: '600',
+  reportDateText: {
+    fontSize: 12,
+    color: '#64748B',
   },
   reporterInfo: {
     fontSize: 12,
-    color: '#64748B',
+    color: '#94A3B8',
   },
   reportActionRow: {
     flexDirection: 'row',
@@ -1460,26 +1561,30 @@ const styles = StyleSheet.create({
   dismissReportBtn: {
     flex: 1,
     backgroundColor: '#F1F5F9',
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingVertical: 10,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   dismissReportText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#475569',
+    color: '#0F172A',
   },
   takeDownBtn: {
-    flex: 1,
-    backgroundColor: '#FEF2F2',
-    paddingVertical: 8,
-    borderRadius: 10,
+    flex: 1.2,
+    backgroundColor: '#EF4444',
+    paddingVertical: 10,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   takeDownText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#DC2626',
+    color: '#FFFFFF',
   },
   collegeTopBar: {
     flexDirection: 'row',
