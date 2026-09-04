@@ -1321,15 +1321,15 @@ export default function OnboardingScreen() {
                   <View style={styles.radarStatusBox}>
                     <Text style={styles.radarStatusTitle}>
                       {radarTextIndex === 0
-                        ? `Calibrating commute radius: ${selectedCities[0] || 'your city'}`
+                        ? `Finding events in ${selectedCities[0] || 'your city'}...`
                         : radarTextIndex === 1
                         ? role === 'student'
-                          ? `Connecting campus stream: ${selectedCollege?.name || collegeSearch.trim() || 'University'}`
-                          : `Connecting community streams: ${selectedCities[0] || 'Metro'}`
-                        : 'Finalizing Personal Discovery Pass...'}
+                          ? `Checking campus fests for ${selectedCollege?.name || collegeSearch.trim() || 'your college'}...`
+                          : `Finding top events in ${selectedCities[0] || 'your city'}...`
+                        : 'Your feed is ready!'}
                     </Text>
                     <Text style={styles.radarStatusSub}>
-                      Filtering noise · Calibrating verified signals
+                      Personalizing your events feed
                     </Text>
                   </View>
                 </View>
@@ -1343,17 +1343,17 @@ export default function OnboardingScreen() {
                     },
                   ]}
                 >
-                  {/* Apple-Grade Discovery Pass Ticket */}
+                  {/* Clean Human-Friendly Discovery Pass */}
                   <View style={styles.passCard}>
                     {/* Header */}
                     <View style={styles.passHeader}>
                       <View>
                         <Text style={styles.passOverline}>EVEN·TIME PASS</Text>
-                        <Text style={styles.passTitle}>Discovery Calibrated</Text>
+                        <Text style={styles.passTitle}>You're All Set!</Text>
                       </View>
                       <View style={styles.passBadge}>
                         <ShieldCheck size={13} color="#059669" />
-                        <Text style={styles.passBadgeText}>CALIBRATED</Text>
+                        <Text style={styles.passBadgeText}>READY</Text>
                       </View>
                     </View>
 
@@ -1370,34 +1370,34 @@ export default function OnboardingScreen() {
                         <Text style={styles.passHandle}>@{username || 'member'}</Text>
                         <Text style={styles.passRoleLabel} numberOfLines={1}>
                           {role === 'student'
-                            ? `Campus Explorer · ${selectedCollege?.name || collegeSearch.trim() || 'University'}`
-                            : `Metro Curator · ${selectedCities[0] || 'City Member'}`}
+                            ? `Student · ${selectedCollege?.name || collegeSearch.trim() || 'Campus'}`
+                            : `Member · ${selectedCities[0] || 'City'}`}
                         </Text>
                       </View>
                     </View>
 
-                    {/* 3 Metrics */}
+                    {/* 3 Clear Metrics */}
                     <View style={styles.passMetricsGrid}>
                       <View style={styles.passMetricBox}>
                         <Text style={styles.passMetricVal}>{matchedEventsCount || 18}</Text>
-                        <Text style={styles.passMetricLbl}>In Commute</Text>
+                        <Text style={styles.passMetricLbl}>Events Near You</Text>
                       </View>
                       <View style={styles.passMetricBox}>
                         <Text style={styles.passMetricVal}>
-                          {role === 'student' ? 'Campus Pass' : 'City Stream'}
+                          {role === 'student' ? 'College Events' : 'City Events'}
                         </Text>
-                        <Text style={styles.passMetricLbl}>Verified Level</Text>
+                        <Text style={styles.passMetricLbl}>Access</Text>
                       </View>
                       <View style={styles.passMetricBox}>
                         <Text style={[styles.passMetricVal, { color: '#6C47FF' }]}>+50 ET</Text>
-                        <Text style={styles.passMetricLbl}>Starting Score</Text>
+                        <Text style={styles.passMetricLbl}>Bonus Score</Text>
                       </View>
                     </View>
 
                     {/* Reassurance text */}
                     <View style={styles.passNoteBox}>
                       <Text style={styles.passNoteText}>
-                        Your personal stream has been calibrated to eliminate noise and surface verified events matching your daily rhythm.
+                        We've picked the top events, workshops, and fests for you. Tap below to start exploring!
                       </Text>
                     </View>
                   </View>
@@ -1413,7 +1413,7 @@ export default function OnboardingScreen() {
                     }}
                     activeOpacity={0.88}
                   >
-                    <Text style={styles.passLaunchBtnText}>Launch My Feed</Text>
+                    <Text style={styles.passLaunchBtnText}>Explore Events</Text>
                     <ArrowRight size={18} color="#FFFFFF" />
                   </TouchableOpacity>
                 </Animated.View>

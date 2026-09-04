@@ -60,13 +60,13 @@ export default function LeaderboardScreen() {
   const cohortTabs = useMemo(() => {
     if (isStudent) {
       return [
-        { id: 'campus' as CohortType, label: 'Your Campus', icon: GraduationCap },
+        { id: 'campus' as CohortType, label: 'Your College', icon: GraduationCap },
         { id: 'city' as CohortType, label: primaryCity, icon: MapPin },
         { id: 'all_time' as CohortType, label: 'All-Time', icon: Trophy },
       ];
     }
     return [
-      { id: 'campus' as CohortType, label: 'Top Curators', icon: ShieldCheck },
+      { id: 'campus' as CohortType, label: 'Top Users', icon: ShieldCheck },
       { id: 'city' as CohortType, label: primaryCity, icon: MapPin },
       { id: 'all_time' as CohortType, label: 'All-Time', icon: Trophy },
     ];
@@ -265,22 +265,22 @@ export default function LeaderboardScreen() {
     return Math.max(1, rivalScore - userScore + 1);
   }, [prevRival, userScore]);
 
-  // Qualitative Tier Badge
+  // Simple, recognizable rank badges
   const tierBadge = useMemo(() => {
     if (myRank === 1) {
-      return { label: 'Cohort Leader', icon: Crown, color: '#F59E0B', bg: '#FEF3C7' };
+      return { label: 'Rank #1', icon: Crown, color: '#F59E0B', bg: '#FEF3C7' };
     }
     if (myRank && myRank <= 3) {
-      return { label: isStudent ? 'Campus Champion' : 'Lead Curator', icon: Award, color: '#D97706', bg: '#FFEDD5' };
+      return { label: 'Top 3', icon: Award, color: '#D97706', bg: '#FFEDD5' };
     }
     if (myRank && myRank <= 10) {
-      return { label: 'Senior Curator', icon: ShieldCheck, color: '#6C47FF', bg: '#F5F3FF' };
+      return { label: 'Top 10', icon: ShieldCheck, color: '#6C47FF', bg: '#F5F3FF' };
     }
     if (myRank && myRank <= 25) {
-      return { label: 'Rising Explorer', icon: Sparkles, color: '#0284C7', bg: '#E0F2FE' };
+      return { label: 'Top 25', icon: Sparkles, color: '#0284C7', bg: '#E0F2FE' };
     }
-    return { label: 'Pioneer', icon: Compass, color: '#64748B', bg: '#F1F5F9' };
-  }, [myRank, isStudent]);
+    return { label: 'Member', icon: Compass, color: '#64748B', bg: '#F1F5F9' };
+  }, [myRank]);
 
   const topThree = leaderboard.slice(0, 3);
   const restList = leaderboard.slice(3);
@@ -335,7 +335,7 @@ export default function LeaderboardScreen() {
           <AlertCircle size={40} color="#94A3B8" />
           <Text style={styles.disabledTitle}>Leaderboard Unavailable</Text>
           <Text style={styles.disabledSubtitle}>
-            The curator leaderboard is currently undergoing scheduled updates. Please check back later.
+            The leaderboard is currently undergoing scheduled updates. Please check back soon.
           </Text>
         </View>
       ) : leaderboard.length === 0 ? (
@@ -358,17 +358,17 @@ export default function LeaderboardScreen() {
           />
           <Text style={styles.emptyTitle}>
             {activeCohort === 'campus'
-              ? 'Be the First Campus Curator'
+              ? 'No one from your college is ranked yet'
               : activeCohort === 'city'
-              ? `Be the Pioneer in ${primaryCity}`
-              : 'The Throne is Empty!'}
+              ? `No rankings in ${primaryCity} yet`
+              : 'Leaderboard is empty'}
           </Text>
           <Text style={styles.emptySubtitle}>
             {activeCohort === 'campus'
-              ? `No one from ${userCollege || 'your campus'} has ranked yet. Post an approved event or save events to claim the #1 spot!`
+              ? 'Share or save an event to be the first one on your college leaderboard!'
               : activeCohort === 'city'
-              ? `The ${primaryCity} curator leaderboard is wide open. Share verified events to represent your city!`
-              : 'There are currently no curators ranked on this board. Be the first to post approved events and claim #1!'}
+              ? `Share or save an event in ${primaryCity} to get on the board!`
+              : 'Share or save events to climb up the ranks!'}
           </Text>
         </ScrollView>
       ) : (
@@ -410,7 +410,7 @@ export default function LeaderboardScreen() {
                       </View>
                     </View>
                     <Text style={styles.podiumName} numberOfLines={1}>
-                      {topThree[1].full_name || topThree[1].username || 'Curator'}
+                      {topThree[1].full_name || topThree[1].username || 'Member'}
                     </Text>
                     <Text style={styles.podiumScore}>{topThree[1].et_score || 100} ET</Text>
                     <View style={[styles.podiumPedestal, { height: 75, backgroundColor: '#E2E8F0' }]}>
@@ -453,7 +453,7 @@ export default function LeaderboardScreen() {
                       </View>
                     </View>
                     <Text style={[styles.podiumName, { fontWeight: '900' }]} numberOfLines={1}>
-                      {topThree[0].full_name || topThree[0].username || 'Curator'}
+                      {topThree[0].full_name || topThree[0].username || 'Member'}
                     </Text>
                     <Text style={[styles.podiumScore, { color: '#B45309', fontWeight: '900' }]}>
                       {topThree[0].et_score || 100} ET
@@ -498,7 +498,7 @@ export default function LeaderboardScreen() {
                       </View>
                     </View>
                     <Text style={styles.podiumName} numberOfLines={1}>
-                      {topThree[2].full_name || topThree[2].username || 'Curator'}
+                      {topThree[2].full_name || topThree[2].username || 'Member'}
                     </Text>
                     <Text style={styles.podiumScore}>{topThree[2].et_score || 100} ET</Text>
                     <View style={[styles.podiumPedestal, { height: 55, backgroundColor: '#FFEDD5' }]}>
@@ -525,10 +525,10 @@ export default function LeaderboardScreen() {
               {restList.length > 0 && (
                 <Text style={styles.listSectionTitle}>
                   {activeCohort === 'campus'
-                    ? 'Campus Curators'
+                    ? 'College Leaderboard'
                     : activeCohort === 'city'
-                    ? `${primaryCity} Curators`
-                    : 'All Top Curators'}
+                    ? `Top in ${primaryCity}`
+                    : 'Top Ranked'}
                 </Text>
               )}
             </View>
@@ -540,7 +540,6 @@ export default function LeaderboardScreen() {
               <TouchableOpacity
                 style={[styles.rankRow, isMe && styles.rankRowMe]}
                 onPress={() => handleCuratorPress(item)}
-                activeOpacity={0.7}
               >
                 <Text style={[styles.rankNumber, isMe && styles.rankNumberMe]}>#{rank}</Text>
 
@@ -556,7 +555,7 @@ export default function LeaderboardScreen() {
 
                 <View style={styles.rowDetails}>
                   <Text style={[styles.rowName, isMe && styles.rowNameMe]} numberOfLines={1}>
-                    {item.full_name || item.username || 'Curator'} {isMe ? '(You)' : ''}
+                    {item.full_name || item.username || 'Member'} {isMe ? '(You)' : ''}
                   </Text>
                   {item.college && (
                     <Text style={styles.rowCollege} numberOfLines={1}>
@@ -585,7 +584,7 @@ export default function LeaderboardScreen() {
             <View style={styles.rivalCenter}>
               <View style={styles.rivalHeaderRow}>
                 <Text style={styles.rivalTitle}>
-                  {myRank === 1 ? 'You · Cohort Leader' : myRank ? `You · #${myRank}` : 'You · Unranked'}
+                  {myRank === 1 ? 'You · Rank #1' : myRank ? `You · #${myRank}` : 'You · Unranked'}
                 </Text>
                 <View style={[styles.tierPill, { backgroundColor: tierBadge.bg }]}>
                   <tierBadge.icon size={11} color={tierBadge.color} />
@@ -595,19 +594,19 @@ export default function LeaderboardScreen() {
 
               {myRank === 1 ? (
                 <Text style={styles.rivalSubtitle}>
-                  👑 Leading this cohort! Keep hosting to defend your crown.
+                  👑 You're in 1st place! Keep sharing events to stay on top.
                 </Text>
               ) : prevRival && deltaToPass ? (
                 <View style={styles.rivalDeltaRow}>
                   <Zap size={12} color="#F59E0B" />
                   <Text style={styles.rivalSubtitle} numberOfLines={1}>
-                    Only <Text style={styles.rivalHighlight}>{deltaToPass} ET</Text> to pass @
-                    {prevRival.username || prevRival.full_name || 'curator'} for #{myRank! - 1}
+                    Just <Text style={styles.rivalHighlight}>{deltaToPass} ET</Text> more to pass @
+                    {prevRival.username || prevRival.full_name || 'user'} for #{myRank! - 1}
                   </Text>
                 </View>
               ) : (
                 <Text style={styles.rivalSubtitle}>
-                  Curate or save events (+10 ET) to claim your spot on this board.
+                  Save or share events (+10 ET) to join this leaderboard.
                 </Text>
               )}
             </View>
@@ -624,7 +623,7 @@ export default function LeaderboardScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.scoreModalCard}>
             <View style={styles.scoreModalHeader}>
-              <Text style={styles.scoreModalTitle}>How ET Score Works</Text>
+              <Text style={styles.scoreModalTitle}>How Points Work</Text>
               <TouchableOpacity style={styles.scoreModalClose} onPress={() => setShowScoreInfo(false)}>
                 <X size={18} color="#64748B" />
               </TouchableOpacity>
@@ -633,43 +632,43 @@ export default function LeaderboardScreen() {
             <View style={styles.scoreRowsList}>
               <View style={styles.scoreRow}>
                 <View style={styles.scoreRowLeft}>
-                  <Text style={styles.scoreRowLabel}>Base Welcome Credit</Text>
-                  <Text style={styles.scoreRowDesc}>Awarded automatically on registration</Text>
+                  <Text style={styles.scoreRowLabel}>Sign-up Bonus</Text>
+                  <Text style={styles.scoreRowDesc}>Given when you create your account</Text>
                 </View>
                 <Text style={styles.scoreRowValue}>+100</Text>
               </View>
               <View style={styles.scoreRow}>
                 <View style={styles.scoreRowLeft}>
-                  <Text style={styles.scoreRowLabel}>Profile Calibration</Text>
-                  <Text style={styles.scoreRowDesc}>One-time boost for completing onboarding</Text>
+                  <Text style={styles.scoreRowLabel}>Complete Profile</Text>
+                  <Text style={styles.scoreRowDesc}>Set up your city and interests</Text>
                 </View>
                 <Text style={styles.scoreRowValue}>+50</Text>
               </View>
               <View style={styles.scoreRow}>
                 <View style={styles.scoreRowLeft}>
-                  <Text style={styles.scoreRowLabel}>Verified Event Host</Text>
-                  <Text style={styles.scoreRowDesc}>For every community-approved event shared</Text>
+                  <Text style={styles.scoreRowLabel}>Share an Event</Text>
+                  <Text style={styles.scoreRowDesc}>When your posted event gets approved</Text>
                 </View>
                 <Text style={styles.scoreRowValue}>+100</Text>
               </View>
               <View style={styles.scoreRow}>
                 <View style={styles.scoreRowLeft}>
-                  <Text style={styles.scoreRowLabel}>Community Attendance</Text>
-                  <Text style={styles.scoreRowDesc}>When members mark interest or attend your event</Text>
+                  <Text style={styles.scoreRowLabel}>Someone Attends</Text>
+                  <Text style={styles.scoreRowDesc}>When someone marks 'Interested' on your event</Text>
                 </View>
                 <Text style={styles.scoreRowValue}>+25</Text>
               </View>
               <View style={styles.scoreRow}>
                 <View style={styles.scoreRowLeft}>
-                  <Text style={styles.scoreRowLabel}>Save for Later</Text>
-                  <Text style={styles.scoreRowDesc}>When an attendee saves your curated event</Text>
+                  <Text style={styles.scoreRowLabel}>Someone Saves</Text>
+                  <Text style={styles.scoreRowDesc}>When someone bookmarks your event</Text>
                 </View>
                 <Text style={styles.scoreRowValue}>+10</Text>
               </View>
               <View style={[styles.scoreRow, { borderBottomWidth: 0 }]}>
                 <View style={styles.scoreRowLeft}>
-                  <Text style={styles.scoreRowLabel}>Confirmed Spam Report</Text>
-                  <Text style={styles.scoreRowDesc}>Penalty for submitting inaccurate or duplicate events</Text>
+                  <Text style={styles.scoreRowLabel}>Spam or Fake Event</Text>
+                  <Text style={styles.scoreRowDesc}>Penalty if a posted event is fake or misleading</Text>
                 </View>
                 <Text style={[styles.scoreRowValue, { color: '#EF4444' }]}>−25</Text>
               </View>

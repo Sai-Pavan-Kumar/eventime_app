@@ -512,20 +512,20 @@ export default function EventDetailScreen() {
                   ? interestCount > 0
                     ? isInterested
                       ? interestCount === 1
-                        ? `You are attending from ${userCollege || 'Campus'}`
-                        : `You & ${interestCount - 1} ${interestCount - 1 === 1 ? 'other student' : 'other students'} attending · ${userCollege || 'Campus'}`
-                      : `${interestCount} ${interestCount === 1 ? 'student is' : 'students are'} attending · ${event.colleges?.name || userCollege || 'Campus'}`
-                    : `Be the first student from ${userCollege || 'your campus'} to attend`
+                        ? `You're going · ${userCollege || 'Your College'}`
+                        : `You & ${interestCount - 1} ${interestCount - 1 === 1 ? 'other student' : 'other students'} are going · ${userCollege || 'Campus'}`
+                      : `${interestCount} ${interestCount === 1 ? 'student is' : 'students are'} going · ${event.colleges?.name || userCollege || 'Campus'}`
+                    : `Be the first from ${userCollege || 'your college'} to show interest`
                   : interestCount > 0
                   ? isInterested
                     ? interestCount === 1
-                      ? `You are attending · ${event.city || 'Local'}`
-                      : `You & ${interestCount - 1} ${interestCount - 1 === 1 ? 'other person' : 'others'} attending · ${event.city || 'Local'}`
-                    : `${interestCount} ${interestCount === 1 ? 'person is' : 'people are'} attending · ${event.city || 'Local'}`
-                  : `Be the first in ${event.city || 'your city'} to express interest`}
+                      ? `You're going · ${event.city || 'Local'}`
+                      : `You & ${interestCount - 1} ${interestCount - 1 === 1 ? 'other person' : 'others'} are going · ${event.city || 'Local'}`
+                    : `${interestCount} ${interestCount === 1 ? 'person is' : 'people are'} interested · ${event.city || 'Local'}`
+                  : `Be the first in ${event.city || 'your city'} to show interest`}
               </Text>
               <Text style={styles.socialProofSub}>
-                {isInterested ? 'You are marked as attending · Tap to undo' : 'Real-time verified attendee stream'}
+                {isInterested ? 'You are marked as interested · Tap to remove' : 'Tap to show you are interested'}
               </Text>
             </View>
 
@@ -536,7 +536,7 @@ export default function EventDetailScreen() {
                 fill={isInterested ? '#FFFFFF' : 'none'}
               />
               <Text style={[styles.socialProofPillText, isInterested && styles.socialProofPillTextActive]}>
-                {isInterested ? 'Attending' : 'Attend'}
+                {isInterested ? 'Interested' : "I'm Interested"}
               </Text>
             </View>
           </TouchableOpacity>
@@ -729,7 +729,7 @@ export default function EventDetailScreen() {
                   More Events in {event.category || event.city || 'EvenTime'}
                 </Text>
                 <Text style={styles.similarSubtitle}>
-                  Keep exploring events tailored to your stream
+                  Similar events happening near you
                 </Text>
               </View>
               <ScrollView
