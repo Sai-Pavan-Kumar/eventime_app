@@ -55,6 +55,7 @@ import { CITIES } from '../lib/constants/cities';
 import { INDIAN_COLLEGE_BRANCHES } from '../lib/constants/branches';
 import { CATEGORY_TEMPLATES, teamOptions } from '../lib/constants/event-options';
 import { uploadEventPoster } from '../lib/storage';
+import { sendRemotePushNotification } from '../lib/notifications';
 import { CuratorCelebrationModal, CelebrationEventData } from '../components/CuratorCelebrationModal';
 import type { RootStackParamList } from '../types';
 
@@ -895,6 +896,39 @@ export default function CreateEventScreen() {
               delta: 100,
             } as any);
           } catch {}
+
+          const insertedId = insertedEvent?.id;
+
+          // Notify creator that event is live
+          sendRemotePushNotification({
+            userIds: [user.id],
+            title: 'Event Published',
+            body: `"${payload.title}" is now live on EvenTime (+100 ET score).`,
+            data: { eventId: insertedId, id: insertedId },
+            channelId: 'events-reminders',
+          });
+
+          // Broadcast to target audience
+          if (collegeName && isCollegeCategory && collegeOnly) {
+            sendRemotePushNotification({
+              college: collegeName,
+              notificationType: 'campus_alerts',
+              title: `Campus Event · ${collegeName}`,
+              body: `"${payload.title}" has been scheduled for your campus.`,
+              data: { eventId: insertedId, id: insertedId },
+              channelId: 'campus-alerts',
+            });
+          } else if (payload.city && payload.city !== 'online') {
+            sendRemotePushNotification({
+              city: payload.city,
+              category: payload.category,
+              notificationType: 'city_updates',
+              title: `New in ${payload.city} · ${payload.category}`,
+              body: `"${payload.title}" opened for registration.`,
+              data: { eventId: insertedId, id: insertedId },
+              channelId: 'city-updates',
+            });
+          }
         }
 
         const insertedId = insertedEvent?.id;

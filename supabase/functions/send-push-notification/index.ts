@@ -13,6 +13,7 @@ const corsHeaders = {
 interface PushPayload {
   user_ids?: string[]; // Target specific users
   city?: string; // Target all users with this preferred city
+  category?: string; // High-relevance: target users interested in this category
   college?: string; // Target all students from this college
   notification_type?: "event_reminders" | "campus_alerts" | "city_updates" | "weekly_digest";
   title: string;
@@ -33,7 +34,7 @@ serve(async (req: Request) => {
     );
 
     const payload: PushPayload = await req.json();
-    const { user_ids, city, college, notification_type = "event_reminders", title, body, data = {}, channel_id = "default" } = payload;
+    const { user_ids, city, category, college, notification_type = "event_reminders", title, body, data = {}, channel_id = "default" } = payload;
 
     if (!title || !body) {
       return new Response(JSON.stringify({ error: "Title and body are required." }), {
@@ -45,15 +46,18 @@ serve(async (req: Request) => {
     // 1. Build profile query based on targeting filters
     let query = supabaseClient
       .from("profiles")
-      .select("id, push_token, notification_preferences, preferred_cities, college")
+      .select("id, push_token, notification_preferences, preferred_cities, college, goals")
       .not("push_token", "is", null);
 
     if (user_ids && user_ids.length > 0) {
       query = query.in("id", user_ids);
-    } else if (city) {
-      query = query.contains("preferred_cities", [city]);
     } else if (college) {
       query = query.eq("college", college);
+    } else if (city && category) {
+      // High-relevance match: User preferred this city AND selected this category in goals
+      query = query.contains("preferred_cities", [city]).contains("goals", [category]);
+    } else if (city) {
+      query = query.contains("preferred_cities", [city]);
     }
 
     const { data: profiles, error: dbError } = await query;

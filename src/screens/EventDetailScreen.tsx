@@ -42,7 +42,7 @@ import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { getCategoryConfig } from '../lib/category-config';
 import { APP_ASSETS, getCategoryPoster } from '../lib/asset-registry';
-import { scheduleEventReminder, cancelEventReminder } from '../lib/notifications';
+import { scheduleEventReminder, cancelEventReminder, sendRemotePushNotification } from '../lib/notifications';
 import { useAuth } from '../context/AuthContext';
 import { EventCard } from '../components/EventCard';
 import { EmptyState } from '../components/EmptyState';
@@ -248,9 +248,10 @@ export default function EventDetailScreen() {
 
     const previousState = isInterested;
     const nextState = !previousState;
+    const newCount = nextState ? interestCount + 1 : Math.max(0, interestCount - 1);
 
     setIsInterested(nextState);
-    setInterestCount((prev) => (nextState ? prev + 1 : Math.max(0, prev - 1)));
+    setInterestCount(newCount);
     setIsUpdatingInterest(true);
 
     try {
@@ -272,6 +273,18 @@ export default function EventDetailScreen() {
             user_id: event.creator_id,
             delta: 10,
           } as any);
+
+          // Milestone alert for host: 1, 10, 25, 50, 100, 250, 500 attendees
+          const MILESTONES = [1, 10, 25, 50, 100, 250, 500];
+          if (MILESTONES.includes(newCount) && event.creator_id !== user.id) {
+            sendRemotePushNotification({
+              userIds: [event.creator_id],
+              title: newCount === 1 ? 'First Attendee Interested' : `${newCount} Attendees Interested`,
+              body: `"${event.title}" reached ${newCount} interested ${newCount === 1 ? 'attendee' : 'attendees'}.`,
+              data: { eventId: event.id, id: event.id },
+              channelId: 'events-reminders',
+            });
+          }
         }
       } else {
         const { error } = await supabase

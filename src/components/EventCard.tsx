@@ -9,6 +9,7 @@ import { getCategoryPoster } from '../lib/asset-registry';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { parseEventDateString, formatEventTime } from '../lib/utils/date';
+import { scheduleEventReminder, cancelEventReminder } from '../lib/notifications';
 import type { EventRow } from '../types';
 
 export interface EventCardProps {
@@ -139,12 +140,20 @@ export const EventCard: React.FC<EventCardProps> = (props) => {
           user_id: user.id,
           event_id: id,
         });
+        scheduleEventReminder({
+          id,
+          title,
+          date_string: dateString,
+          start_time: startTime,
+          location,
+        });
       } else {
         await supabase
           .from('saved_events')
           .delete()
           .eq('user_id', user.id)
           .eq('event_id', id);
+        cancelEventReminder(id);
       }
       if (props.onSaveToggle) {
         props.onSaveToggle(id, nextState);

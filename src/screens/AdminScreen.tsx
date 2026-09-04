@@ -226,8 +226,8 @@ export default function AdminScreen() {
       if (eventItem.creator_id) {
         sendRemotePushNotification({
           userIds: [eventItem.creator_id],
-          title: 'Event Approved! 🎉',
-          body: `"${eventItem.title}" has been approved and is now live (+100 ET awarded).`,
+          title: 'Event Published',
+          body: `"${eventItem.title}" is now live on EvenTime (+100 ET score).`,
           data: { eventId: eventItem.id, id: eventItem.id },
           channelId: 'events-reminders',
         });
@@ -239,17 +239,18 @@ export default function AdminScreen() {
         sendRemotePushNotification({
           college: collegeTarget,
           notificationType: 'campus_alerts',
-          title: `New Campus Event: ${collegeTarget}`,
-          body: `"${eventItem.title}" just dropped for your college!`,
+          title: `Campus Event · ${collegeTarget}`,
+          body: `"${eventItem.title}" has been scheduled for your campus.`,
           data: { eventId: eventItem.id, id: eventItem.id },
           channelId: 'campus-alerts',
         });
       } else if (eventItem.city && eventItem.city !== 'Online') {
         sendRemotePushNotification({
           city: eventItem.city,
+          category: eventItem.category,
           notificationType: 'city_updates',
-          title: `New Event in ${eventItem.city}`,
-          body: `"${eventItem.title}" is now live on EvenTime.`,
+          title: `New in ${eventItem.city} · ${eventItem.category || 'Event'}`,
+          body: `"${eventItem.title}" opened for registration.`,
           data: { eventId: eventItem.id, id: eventItem.id },
           channelId: 'city-updates',
         });
@@ -278,12 +279,12 @@ export default function AdminScreen() {
 
       if (error) throw error;
 
-      // Notify creator about rejection
+      // Notify creator about rejection with clean, polite copy
       if (rejectedEvent?.creator_id) {
         sendRemotePushNotification({
           userIds: [rejectedEvent.creator_id],
           title: 'Event Submission Update',
-          body: `Your submission "${rejectedEvent.title}" was not approved: ${noteText}`,
+          body: `Your submission for "${rejectedEvent.title}" was reviewed and could not be published at this time.`,
           data: { eventId: rejectedEvent.id, id: rejectedEvent.id },
           channelId: 'default',
         });

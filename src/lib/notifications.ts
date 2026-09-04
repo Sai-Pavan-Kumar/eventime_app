@@ -4,7 +4,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
-import { parseEventDateString } from './utils/date';
+import { parseEventDateString, formatEventTime } from './utils/date';
 
 const PUSH_TOKEN_KEY = '@eventime_push_token';
 const NOTIF_PREFS_KEY = '@eventime_notif_prefs';
@@ -301,22 +301,29 @@ export async function scheduleEventReminder(event: {
     reminderTime.setHours(9, 0, 0, 0);
 
     let triggerTime: Date;
+    let reminderTitle: string;
     let reminderBody: string;
+
+    const formattedTime = formatEventTime(event.date_string, event.start_time);
+    const timeSnippet = formattedTime && formattedTime !== 'All Day' ? ` · ${formattedTime}` : '';
 
     if (reminderTime.getTime() > now.getTime()) {
       triggerTime = reminderTime;
-      reminderBody = `Happening tomorrow${event.location ? ` at ${event.location}` : ''}! Tap to view details.`;
+      reminderTitle = `Tomorrow${timeSnippet}`;
+      reminderBody = `"${event.title}" begins tomorrow${event.location ? ` at ${event.location}` : ''}.`;
     } else {
       // Event is within 24 hours
       const oneHourBefore = new Date(eventDate.getTime() - 60 * 60 * 1000);
       if (oneHourBefore.getTime() > now.getTime()) {
         triggerTime = oneHourBefore;
-        reminderBody = `Starting in 1 hour${event.location ? ` at ${event.location}` : ''}! Get ready.`;
+        reminderTitle = 'Starting in 1 hour';
+        reminderBody = `"${event.title}" begins shortly${event.location ? ` at ${event.location}` : ''}.`;
       } else {
         const msUntilEvent = eventDate.getTime() - now.getTime();
         if (msUntilEvent > 15 * 60 * 1000) {
           triggerTime = new Date(now.getTime() + 5 * 60 * 1000);
-          reminderBody = `Happening today${event.location ? ` at ${event.location}` : ''}! Don't miss out.`;
+          reminderTitle = `Today${timeSnippet}`;
+          reminderBody = `"${event.title}" is scheduled for today${event.location ? ` at ${event.location}` : ''}.`;
         } else {
           return null; // Starting in under 15 mins or in the past
         }
@@ -328,7 +335,7 @@ export async function scheduleEventReminder(event: {
 
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: `Reminder: ${event.title}`,
+        title: reminderTitle,
         body: reminderBody,
         data: { eventId: event.id, id: event.id },
         sound: 'default',
@@ -375,6 +382,7 @@ export async function cancelScheduledReminder(notificationId: string): Promise<v
 export interface SendPushNotificationParams {
   userIds?: string[];
   city?: string;
+  category?: string;
   college?: string;
   notificationType?: 'event_reminders' | 'campus_alerts' | 'city_updates' | 'weekly_digest';
   title: string;
@@ -389,6 +397,7 @@ export async function sendRemotePushNotification(params: SendPushNotificationPar
       body: {
         user_ids: params.userIds,
         city: params.city,
+        category: params.category,
         college: params.college,
         notification_type: params.notificationType || 'event_reminders',
         title: params.title,
