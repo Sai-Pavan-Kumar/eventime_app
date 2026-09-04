@@ -142,7 +142,13 @@ export function RootNavigator() {
   const requiresOnboarding = (!!user && !isOnboarded) || (!user && !hasCompletedLocalOnboarding);
 
   return (
-    <NavigationContainer ref={navigationRef} linking={linking}>
+    <NavigationContainer
+      ref={navigationRef}
+      linking={linking}
+      onReady={() => {
+        checkColdStartNotification(navigationRef);
+      }}
+    >
       <Stack.Navigator
         initialRouteName={requiresOnboarding ? 'Onboarding' : 'MainTabs'}
         screenOptions={{

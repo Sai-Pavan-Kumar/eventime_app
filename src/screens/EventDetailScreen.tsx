@@ -42,7 +42,7 @@ import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { getCategoryConfig } from '../lib/category-config';
 import { APP_ASSETS, getCategoryPoster } from '../lib/asset-registry';
-import { scheduleEventReminder } from '../lib/notifications';
+import { scheduleEventReminder, cancelEventReminder } from '../lib/notifications';
 import { useAuth } from '../context/AuthContext';
 import { EventCard } from '../components/EventCard';
 import { EmptyState } from '../components/EmptyState';
@@ -227,6 +227,9 @@ export default function EventDetailScreen() {
           .delete()
           .eq('event_id', event.id)
           .eq('user_id', user.id);
+        if (!isInterested) {
+          cancelEventReminder(event.id);
+        }
       }
     } catch (e) {
       console.error('Bookmark error:', e);
@@ -262,6 +265,8 @@ export default function EventDetailScreen() {
 
         if (error) throw error;
 
+        scheduleEventReminder(event);
+
         if (event.creator_id && inserted && inserted.length > 0) {
           await supabase.rpc('increment_et_score', {
             user_id: event.creator_id,
@@ -276,6 +281,10 @@ export default function EventDetailScreen() {
           .eq('user_id', user.id);
 
         if (error) throw error;
+
+        if (!isSaved) {
+          cancelEventReminder(event.id);
+        }
       }
     } catch (err) {
       console.error('[EventDetail] Interested error:', err);

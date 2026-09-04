@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
+import { parseEventDateString } from './utils/date';
 
 const PUSH_TOKEN_KEY = '@eventime_push_token';
 const NOTIF_PREFS_KEY = '@eventime_notif_prefs';
@@ -114,21 +115,24 @@ export async function registerForPushNotificationsAsync(userId?: string): Promis
 
     if (token) {
       await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
+    }
 
-      // If user is authenticated, sync token with Supabase profile
-      if (userId) {
-        try {
-          await supabase
-            .from('profiles')
-            .update({ push_token: token } as any)
-            .eq('id', userId);
-        } catch (dbErr) {
-          console.warn('[Notifications] Error syncing push token to profile:', dbErr);
-        }
+    // Resilience: use newly retrieved token or fallback to cached token in storage
+    const effectiveToken = token || (await AsyncStorage.getItem(PUSH_TOKEN_KEY));
+
+    // If user is authenticated, sync token with Supabase profile
+    if (effectiveToken && userId) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({ push_token: effectiveToken } as any)
+          .eq('id', userId);
+      } catch (dbErr) {
+        console.warn('[Notifications] Error syncing push token to profile:', dbErr);
       }
     }
 
-    return token;
+    return effectiveToken;
   } catch (error) {
     console.error('[Notifications] Failed to register for push notifications:', error);
     return null;
@@ -223,8 +227,9 @@ export function handleNotificationResponse(navigation: any, response: Notificati
     const data = response.notification.request.content.data;
     if (!data) return;
 
-    if (data.eventId) {
-      navigation.navigate('EventDetail', { eventId: data.eventId });
+    const eventId = data.eventId || data.id;
+    if (eventId) {
+      navigation.navigate('EventDetail', { eventId, id: eventId });
     } else if (data.city) {
       navigation.navigate('CityEvents', { city: data.city });
     } else if (data.screen) {
@@ -256,30 +261,76 @@ export async function scheduleEventReminder(event: {
   location?: string | null;
 }): Promise<string | null> {
   try {
-    const eventDate = new Date(event.date_string);
-    if (isNaN(eventDate.getTime())) return null;
+    const prefs = await getNotificationPreferences();
+    if (prefs.event_reminders === false) {
+      return null;
+    }
+
+    const eventDate = parseEventDateString(event.date_string);
+    if (!eventDate || isNaN(eventDate.getTime())) return null;
+
+    // Try to parse time from start_time or composite date_string
+    let timeStr = event.start_time;
+    if (!timeStr && (event.date_string.includes('·') || event.date_string.includes('•'))) {
+      const parts = event.date_string.split(/[·•]/);
+      if (parts.length > 1 && parts[1].trim()) {
+        timeStr = parts[1].trim();
+      }
+    }
+
+    if (timeStr) {
+      const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+      if (match) {
+        let hours = parseInt(match[1], 10);
+        const minutes = parseInt(match[2], 10);
+        const meridian = match[3]?.toUpperCase();
+        if (meridian === 'PM' && hours < 12) hours += 12;
+        if (meridian === 'AM' && hours === 12) hours = 0;
+        eventDate.setHours(hours, minutes, 0, 0);
+      }
+    }
+
+    const now = new Date();
+    if (eventDate.getTime() <= now.getTime()) {
+      return null; // Event has already passed
+    }
 
     // Schedule 24 hours before the event date (at 9:00 AM)
     const reminderTime = new Date(eventDate);
     reminderTime.setDate(reminderTime.getDate() - 1);
     reminderTime.setHours(9, 0, 0, 0);
 
-    const now = new Date();
-    // If 24h before is already in the past, schedule for 1 hour from now if event is in the future
-    let triggerTime: Date = reminderTime;
-    if (reminderTime.getTime() <= now.getTime()) {
-      if (eventDate.getTime() > now.getTime()) {
-        triggerTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
+    let triggerTime: Date;
+    let reminderBody: string;
+
+    if (reminderTime.getTime() > now.getTime()) {
+      triggerTime = reminderTime;
+      reminderBody = `Happening tomorrow${event.location ? ` at ${event.location}` : ''}! Tap to view details.`;
+    } else {
+      // Event is within 24 hours
+      const oneHourBefore = new Date(eventDate.getTime() - 60 * 60 * 1000);
+      if (oneHourBefore.getTime() > now.getTime()) {
+        triggerTime = oneHourBefore;
+        reminderBody = `Starting in 1 hour${event.location ? ` at ${event.location}` : ''}! Get ready.`;
       } else {
-        return null; // Event has already passed
+        const msUntilEvent = eventDate.getTime() - now.getTime();
+        if (msUntilEvent > 15 * 60 * 1000) {
+          triggerTime = new Date(now.getTime() + 5 * 60 * 1000);
+          reminderBody = `Happening today${event.location ? ` at ${event.location}` : ''}! Don't miss out.`;
+        } else {
+          return null; // Starting in under 15 mins or in the past
+        }
       }
     }
 
+    // Avoid duplicate reminders for the same event
+    await cancelEventReminder(event.id);
+
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: `Upcoming Event: ${event.title}`,
-        body: `Happening tomorrow${event.location ? ` at ${event.location}` : ''}! Don't miss out.`,
-        data: { eventId: event.id },
+        title: `Reminder: ${event.title}`,
+        body: reminderBody,
+        data: { eventId: event.id, id: event.id },
         sound: 'default',
       },
       trigger: {
@@ -296,12 +347,66 @@ export async function scheduleEventReminder(event: {
   }
 }
 
-// 10. Cancel a scheduled notification
+// 10. Cancel all scheduled notifications for a specific event
+export async function cancelEventReminder(eventId: string): Promise<void> {
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notif of scheduled) {
+      const data = notif.content.data;
+      if (data?.eventId === eventId || data?.id === eventId) {
+        await Notifications.cancelScheduledNotificationAsync(notif.identifier);
+      }
+    }
+  } catch (err) {
+    console.warn('[Notifications] Error cancelling reminder for event:', err);
+  }
+}
+
+// 11. Cancel a scheduled notification by notification ID
 export async function cancelScheduledReminder(notificationId: string): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(notificationId);
   } catch (err) {
     console.warn('[Notifications] Error cancelling reminder:', err);
+  }
+}
+
+// 12. Remote Push Notification Dispatcher (Invokes Supabase Edge Function)
+export interface SendPushNotificationParams {
+  userIds?: string[];
+  city?: string;
+  college?: string;
+  notificationType?: 'event_reminders' | 'campus_alerts' | 'city_updates' | 'weekly_digest';
+  title: string;
+  body: string;
+  data?: Record<string, any>;
+  channelId?: string;
+}
+
+export async function sendRemotePushNotification(params: SendPushNotificationParams): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke('send-push-notification', {
+      body: {
+        user_ids: params.userIds,
+        city: params.city,
+        college: params.college,
+        notification_type: params.notificationType || 'event_reminders',
+        title: params.title,
+        body: params.body,
+        data: params.data || {},
+        channel_id: params.channelId || 'default',
+      },
+    });
+
+    if (error) {
+      console.warn('[Notifications] Remote push notification error:', error);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.warn('[Notifications] Failed to invoke send-push-notification:', err);
+    return false;
   }
 }
 

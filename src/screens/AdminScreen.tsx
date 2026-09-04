@@ -36,6 +36,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
+import { sendRemotePushNotification } from '../lib/notifications';
 import type { EventRow, ReportRow, CollegeRow, FeedbackRow, ProfileRow } from '../types';
 
 export default function AdminScreen() {
@@ -221,6 +222,39 @@ export default function AdminScreen() {
         }
       }
 
+      // Send remote push notification to creator
+      if (eventItem.creator_id) {
+        sendRemotePushNotification({
+          userIds: [eventItem.creator_id],
+          title: 'Event Approved! 🎉',
+          body: `"${eventItem.title}" has been approved and is now live (+100 ET awarded).`,
+          data: { eventId: eventItem.id, id: eventItem.id },
+          channelId: 'events-reminders',
+        });
+      }
+
+      // Broadcast notification to college or city audience
+      const collegeTarget = eventItem.college_name || (eventItem as any).colleges?.name;
+      if (collegeTarget) {
+        sendRemotePushNotification({
+          college: collegeTarget,
+          notificationType: 'campus_alerts',
+          title: `New Campus Event: ${collegeTarget}`,
+          body: `"${eventItem.title}" just dropped for your college!`,
+          data: { eventId: eventItem.id, id: eventItem.id },
+          channelId: 'campus-alerts',
+        });
+      } else if (eventItem.city && eventItem.city !== 'Online') {
+        sendRemotePushNotification({
+          city: eventItem.city,
+          notificationType: 'city_updates',
+          title: `New Event in ${eventItem.city}`,
+          body: `"${eventItem.title}" is now live on EvenTime.`,
+          data: { eventId: eventItem.id, id: eventItem.id },
+          channelId: 'city-updates',
+        });
+      }
+
       Alert.alert('Approved', `"${eventItem.title}" is now published and live.`);
       loadData();
     } catch (err: any) {
@@ -231,15 +265,29 @@ export default function AdminScreen() {
   const handleConfirmReject = async () => {
     if (!rejectModalEventId) return;
     try {
+      const rejectedEvent = events.find((e) => e.id === rejectModalEventId);
+      const noteText = adminNotes.trim() || 'Rejected by moderator.';
+
       const { error } = await supabase
         .from('events')
         .update({
           status: 'rejected',
-          admin_notes: adminNotes.trim() || 'Rejected by moderator.',
+          admin_notes: noteText,
         })
         .eq('id', rejectModalEventId);
 
       if (error) throw error;
+
+      // Notify creator about rejection
+      if (rejectedEvent?.creator_id) {
+        sendRemotePushNotification({
+          userIds: [rejectedEvent.creator_id],
+          title: 'Event Submission Update',
+          body: `Your submission "${rejectedEvent.title}" was not approved: ${noteText}`,
+          data: { eventId: rejectedEvent.id, id: rejectedEvent.id },
+          channelId: 'default',
+        });
+      }
 
       Alert.alert('Rejected', 'Event has been marked as rejected.');
       setRejectModalEventId(null);
