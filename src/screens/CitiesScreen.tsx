@@ -21,6 +21,7 @@ import { theme } from '../config/theme';
 import { CITIES } from '../lib/constants/cities';
 import { getCityImage, APP_ASSETS } from '../lib/asset-registry';
 import { parseEventDateString } from '../lib/utils/date';
+import { withTimeout } from '../lib/api-resilience';
 import type { RootStackParamList } from '../types';
 
 const { width } = Dimensions.get('window');
@@ -36,18 +37,20 @@ export default function CitiesScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const { data, error } = await supabase
+        const query = supabase
           .from('events')
           .select('city, date_string')
           .eq('status', 'approved')
           .or('college_only.is.null,college_only.eq.false');
+
+        const { data, error } = await withTimeout(query, 8000);
 
         if (!error && data) {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
 
           const counts: Record<string, number> = {};
-          data.forEach((ev) => {
+          data.forEach((ev: any) => {
             // Strictly exclude past events from upcoming city counts
             const parsed = parseEventDateString(ev.date_string || '');
             if (parsed) {

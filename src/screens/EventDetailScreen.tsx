@@ -43,6 +43,7 @@ import { theme } from '../config/theme';
 import { getCategoryConfig } from '../lib/category-config';
 import { APP_ASSETS, getCategoryPoster } from '../lib/asset-registry';
 import { scheduleEventReminder, cancelEventReminder, sendRemotePushNotification } from '../lib/notifications';
+import { withTimeout } from '../lib/api-resilience';
 import { useAuth } from '../context/AuthContext';
 import { EventCard } from '../components/EventCard';
 import { EmptyState } from '../components/EmptyState';
@@ -136,7 +137,7 @@ export default function EventDetailScreen() {
         query = query.eq('slug', target);
       }
 
-      const { data, error } = await query.maybeSingle();
+      const { data, error } = await withTimeout(query.maybeSingle(), 8000);
       if (error) throw error;
       setEvent(data as any);
 

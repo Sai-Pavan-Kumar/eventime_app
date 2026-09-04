@@ -51,7 +51,7 @@ export default function SettingsScreen() {
 
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [username, setUsername] = useState(profile?.username || '');
-  const isUsernameLocked = !isAdmin && Boolean(profile?.is_onboarded || profile?.username);
+  const isUsernameLocked = !isAdmin && Boolean(profile?.is_onboarded);
   const [userType, setUserType] = useState<'student' | 'professional'>((profile?.user_type as any) || 'student');
   const [college, setCollege] = useState(profile?.college || '');
   const [collegeId, setCollegeId] = useState<string | null>(profile?.college_id || null);

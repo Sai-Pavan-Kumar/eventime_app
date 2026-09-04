@@ -33,6 +33,7 @@ import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
 import { EmptyState } from '../components/EmptyState';
+import { FeedSkeleton } from '../components/EventCardSkeleton';
 import { SmartRatingModal } from '../components/SmartRatingModal';
 import { DelayedPromptModal } from '../components/DelayedPromptModal';
 import { shouldShowRatingPrompt } from '../lib/rating-prompt';
@@ -40,6 +41,7 @@ import { APP_ASSETS } from '../lib/asset-registry';
 import { parseEventDateString } from '../lib/utils/date';
 import { getGuestPreferences, OnboardingData } from '../lib/guest-preferences';
 import { haptic } from '../lib/haptics';
+import { withTimeout } from '../lib/api-resilience';
 import type { EventRow, RootStackParamList } from '../types';
 
 const { width } = Dimensions.get('window');
@@ -288,7 +290,7 @@ export default function HomeScreen() {
         .order('created_at', { ascending: false })
         .range(from, to);
 
-      const { data, error } = await query;
+      const { data, error } = await withTimeout(query, 8000);
 
       if (error) {
         console.error('[HomeScreen] Fetch events error:', error);
@@ -707,9 +709,7 @@ export default function HomeScreen() {
 
       {/* Horizontally Swipeable Feeds Container */}
       {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.brand} />
-        </View>
+        <FeedSkeleton count={3} />
       ) : (
         <Animated.ScrollView
           ref={pagerRef}

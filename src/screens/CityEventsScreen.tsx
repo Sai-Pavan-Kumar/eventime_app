@@ -23,6 +23,8 @@ import { EventCard } from '../components/EventCard';
 import { getCityCover, APP_ASSETS } from '../lib/asset-registry';
 import { parseEventDateString } from '../lib/utils/date';
 import { haptic } from '../lib/haptics';
+import { FeedSkeleton } from '../components/EventCardSkeleton';
+import { withTimeout } from '../lib/api-resilience';
 import type { EventRow, RootStackParamList } from '../types';
 
 const PAGE_SIZE = 12;
@@ -48,7 +50,7 @@ export default function CityEventsScreen() {
         const from = pageIndex * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
-        const { data, error } = await supabase
+        const query = supabase
           .from('events')
           .select('*, colleges(name), profiles(username, full_name), interested_events(count)')
           .eq('status', 'approved')
@@ -57,13 +59,15 @@ export default function CityEventsScreen() {
           .order('created_at', { ascending: false })
           .range(from, to);
 
+        const { data, error } = await withTimeout(query, 8000);
+
         if (error) throw error;
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
         // Filter out past events so only upcoming events in this city are shown
-        const upcomingBatch = (data || []).filter((ev) => {
+        const upcomingBatch = (data || []).filter((ev: any) => {
           const parsed = parseEventDateString(ev.date_string || '');
           if (!parsed) return true;
           const evDate = new Date(parsed);
@@ -163,9 +167,9 @@ export default function CityEventsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#6C47FF" />
-          <Text style={styles.loadingText}>Loading upcoming {city} events...</Text>
+        <View style={{ flex: 1 }}>
+          {renderHeader()}
+          <FeedSkeleton count={3} />
         </View>
       ) : (
         <FlatList

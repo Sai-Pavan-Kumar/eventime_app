@@ -27,6 +27,8 @@ import {
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
+import { FeedSkeleton } from '../components/EventCardSkeleton';
+import { withTimeout } from '../lib/api-resilience';
 import { SelectPickerModal } from '../components/SelectPickerModal';
 import { CATEGORIES_LIST } from '../lib/category-config';
 import { CITIES } from '../lib/constants/cities';
@@ -87,12 +89,14 @@ export default function SearchScreen() {
   // Fetch all approved events with relations
   const fetchAllEvents = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('events')
         .select('*, colleges(name), profiles(username, full_name), interested_events(count)')
         .eq('status', 'approved')
         .or('college_only.is.null,college_only.eq.false')
         .order('created_at', { ascending: false });
+
+      const { data, error } = await withTimeout(query, 8000);
 
       if (error) throw error;
       setAllEvents((data as any[]) || []);
@@ -456,10 +460,7 @@ export default function SearchScreen() {
 
       {/* Results / Content */}
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#6C47FF" />
-          <Text style={styles.loadingText}>Searching events...</Text>
-        </View>
+        <FeedSkeleton count={4} />
       ) : (
         <FlatList
           data={visibleEvents}

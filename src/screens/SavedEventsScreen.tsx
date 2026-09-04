@@ -17,6 +17,8 @@ import { ArrowLeft, Bookmark, Compass } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
+import { FeedSkeleton } from '../components/EventCardSkeleton';
+import { withTimeout } from '../lib/api-resilience';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { useAuth } from '../context/AuthContext';
 import { haptic } from '../lib/haptics';
@@ -36,11 +38,13 @@ export default function SavedEventsScreen() {
       return;
     }
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('saved_events')
         .select('events(*)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
+
+      const { data, error } = await withTimeout(query, 8000);
 
       if (error) throw error;
 
@@ -91,9 +95,7 @@ export default function SavedEventsScreen() {
       </View>
 
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={theme.colors.brand} />
-        </View>
+        <FeedSkeleton count={3} />
       ) : (
         <FlatList
           data={savedEvents}

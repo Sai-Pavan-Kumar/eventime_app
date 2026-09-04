@@ -30,6 +30,8 @@ import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { EmptyState } from '../components/EmptyState';
+import { FeedSkeleton } from '../components/EventCardSkeleton';
+import { withTimeout } from '../lib/api-resilience';
 import { parseEventDateString } from '../lib/utils/date';
 import type { EventRow, RootStackParamList } from '../types';
 
@@ -47,10 +49,12 @@ export default function MyPostedEventsScreen() {
       return;
     }
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('events')
         .select('*, saved_events(count), interested_events(count)')
         .eq('creator_id', user.id);
+
+      const { data, error } = await withTimeout(query, 8000);
 
       if (error) throw error;
 
@@ -148,9 +152,7 @@ export default function MyPostedEventsScreen() {
       </View>
 
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={theme.colors.brand} />
-        </View>
+        <FeedSkeleton count={3} />
       ) : (
         <FlatList
           data={events}
