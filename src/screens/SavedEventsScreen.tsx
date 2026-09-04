@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -18,6 +19,7 @@ import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { useAuth } from '../context/AuthContext';
+import { haptic } from '../lib/haptics';
 import type { EventRow, RootStackParamList } from '../types';
 
 export default function SavedEventsScreen() {
@@ -60,6 +62,7 @@ export default function SavedEventsScreen() {
   }, [fetchSaved]);
 
   const onRefresh = () => {
+    haptic.light();
     setIsRefreshing(true);
     fetchSaved();
   };
@@ -74,7 +77,13 @@ export default function SavedEventsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            haptic.light();
+            navigation.goBack();
+          }}
+        >
           <ArrowLeft size={22} color={theme.colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Saved Events</Text>
@@ -91,6 +100,11 @@ export default function SavedEventsScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS === 'android'}
+          updateCellsBatchingPeriod={50}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}

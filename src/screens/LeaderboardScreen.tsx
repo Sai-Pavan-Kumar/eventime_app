@@ -10,6 +10,7 @@ import {
   ScrollView,
   Modal,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -33,6 +34,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { APP_ASSETS } from '../lib/asset-registry';
+import { haptic } from '../lib/haptics';
 import { useAuth } from '../context/AuthContext';
 import type { LeaderboardViewRow } from '../types';
 
@@ -318,6 +320,7 @@ export default function LeaderboardScreen() {
 
   const handleCitySelect = async (city: string) => {
     if (city === selectedLeaderboardCity) return;
+    haptic.selection();
     setSelectedLeaderboardCity(city);
     const cityRows = await fetchCohort('city', city);
     setCohortData((prev) => ({ ...prev, city: cityRows }));
@@ -325,6 +328,7 @@ export default function LeaderboardScreen() {
 
   const handleTabPress = (idx: number) => {
     if (idx === activeTabIndex) return;
+    haptic.light();
     setActiveTabIndex(idx);
     pagerRef.current?.scrollTo({ x: idx * width, animated: true });
   };
@@ -333,6 +337,7 @@ export default function LeaderboardScreen() {
     const offsetX = e.nativeEvent.contentOffset.x;
     const newIdx = Math.round(offsetX / width);
     if (newIdx >= 0 && newIdx < cohortTabs.length && newIdx !== activeTabIndex) {
+      haptic.light();
       setActiveTabIndex(newIdx);
     }
   };
@@ -560,6 +565,11 @@ export default function LeaderboardScreen() {
                       { paddingBottom: user ? Math.max(insets.bottom, 12) + 90 : 32 },
                     ]}
                     showsVerticalScrollIndicator={false}
+                    initialNumToRender={8}
+                    maxToRenderPerBatch={8}
+                    windowSize={7}
+                    removeClippedSubviews={Platform.OS === 'android'}
+                    updateCellsBatchingPeriod={50}
                     refreshControl={
                       <RefreshControl
                         refreshing={isRefreshing}

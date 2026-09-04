@@ -26,6 +26,7 @@ import {
   type NotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
 } from '../lib/notifications';
+import { haptic } from '../lib/haptics';
 
 const GRAD_YEARS = ['2024', '2025', '2026', '2027', '2028', '2029', '2030'];
 
@@ -106,10 +107,12 @@ export default function SettingsScreen() {
   }, [user?.id]);
 
   const toggleNotifPref = (key: keyof NotificationPreferences) => {
+    haptic.light();
     setNotifPrefs((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const toggleCity = (city: string) => {
+    haptic.light();
     if (preferredCities.includes(city)) {
       setPreferredCities(preferredCities.filter((c) => c !== city));
     } else {
@@ -122,6 +125,7 @@ export default function SettingsScreen() {
   };
 
   const toggleCategory = (cat: string) => {
+    haptic.light();
     if (goals.includes(cat)) {
       setGoals(goals.filter((g) => g !== cat));
     } else {
@@ -283,6 +287,7 @@ export default function SettingsScreen() {
       await saveNotificationPreferences(notifPrefs, user.id);
 
       await refreshProfile();
+      haptic.success();
       Alert.alert('Success', 'Profile settings updated successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);

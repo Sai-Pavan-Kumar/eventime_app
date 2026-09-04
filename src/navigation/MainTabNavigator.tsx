@@ -10,6 +10,7 @@ import SearchScreen from '../screens/SearchScreen';
 import CitiesScreen from '../screens/CitiesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { theme } from '../config/theme';
+import { haptic } from '../lib/haptics';
 import type { MainTabParamList, RootStackParamList } from '../types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -27,6 +28,11 @@ export function MainTabNavigator() {
 
   return (
     <Tab.Navigator
+      screenListeners={{
+        tabPress: () => {
+          haptic.light();
+        },
+      }}
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
@@ -97,6 +103,7 @@ export function MainTabNavigator() {
         listeners={{
           tabPress: (e) => {
             e.preventDefault();
+            haptic.medium();
             rootNavigation.navigate('CreateEvent', {});
           },
         }}

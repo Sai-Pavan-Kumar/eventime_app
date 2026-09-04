@@ -43,6 +43,7 @@ import { INDIAN_COLLEGE_BRANCHES } from '../lib/constants/branches';
 import { setHasCompletedOnboarding } from '../lib/guest-preferences';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { theme } from '../config/theme';
+import { haptic } from '../lib/haptics';
 
 interface CollegeItem {
   id: string;
@@ -526,6 +527,7 @@ export default function OnboardingScreen() {
       }
 
       setProfileSubStep(5);
+      haptic.success();
       startRadarAnimation();
     } catch (err: any) {
       console.error('[Onboarding] Profile save error:', err);
@@ -551,12 +553,14 @@ export default function OnboardingScreen() {
   };
 
   const handleSelectBranch = (b: string) => {
+    haptic.selection();
     setBranch(b);
     setBranchSearch(b);
     setBranchesList([]);
   };
 
   const handleClearBranch = () => {
+    haptic.light();
     setBranch('');
     setBranchSearch('');
     setBranchesList([]);
@@ -588,6 +592,7 @@ export default function OnboardingScreen() {
 
   // Toggle helpers for multi-select
   const toggleCity = (city: string) => {
+    haptic.light();
     if (selectedCities.includes(city)) {
       setSelectedCities(selectedCities.filter((c) => c !== city));
     } else {
@@ -600,6 +605,7 @@ export default function OnboardingScreen() {
   };
 
   const toggleGoal = (cat: string) => {
+    haptic.light();
     if (selectedGoals.includes(cat)) {
       setSelectedGoals(selectedGoals.filter((g) => g !== cat));
     } else {

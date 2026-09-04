@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -20,7 +22,10 @@ import { theme } from '../config/theme';
 import { EventCard } from '../components/EventCard';
 import { getCityCover, APP_ASSETS } from '../lib/asset-registry';
 import { parseEventDateString } from '../lib/utils/date';
+import { haptic } from '../lib/haptics';
 import type { EventRow, RootStackParamList } from '../types';
+
+const PAGE_SIZE = 12;
 
 export default function CityEventsScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'CityEvents'>>();
@@ -30,42 +35,84 @@ export default function CityEventsScreen() {
 
   const [events, setEvents] = useState<EventRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
-  useEffect(() => {
-    (async () => {
+  const fetchCityEvents = useCallback(
+    async (pageIndex = 0, isRefresh = false) => {
       try {
+        if (pageIndex === 0 && !isRefresh) setIsLoading(true);
+
+        const from = pageIndex * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+
         const { data, error } = await supabase
           .from('events')
           .select('*, colleges(name), profiles(username, full_name), interested_events(count)')
           .eq('status', 'approved')
           .or('college_only.is.null,college_only.eq.false')
           .ilike('city', city)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .range(from, to);
 
-        if (!error && data) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
+        if (error) throw error;
 
-          // Strictly filter out past events so only upcoming events in this city are shown
-          const upcomingEvents = data.filter((ev) => {
-            const parsed = parseEventDateString(ev.date_string || '');
-            if (!parsed) return true;
-            const evDate = new Date(parsed);
-            evDate.setHours(0, 0, 0, 0);
-            return evDate.getTime() >= today.getTime();
-          });
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-          setEvents((upcomingEvents as any[]) || []);
+        // Filter out past events so only upcoming events in this city are shown
+        const upcomingBatch = (data || []).filter((ev) => {
+          const parsed = parseEventDateString(ev.date_string || '');
+          if (!parsed) return true;
+          const evDate = new Date(parsed);
+          evDate.setHours(0, 0, 0, 0);
+          return evDate.getTime() >= today.getTime();
+        });
+
+        if (!data || data.length < PAGE_SIZE) {
+          setHasMore(false);
+        } else {
+          setHasMore(true);
         }
+
+        setEvents((prev) => (pageIndex === 0 ? upcomingBatch : [...prev, ...upcomingBatch]));
       } catch (err) {
         console.error('[CityEventsScreen] Fetch error:', err);
       } finally {
         setIsLoading(false);
+        setIsRefreshing(false);
+        setIsFetchingMore(false);
       }
-    })();
-  }, [city]);
+    },
+    [city]
+  );
+
+  useEffect(() => {
+    setPage(0);
+    setHasMore(true);
+    fetchCityEvents(0);
+  }, [fetchCityEvents]);
+
+  const onRefresh = () => {
+    haptic.light();
+    setIsRefreshing(true);
+    setPage(0);
+    setHasMore(true);
+    fetchCityEvents(0, true);
+  };
+
+  const loadMore = () => {
+    if (!hasMore || isFetchingMore || isLoading || isRefreshing) return;
+    setIsFetchingMore(true);
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchCityEvents(nextPage);
+  };
 
   const handleHostEvent = () => {
+    haptic.light();
     if (!user) {
       Alert.alert(
         'Sign In Required',
@@ -95,7 +142,10 @@ export default function CityEventsScreen() {
 
       <TouchableOpacity
         style={styles.backButton}
-        onPress={() => navigation.goBack()}
+        onPress={() => {
+          haptic.light();
+          navigation.goBack();
+        }}
         activeOpacity={0.8}
       >
         <ArrowLeft size={20} color="#0F172A" />
@@ -124,6 +174,29 @@ export default function CityEventsScreen() {
           ListHeaderComponent={renderHeader}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS === 'android'}
+          updateCellsBatchingPeriod={50}
+          keyboardDismissMode="on-drag"
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              colors={['#6C47FF']}
+              tintColor="#6C47FF"
+            />
+          }
+          ListFooterComponent={
+            isFetchingMore ? (
+              <View style={{ paddingVertical: 20 }}>
+                <ActivityIndicator size="small" color="#6C47FF" />
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Image
@@ -147,13 +220,14 @@ export default function CityEventsScreen() {
             <View style={styles.cardWrapper}>
               <EventCard
                 event={item}
-                onPress={() =>
+                onPress={() => {
+                  haptic.light();
                   navigation.navigate('EventDetail', {
                     id: item.id,
                     eventId: item.id,
                     slug: item.slug || item.id,
-                  })
-                }
+                  });
+                }}
               />
             </View>
           )}

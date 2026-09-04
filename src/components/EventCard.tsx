@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { parseEventDateString, formatEventTime } from '../lib/utils/date';
 import { scheduleEventReminder, cancelEventReminder } from '../lib/notifications';
+import { haptic } from '../lib/haptics';
 import type { EventRow } from '../types';
 
 export interface EventCardProps {
@@ -97,6 +98,7 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
   })();
 
   const handlePress = () => {
+    haptic.light();
     if (props.onPress) {
       props.onPress();
     } else if (id || slug) {
@@ -105,6 +107,7 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
   };
 
   const handleOrganizerPress = () => {
+    haptic.light();
     if (props.onOrganizerPress) {
       props.onOrganizerPress();
     } else if (organizerUsername) {
@@ -116,6 +119,7 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
   };
 
   const handleCityPress = () => {
+    haptic.light();
     const targetCity = city || 'Online';
     if (props.onCityPress) {
       props.onCityPress(targetCity);
@@ -131,6 +135,11 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
     }
 
     const nextState = !isSaved;
+    if (nextState) {
+      haptic.medium();
+    } else {
+      haptic.light();
+    }
     setIsSaved(nextState);
     setIsSaving(true);
 

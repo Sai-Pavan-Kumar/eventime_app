@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useDeferredValue } from 'react';
 import {
   View,
   Text,
@@ -33,6 +33,7 @@ import { CITIES } from '../lib/constants/cities';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { parseEventDateString } from '../lib/utils/date';
 import { useAuth } from '../context/AuthContext';
+import { haptic } from '../lib/haptics';
 import type { EventRow, RootStackParamList } from '../types';
 
 const MONTH_NAMES = [
@@ -46,9 +47,11 @@ export default function SearchScreen() {
   const { user } = useAuth();
 
   const [keyword, setKeyword] = useState('');
+  const deferredKeyword = useDeferredValue(keyword);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [displayLimit, setDisplayLimit] = useState(15);
 
   const getTodayStr = () => {
     const now = new Date();
@@ -241,8 +244,8 @@ export default function SearchScreen() {
     }
 
     // 2. Keyword search (Event title, category, city, location, organizer, college, curator username/name, description)
-    if (keyword.trim()) {
-      const q = keyword.trim().toLowerCase();
+    if (deferredKeyword.trim()) {
+      const q = deferredKeyword.trim().toLowerCase();
       pool = pool.filter((ev: any) => {
         const title = (ev.title || '').toLowerCase();
         const category = (ev.category || '').toLowerCase();
@@ -300,9 +303,26 @@ export default function SearchScreen() {
     });
 
     return pool;
-  }, [allEvents, keyword, selectedCity, selectedCategory, selectedDate]);
+  }, [allEvents, deferredKeyword, selectedCity, selectedCategory, selectedDate]);
+
+  // Reset displayLimit to 15 whenever any filter or search query changes
+  useEffect(() => {
+    setDisplayLimit(15);
+  }, [deferredKeyword, selectedCity, selectedCategory, selectedDate]);
+
+  // Virtualized progressive slice of events for peak scroll fluidity
+  const visibleEvents = useMemo(() => {
+    return filteredEvents.slice(0, displayLimit);
+  }, [filteredEvents, displayLimit]);
+
+  const handleLoadMore = () => {
+    if (displayLimit < filteredEvents.length) {
+      setDisplayLimit((prev) => prev + 15);
+    }
+  };
 
   const clearAllFilters = () => {
+    haptic.light();
     setKeyword('');
     setSelectedCity(null);
     setSelectedCategory(null);
@@ -442,14 +462,26 @@ export default function SearchScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredEvents}
+          data={visibleEvents}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          initialNumToRender={8}
-          maxToRenderPerBatch={10}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
           windowSize={7}
           removeClippedSubviews={Platform.OS === 'android'}
+          updateCellsBatchingPeriod={50}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            displayLimit < filteredEvents.length ? (
+              <View style={{ paddingVertical: 18, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="#6C47FF" />
+              </View>
+            ) : null
+          }
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}

@@ -39,6 +39,7 @@ import { shouldShowRatingPrompt } from '../lib/rating-prompt';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { parseEventDateString } from '../lib/utils/date';
 import { getGuestPreferences, OnboardingData } from '../lib/guest-preferences';
+import { haptic } from '../lib/haptics';
 import type { EventRow, RootStackParamList } from '../types';
 
 const { width } = Dimensions.get('window');
@@ -132,6 +133,7 @@ export default function HomeScreen() {
   });
 
   const handleSelectTab = (idx: number) => {
+    haptic.light();
     setActiveTabIdx(idx);
     pagerRef.current?.scrollTo({ x: idx * width, animated: true });
   };
@@ -140,6 +142,7 @@ export default function HomeScreen() {
     const offsetX = e.nativeEvent.contentOffset.x;
     const newIdx = Math.round(offsetX / width);
     if (newIdx >= 0 && newIdx < tabs.length && newIdx !== activeTabIdx) {
+      haptic.light();
       setActiveTabIdx(newIdx);
     }
   };
@@ -517,6 +520,7 @@ export default function HomeScreen() {
   };
 
   const handleSelectDay = (day: number) => {
+    haptic.selection();
     const m = String(calendarMonth + 1).padStart(2, '0');
     const d = String(day).padStart(2, '0');
     setSelectedDate(`${calendarYear}-${m}-${d}`);
@@ -524,6 +528,7 @@ export default function HomeScreen() {
   };
 
   const handleSelectToday = () => {
+    haptic.selection();
     const now = new Date();
     const y = now.getFullYear();
     const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -535,6 +540,7 @@ export default function HomeScreen() {
   };
 
   const handleClearDate = () => {
+    haptic.light();
     setSelectedDate(null);
     setShowDateModal(false);
   };
