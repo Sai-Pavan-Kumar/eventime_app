@@ -36,13 +36,11 @@ import { APP_ASSETS } from '../lib/asset-registry';
 import { parseEventDateString } from '../lib/utils/date';
 import { useAuth } from '../context/AuthContext';
 import { haptic } from '../lib/haptics';
+import { SearchBar } from '../components/search/SearchBar';
+import { SearchFilterRow } from '../components/search/SearchFilterRow';
+import { HomeActiveDateBanner } from '../components/home/HomeActiveDateBanner';
+import { CalendarPickerModal } from '../components/CalendarPickerModal';
 import type { EventRow, RootStackParamList } from '../types';
-
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-const WEEKDAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 export default function SearchScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -76,10 +74,6 @@ export default function SearchScreen() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showCityModal, setShowCityModal] = useState(false);
   const [showDateModal, setShowDateModal] = useState(false);
-
-  // Calendar State (Matching HomeScreen parity)
-  const [calendarYear, setCalendarYear] = useState(() => new Date().getFullYear());
-  const [calendarMonth, setCalendarMonth] = useState(() => new Date().getMonth());
 
   const [allEvents, setAllEvents] = useState<EventRow[]>([]);
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(new Set());
@@ -168,65 +162,6 @@ export default function SearchScreen() {
 
     return { categoryCounts: catMap, cityCounts: cityMap, eventDates: datesSet };
   }, [allEvents]);
-
-  // Calendar calculations (HomeScreen parity)
-  const calendarDays = useMemo(() => {
-    const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
-    const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
-    const days: (number | null)[] = [];
-    for (let i = 0; i < firstDay; i++) {
-      days.push(null);
-    }
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(i);
-    }
-    return days;
-  }, [calendarYear, calendarMonth]);
-
-  const handlePrevMonth = () => {
-    if (calendarMonth === 0) {
-      setCalendarMonth(11);
-      setCalendarYear((y) => y - 1);
-    } else {
-      setCalendarMonth((m) => m - 1);
-    }
-  };
-
-  const handleNextMonth = () => {
-    if (calendarMonth === 11) {
-      setCalendarMonth(0);
-      setCalendarYear((y) => y + 1);
-    } else {
-      setCalendarMonth((m) => m + 1);
-    }
-  };
-
-  const handleSelectDay = (day: number) => {
-    const m = String(calendarMonth + 1).padStart(2, '0');
-    const d = String(day).padStart(2, '0');
-    const dateKey = `${calendarYear}-${m}-${d}`;
-    if (selectedDate === dateKey) {
-      setSelectedDate(null);
-    } else {
-      setSelectedDate(dateKey);
-    }
-    setShowDateModal(false);
-  };
-
-  const handleSelectToday = () => {
-    const now = new Date();
-    setCalendarYear(now.getFullYear());
-    setCalendarMonth(now.getMonth());
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    setSelectedDate(`${now.getFullYear()}-${m}-${d}`);
-    setShowDateModal(false);
-  };
-
-  const handleClearDate = () => {
-    setSelectedDate(null);
-    setShowDateModal(false);
-  };
 
   // Comprehensive multi-field search and filtering
   const filteredEvents = useMemo(() => {
@@ -339,123 +274,44 @@ export default function SearchScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Search Bar Header */}
+      {/* Search Bar & Filter Header */}
       <View style={styles.header}>
-        <View style={styles.searchBar}>
-          <Search size={18} color="#94A3B8" />
-          <TextInput
-            style={styles.input}
-            placeholder="Search events, categories, cities, curators..."
-            placeholderTextColor="#94A3B8"
-            value={keyword}
-            onChangeText={setKeyword}
-            returnKeyType="search"
-            autoCapitalize="none"
-          />
-          {keyword.length > 0 && (
-            <TouchableOpacity onPress={() => setKeyword('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <X size={16} color="#94A3B8" />
-            </TouchableOpacity>
-          )}
-        </View>
+        <SearchBar
+          keyword={keyword}
+          onChangeKeyword={setKeyword}
+          onClear={() => setKeyword('')}
+        />
 
-        {/* Filter Chips Horizontal Scroll: Calendar | City | Category | Price */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScroll}
-        >
-          {/* 1. Calendar Date Button (HomeScreen Parity) */}
-          <TouchableOpacity
-            style={[styles.dropdownChip, Boolean(selectedDate) && styles.chipActive]}
-            onPress={() => setShowDateModal(true)}
-            activeOpacity={0.8}
-          >
-            <CalendarDays size={14} color={selectedDate ? '#FFF' : '#6C47FF'} />
-            <Text style={[styles.chipText, Boolean(selectedDate) && styles.chipTextActive]}>
-              {selectedDate
-                ? new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
-                : 'Date'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* 2. Today Filter */}
-          <TouchableOpacity
-            style={[styles.chip, selectedDate === getTodayStr() && styles.chipActive]}
-            onPress={() => {
-              const todayStr = getTodayStr();
-              setSelectedDate((prev) => (prev === todayStr ? null : todayStr));
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.chipText, selectedDate === getTodayStr() && styles.chipTextActive]}>
-              Today
-            </Text>
-          </TouchableOpacity>
-
-          {/* 3. Tomorrow Filter */}
-          <TouchableOpacity
-            style={[styles.chip, selectedDate === getTomorrowStr() && styles.chipActive]}
-            onPress={() => {
-              const tomorrowStr = getTomorrowStr();
-              setSelectedDate((prev) => (prev === tomorrowStr ? null : tomorrowStr));
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.chipText, selectedDate === getTomorrowStr() && styles.chipTextActive]}>
-              Tomorrow
-            </Text>
-          </TouchableOpacity>
-
-          {/* 4. City Dropdown */}
-          <TouchableOpacity
-            style={[styles.dropdownChip, selectedCity && styles.chipActive]}
-            onPress={() => setShowCityModal(true)}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.chipText, selectedCity && styles.chipTextActive]}>
-              {selectedCity
-                ? `${selectedCity}${cityCounts[selectedCity] !== undefined ? ` (${cityCounts[selectedCity]})` : ''}`
-                : 'City'}
-            </Text>
-            <ChevronDown size={14} color={selectedCity ? '#FFF' : '#64748B'} />
-          </TouchableOpacity>
-
-          {/* 5. Category Dropdown */}
-          <TouchableOpacity
-            style={[styles.dropdownChip, selectedCategory && styles.chipActive]}
-            onPress={() => setShowCategoryModal(true)}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.chipText, selectedCategory && styles.chipTextActive]}>
-              {selectedCategory
-                ? `${selectedCategory}${categoryCounts[selectedCategory] !== undefined ? ` (${categoryCounts[selectedCategory]})` : ''}`
-                : 'Category'}
-            </Text>
-            <ChevronDown size={14} color={selectedCategory ? '#FFF' : '#64748B'} />
-          </TouchableOpacity>
-
-          {/* Clear Button if any filter is active */}
-          {hasActiveFilters && (
-            <TouchableOpacity style={styles.clearChip} onPress={clearAllFilters} activeOpacity={0.8}>
-              <X size={12} color="#EF4444" />
-              <Text style={styles.clearChipText}>Reset</Text>
-            </TouchableOpacity>
-          )}
-        </ScrollView>
+        <SearchFilterRow
+          selectedDate={selectedDate}
+          onOpenDateModal={() => setShowDateModal(true)}
+          onToggleToday={() => {
+            const todayStr = getTodayStr();
+            setSelectedDate((prev) => (prev === todayStr ? null : todayStr));
+          }}
+          isTodayActive={selectedDate === getTodayStr()}
+          onToggleTomorrow={() => {
+            const tomorrowStr = getTomorrowStr();
+            setSelectedDate((prev) => (prev === tomorrowStr ? null : tomorrowStr));
+          }}
+          isTomorrowActive={selectedDate === getTomorrowStr()}
+          selectedCity={selectedCity}
+          cityCounts={cityCounts}
+          onOpenCityModal={() => setShowCityModal(true)}
+          selectedCategory={selectedCategory}
+          categoryCounts={categoryCounts}
+          onOpenCategoryModal={() => setShowCategoryModal(true)}
+          hasActiveFilters={hasActiveFilters}
+          onResetFilters={clearAllFilters}
+        />
       </View>
 
-      {/* Active Calendar Date Banner (Identical to HomeScreen) */}
+      {/* Active Calendar Date Banner */}
       {selectedDate && (
-        <View style={styles.activeDateBanner}>
-          <Text style={styles.activeDateBannerText}>
-            Showing events for {new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
-          </Text>
-          <TouchableOpacity onPress={() => setSelectedDate(null)} style={styles.clearActiveDateBtn}>
-            <X size={14} color="#EF4444" />
-            <Text style={styles.clearActiveDateBtnText}>Clear</Text>
-          </TouchableOpacity>
-        </View>
+        <HomeActiveDateBanner
+          selectedDate={selectedDate}
+          onClearDate={() => setSelectedDate(null)}
+        />
       )}
 
       {/* Results / Content */}
@@ -571,106 +427,15 @@ export default function SearchScreen() {
         searchPlaceholder="Search Indian cities..."
       />
 
-      {/* Calendar Month Grid Modal (HomeScreen Parity) */}
-      {showDateModal && (
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => setShowDateModal(false)}
-          />
-          <View style={styles.calendarModalContent}>
-            {/* Modal Header */}
-            <View style={styles.calendarModalHeader}>
-              <View style={styles.monthSelector}>
-                <TouchableOpacity onPress={handlePrevMonth} style={styles.monthNavBtn}>
-                  <ChevronLeft size={20} color="#0F172A" />
-                </TouchableOpacity>
-                <Text style={styles.monthYearText}>
-                  {MONTH_NAMES[calendarMonth]} {calendarYear}
-                </Text>
-                <TouchableOpacity onPress={handleNextMonth} style={styles.monthNavBtn}>
-                  <ChevronRight size={20} color="#0F172A" />
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setShowDateModal(false)}
-              >
-                <X size={18} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Weekday Row */}
-            <View style={styles.weekdayRow}>
-              {WEEKDAY_NAMES.map((day, idx) => (
-                <Text key={idx} style={styles.weekdayText}>
-                  {day}
-                </Text>
-              ))}
-            </View>
-
-            {/* Days Grid */}
-            <View style={styles.daysGrid}>
-              {calendarDays.map((day, idx) => {
-                if (day === null) {
-                  return <View key={idx} style={styles.emptyDayCell} />;
-                }
-
-                const m = String(calendarMonth + 1).padStart(2, '0');
-                const d = String(day).padStart(2, '0');
-                const dateKey = `${calendarYear}-${m}-${d}`;
-                const isSelected = selectedDate === dateKey;
-                const hasEvents = eventDates.has(dateKey);
-
-                const now = new Date();
-                const isToday =
-                  now.getFullYear() === calendarYear &&
-                  now.getMonth() === calendarMonth &&
-                  now.getDate() === day;
-
-                return (
-                  <TouchableOpacity
-                    key={idx}
-                    style={[
-                      styles.dayCell,
-                      isSelected && styles.dayCellSelected,
-                      isToday && !isSelected && styles.dayCellToday,
-                    ]}
-                    onPress={() => handleSelectDay(day)}
-                  >
-                    <Text
-                      style={[
-                        styles.dayText,
-                        isSelected && styles.dayTextSelected,
-                        isToday && !isSelected && styles.dayTextToday,
-                      ]}
-                    >
-                      {day}
-                    </Text>
-                    {hasEvents && !isSelected && <View style={styles.eventDot} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Modal Bottom Actions */}
-            <View style={styles.calendarModalFooter}>
-              <TouchableOpacity style={styles.todayBtn} onPress={handleSelectToday}>
-                <Clock size={14} color="#6C47FF" />
-                <Text style={styles.todayBtnText}>Today</Text>
-              </TouchableOpacity>
-
-              {selectedDate && (
-                <TouchableOpacity style={styles.clearDateBtn} onPress={handleClearDate}>
-                  <Text style={styles.clearDateBtnText}>Clear Date</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </View>
-      )}
+      {/* Shared Calendar Month Grid Modal */}
+      <CalendarPickerModal
+        visible={showDateModal}
+        selectedDate={selectedDate}
+        eventDates={eventDates}
+        onSelectDate={(dateStr) => setSelectedDate(dateStr)}
+        onClearDate={() => setSelectedDate(null)}
+        onClose={() => setShowDateModal(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -806,185 +571,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Switzer-Bold',
     color: '#FFFFFF',
     fontSize: 13,
-  },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    zIndex: 999,
-  },
-  calendarModalContent: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  calendarModalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  monthSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  monthNavBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  monthYearText: {
-    fontFamily: 'Outfit-Bold',
-    fontSize: 15,
-    color: '#0F172A',
-  },
-  modalCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  weekdayRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    marginBottom: 8,
-  },
-  weekdayText: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 12,
-    color: '#94A3B8',
-    width: 36,
-    textAlign: 'center',
-  },
-  daysGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-  },
-  emptyDayCell: {
-    width: 36,
-    height: 36,
-    marginVertical: 4,
-  },
-  dayCell: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 4,
-    position: 'relative',
-  },
-  dayCellSelected: {
-    backgroundColor: '#6C47FF',
-  },
-  dayCellToday: {
-    borderWidth: 1.5,
-    borderColor: '#6C47FF',
-  },
-  dayText: {
-    fontFamily: 'Switzer-Medium',
-    fontSize: 13,
-    color: '#0F172A',
-  },
-  dayTextSelected: {
-    fontFamily: 'Switzer-Bold',
-    color: '#FFFFFF',
-  },
-  dayTextToday: {
-    fontFamily: 'Switzer-Bold',
-    color: '#6C47FF',
-  },
-  eventDot: {
-    position: 'absolute',
-    bottom: 4,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#6C47FF',
-  },
-  calendarModalFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 12,
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  todayBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#EDE9FE',
-  },
-  todayBtnText: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 12,
-    color: '#6C47FF',
-  },
-  clearDateBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  clearDateBtnText: {
-    fontFamily: 'Switzer-Medium',
-    fontSize: 12,
-    color: '#EF4444',
-  },
-  activeDateBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#EDE9FE',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginHorizontal: 16,
-    marginTop: 10,
-    borderRadius: 14,
-  },
-  activeDateBannerText: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 13,
-    color: '#6C47FF',
-  },
-  clearActiveDateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  clearActiveDateBtnText: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 11,
-    color: '#EF4444',
   },
 });

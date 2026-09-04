@@ -42,15 +42,13 @@ import { parseEventDateString } from '../lib/utils/date';
 import { getGuestPreferences, OnboardingData } from '../lib/guest-preferences';
 import { haptic } from '../lib/haptics';
 import { withTimeout } from '../lib/api-resilience';
+import { HomeHeader } from '../components/home/HomeHeader';
+import { HomeSegmentedTabs } from '../components/home/HomeSegmentedTabs';
+import { HomeActiveDateBanner } from '../components/home/HomeActiveDateBanner';
+import { CalendarPickerModal } from '../components/CalendarPickerModal';
 import type { EventRow, RootStackParamList } from '../types';
 
 const { width } = Dimensions.get('window');
-
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
-const WEEKDAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 // In-memory cache to prevent unnecessary refetching across tab switches
 let homeEventsCache: {
@@ -154,8 +152,6 @@ export default function HomeScreen() {
   // Calendar modal state
   const [showDateModal, setShowDateModal] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
-  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
-  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
   const [eventDates, setEventDates] = useState<Set<string>>(new Set());
 
   // 5-Day Smart Rating Prompt Trigger
@@ -488,65 +484,6 @@ export default function HomeScreen() {
     });
   }, [campusEvents, selectedDate]);
 
-  // Calendar calculations
-  const calendarDays = useMemo(() => {
-    const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
-    const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
-    const days: (number | null)[] = [];
-
-    for (let i = 0; i < firstDay; i++) {
-      days.push(null);
-    }
-    for (let d = 1; d <= daysInMonth; d++) {
-      days.push(d);
-    }
-    return days;
-  }, [calendarYear, calendarMonth]);
-
-  const handlePrevMonth = () => {
-    if (calendarMonth === 0) {
-      setCalendarMonth(11);
-      setCalendarYear((y) => y - 1);
-    } else {
-      setCalendarMonth((m) => m - 1);
-    }
-  };
-
-  const handleNextMonth = () => {
-    if (calendarMonth === 11) {
-      setCalendarMonth(0);
-      setCalendarYear((y) => y + 1);
-    } else {
-      setCalendarMonth((m) => m + 1);
-    }
-  };
-
-  const handleSelectDay = (day: number) => {
-    haptic.selection();
-    const m = String(calendarMonth + 1).padStart(2, '0');
-    const d = String(day).padStart(2, '0');
-    setSelectedDate(`${calendarYear}-${m}-${d}`);
-    setShowDateModal(false);
-  };
-
-  const handleSelectToday = () => {
-    haptic.selection();
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    setSelectedDate(`${y}-${m}-${d}`);
-    setCalendarYear(y);
-    setCalendarMonth(now.getMonth());
-    setShowDateModal(false);
-  };
-
-  const handleClearDate = () => {
-    haptic.light();
-    setSelectedDate(null);
-    setShowDateModal(false);
-  };
-
   const renderEventItem = useCallback(
     ({ item }: { item: EventRow }) => (
       <View style={styles.cardContainer}>
@@ -585,125 +522,28 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Stationary Top Header Container */}
       <View style={styles.headerFixedContainer}>
-        {/* Top Bar with Brand Logo and Action Icons */}
-        <View style={styles.topBar}>
-          <View style={styles.brandRow}>
-            <Image
-              source={APP_ASSETS.logo}
-              style={styles.brandLogo}
-              contentFit="contain"
-            />
-            <Text style={styles.brandNameText}>EvenTime</Text>
-          </View>
+        <HomeHeader
+          selectedDate={selectedDate}
+          onOpenCalendar={() => setShowDateModal(true)}
+          onOpenLeaderboard={() => navigation.navigate('Leaderboard')}
+          greeting={getTimeOfDayGreeting(profile?.username?.trim().slice(0, 12) || profile?.full_name?.split(' ')[0]?.trim().slice(0, 12) || (user ? undefined : 'explorer'))}
+          platformStats={platformStats}
+          eventsCount={events.length}
+        />
 
-          <View style={styles.topActions}>
-            {/* Top Calendar Date Button */}
-            <TouchableOpacity
-              style={[styles.topCalendarBtn, Boolean(selectedDate) && styles.topCalendarBtnActive]}
-              onPress={() => setShowDateModal(true)}
-              activeOpacity={0.8}
-            >
-              <CalendarDays size={15} color={selectedDate ? '#6C47FF' : '#475569'} />
-              <Text style={[styles.topCalendarBtnText, Boolean(selectedDate) && styles.topCalendarBtnTextActive]}>
-                {selectedDate
-                  ? new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
-                  : new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
-              </Text>
-            </TouchableOpacity>
+        <HomeSegmentedTabs
+          tabs={tabs}
+          activeTabIdx={activeTabIdx}
+          onSelectTab={handleSelectTab}
+          tabWidth={tabWidth}
+          translateX={translateX}
+        />
 
-            {/* Leaderboard Trophy Icon */}
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => navigation.navigate('Leaderboard')}
-              activeOpacity={0.8}
-            >
-              <Trophy size={18} color="#0F172A" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Dynamic Time-of-Day Greeting for Everyone */}
-        <View style={styles.greetingContainer}>
-          <Text style={styles.greetingText} numberOfLines={1} ellipsizeMode="tail">
-            {getTimeOfDayGreeting(profile?.username?.trim().slice(0, 12) || profile?.full_name?.split(' ')[0]?.trim().slice(0, 12) || (user ? undefined : 'explorer'))}
-          </Text>
-        </View>
-
-        {/* Live Stats Bar (Matching Website Parity) */}
-        <View style={styles.statsBar}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{platformStats.event_count || events.length || 0}</Text>
-            <Text style={styles.statLabel}>EVENTS</Text>
-          </View>
-          <View style={styles.statDivider} />
-
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{platformStats.city_count || 12}</Text>
-            <Text style={styles.statLabel}>CITIES</Text>
-          </View>
-          <View style={styles.statDivider} />
-
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{platformStats.category_count || 36}</Text>
-            <Text style={styles.statLabel}>CATEGORIES</Text>
-          </View>
-          <View style={styles.statDivider} />
-
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{platformStats.user_count || 50}</Text>
-            <Text style={styles.statLabel}>USERS</Text>
-          </View>
-        </View>
-
-        {/* Tactile Segmented Track with Elevated Sliding Thumb */}
-        <View style={styles.segmentedTrackContainer}>
-          <View style={styles.segmentedTrack}>
-            <Animated.View
-              style={[
-                styles.slidingThumb,
-                {
-                  width: tabWidth,
-                  transform: [{ translateX }],
-                },
-              ]}
-            />
-            <View style={styles.segmentBtnsRow}>
-              {tabs.map((tab, idx) => {
-                const isActive = activeTabIdx === idx;
-                return (
-                  <TouchableOpacity
-                    key={tab.key}
-                    style={[styles.segmentBtn, { width: tabWidth }]}
-                    onPress={() => handleSelectTab(idx)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.segmentBtnText,
-                        isActive && styles.segmentBtnTextActive,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {tab.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </View>
-
-        {/* If Calendar Date is selected from top button, show an active date badge */}
         {selectedDate && (
-          <View style={styles.activeDateBanner}>
-            <Text style={styles.activeDateBannerText}>
-              Showing events for {new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
-            </Text>
-            <TouchableOpacity onPress={() => setSelectedDate(null)} style={styles.clearActiveDateBtn}>
-              <X size={14} color="#EF4444" />
-              <Text style={styles.clearActiveDateBtnText}>Clear</Text>
-            </TouchableOpacity>
-          </View>
+          <HomeActiveDateBanner
+            selectedDate={selectedDate}
+            onClearDate={() => setSelectedDate(null)}
+          />
         )}
       </View>
 
@@ -948,106 +788,15 @@ export default function HomeScreen() {
         </Animated.ScrollView>
       )}
 
-      {/* Calendar Month Grid Modal */}
-      {showDateModal && (
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => setShowDateModal(false)}
-          />
-          <View style={styles.calendarModalContent}>
-            {/* Modal Header */}
-            <View style={styles.calendarModalHeader}>
-              <View style={styles.monthSelector}>
-                <TouchableOpacity onPress={handlePrevMonth} style={styles.monthNavBtn}>
-                  <ChevronLeft size={20} color="#0F172A" />
-                </TouchableOpacity>
-                <Text style={styles.monthYearText}>
-                  {MONTH_NAMES[calendarMonth]} {calendarYear}
-                </Text>
-                <TouchableOpacity onPress={handleNextMonth} style={styles.monthNavBtn}>
-                  <ChevronRight size={20} color="#0F172A" />
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setShowDateModal(false)}
-              >
-                <X size={18} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Weekday Row */}
-            <View style={styles.weekdayRow}>
-              {WEEKDAY_NAMES.map((day, idx) => (
-                <Text key={idx} style={styles.weekdayText}>
-                  {day}
-                </Text>
-              ))}
-            </View>
-
-            {/* Days Grid */}
-            <View style={styles.daysGrid}>
-              {calendarDays.map((day, idx) => {
-                if (day === null) {
-                  return <View key={idx} style={styles.emptyDayCell} />;
-                }
-
-                const m = String(calendarMonth + 1).padStart(2, '0');
-                const d = String(day).padStart(2, '0');
-                const dateKey = `${calendarYear}-${m}-${d}`;
-                const isSelected = selectedDate === dateKey;
-                const hasEvents = eventDates.has(dateKey);
-
-                const now = new Date();
-                const isToday =
-                  now.getFullYear() === calendarYear &&
-                  now.getMonth() === calendarMonth &&
-                  now.getDate() === day;
-
-                return (
-                  <TouchableOpacity
-                    key={idx}
-                    style={[
-                      styles.dayCell,
-                      isSelected && styles.dayCellSelected,
-                      isToday && !isSelected && styles.dayCellToday,
-                    ]}
-                    onPress={() => handleSelectDay(day)}
-                  >
-                    <Text
-                      style={[
-                        styles.dayText,
-                        isSelected && styles.dayTextSelected,
-                        isToday && !isSelected && styles.dayTextToday,
-                      ]}
-                    >
-                      {day}
-                    </Text>
-                    {hasEvents && !isSelected && <View style={styles.eventDot} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Modal Bottom Actions */}
-            <View style={styles.calendarModalFooter}>
-              <TouchableOpacity style={styles.todayBtn} onPress={handleSelectToday}>
-                <Clock size={14} color="#6C47FF" />
-                <Text style={styles.todayBtnText}>Today</Text>
-              </TouchableOpacity>
-
-              {selectedDate && (
-                <TouchableOpacity style={styles.clearDateBtn} onPress={handleClearDate}>
-                  <Text style={styles.clearDateBtnText}>Clear Date</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </View>
-      )}
+      {/* Shared Calendar Month Grid Modal */}
+      <CalendarPickerModal
+        visible={showDateModal}
+        selectedDate={selectedDate}
+        eventDates={eventDates}
+        onSelectDate={(dateStr) => setSelectedDate(dateStr)}
+        onClearDate={() => setSelectedDate(null)}
+        onClose={() => setShowDateModal(false)}
+      />
 
       {/* 5-Day Smart In-App Rating Gate */}
       <SmartRatingModal
@@ -1311,183 +1060,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748B',
     textAlign: 'center',
-  },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
-  },
-  calendarModalContent: {
-    width: width - 40,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  calendarModalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  monthSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  monthNavBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  monthYearText: {
-    fontFamily: 'Outfit-Bold',
-    fontSize: 15,
-    color: '#0F172A',
-  },
-  modalCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  weekdayRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    marginBottom: 8,
-  },
-  weekdayText: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 12,
-    color: '#94A3B8',
-    width: 36,
-    textAlign: 'center',
-  },
-  daysGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-  },
-  emptyDayCell: {
-    width: 36,
-    height: 36,
-    marginVertical: 4,
-  },
-  dayCell: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 4,
-    position: 'relative',
-  },
-  dayCellSelected: {
-    backgroundColor: '#6C47FF',
-  },
-  dayCellToday: {
-    borderWidth: 1.5,
-    borderColor: '#6C47FF',
-  },
-  dayText: {
-    fontFamily: 'Switzer-Medium',
-    fontSize: 13,
-    color: '#0F172A',
-  },
-  dayTextSelected: {
-    fontFamily: 'Switzer-Bold',
-    color: '#FFFFFF',
-  },
-  dayTextToday: {
-    fontFamily: 'Switzer-Bold',
-    color: '#6C47FF',
-  },
-  eventDot: {
-    position: 'absolute',
-    bottom: 4,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#6C47FF',
-  },
-  calendarModalFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 12,
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  todayBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#EDE9FE',
-  },
-  todayBtnText: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 12,
-    color: '#6C47FF',
-  },
-  clearDateBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  clearDateBtnText: {
-    fontFamily: 'Switzer-Medium',
-    fontSize: 12,
-    color: '#EF4444',
-  },
-  activeDateBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#EDE9FE',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginHorizontal: 16,
-    marginTop: 10,
-    borderRadius: 14,
-  },
-  activeDateBannerText: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 13,
-    color: '#6C47FF',
-  },
-  clearActiveDateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  clearActiveDateBtnText: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 11,
-    color: '#EF4444',
   },
 });
