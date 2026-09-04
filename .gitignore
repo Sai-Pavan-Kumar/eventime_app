@@ -58,3 +58,4 @@ docs/
 # Local Proton Drive Backup folder
 Proton_Drive_Backup/
 proton-drive-backup/
+build-release.ps1
