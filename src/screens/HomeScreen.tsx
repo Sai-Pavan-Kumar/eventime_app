@@ -68,18 +68,12 @@ let cachedPlatformStats: {
 
 const getTimeOfDayGreeting = (name?: string) => {
   const h = new Date().getHours();
-  const userName = name ? (name.length > 12 ? name.slice(0, 12) : name) : 'there';
-  if (h >= 6 && h < 9) return `Morning, ${userName}.`;
-  if (h >= 9 && h < 12) return `Tiffin time, ${userName}.`;
-  if (h >= 12 && h < 14) return `Afternoon, ${userName}.`;
-  if (h >= 14 && h < 17) return `Lunch done, ${userName}?`;
-  if (h >= 17 && h < 18) return `Snack time, ${userName}.`;
-  if (h >= 18 && h < 20) return `Evening, ${userName}.`;
-  if (h >= 20 && h < 22) return `Dinner time, ${userName}.`;
-  if (h >= 22 && h < 23) return `Dinner done yet, ${userName}?`;
-  if (h >= 23 || h < 0) return `Night, ${userName} — sleep well.`;
-  if (h >= 0 && h < 4) return `Still up, ${userName}?`;
-  return `Up early, ${userName}?`;
+  const userName = name ? (name.length > 14 ? name.slice(0, 14) : name) : 'there';
+  if (h >= 5 && h < 12) return `Good morning, ${userName}.`;
+  if (h >= 12 && h < 17) return `Good afternoon, ${userName}.`;
+  if (h >= 17 && h < 22) return `Good evening, ${userName}.`;
+  if (h >= 22 || h < 1) return `Night, ${userName} — rest well.`;
+  return `Still exploring, ${userName}?`;
 };
 
 export default function HomeScreen() {

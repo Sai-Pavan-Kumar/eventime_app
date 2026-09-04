@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -20,6 +21,7 @@ import {
   MapPin,
   Clock,
   Layers,
+  Share2,
 } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
@@ -43,15 +45,21 @@ export default function CuratorProfileScreen() {
   const fetchCuratorData = useCallback(async () => {
     try {
       setIsLoading(true);
-      let curatorQuery = supabase.from('profiles').select('*');
-
-      if (userId) {
-        curatorQuery = curatorQuery.eq('id', userId);
-      } else if (username) {
-        curatorQuery = curatorQuery.eq('username', username.toLowerCase().trim());
-      } else {
+      const identifier = userId || username;
+      if (!identifier) {
         setIsLoading(false);
         return;
+      }
+
+      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const cleanIdentifier = decodeURIComponent(identifier).replace(/^@/, '').trim();
+      const isUuid = UUID_REGEX.test(cleanIdentifier);
+
+      let curatorQuery = supabase.from('profiles').select('*');
+      if (isUuid) {
+        curatorQuery = curatorQuery.eq('id', cleanIdentifier);
+      } else {
+        curatorQuery = curatorQuery.ilike('username', cleanIdentifier);
       }
 
       const { data: curatorData, error: curatorError } = await curatorQuery.maybeSingle();
@@ -152,6 +160,20 @@ export default function CuratorProfileScreen() {
       curator?.full_name || name || 'Curator'
     )}`;
 
+  const handleShareCurator = async () => {
+    if (!curator) return;
+    const profileUrl = `https://eventime.in/${curator.username || curator.id}`;
+    try {
+      await Share.share({
+        title: `${curator.full_name || 'Curator'} on EvenTime`,
+        message: `Check out ${curator.full_name || 'this curator'}'s profile and curated events on EvenTime:\n${profileUrl}`,
+        url: profileUrl,
+      });
+    } catch (e) {
+      console.warn('[CuratorProfile] Share error:', e);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Top Header */}
@@ -166,7 +188,13 @@ export default function CuratorProfileScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {curator?.username ? `@${curator.username}` : name || 'Curator Profile'}
         </Text>
-        <View style={{ width: 36 }} />
+        <TouchableOpacity
+          style={styles.shareButton}
+          onPress={handleShareCurator}
+          activeOpacity={0.8}
+        >
+          <Share2 size={18} color={theme.colors.textPrimary} />
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (
@@ -320,6 +348,14 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shareButton: {
     width: 36,
     height: 36,
     borderRadius: 18,

@@ -49,9 +49,9 @@ const linking = {
     screens: {
       MainTabs: '',
       Login: 'auth',
-      EventDetail: 'events/:id',
-      CityEvents: 'city/:city',
-      CuratorProfile: 'curator/:userId',
+      EventDetail: 'events/:slug',
+      CityEvents: 'cities/:city',
+      CuratorProfile: 'curator/:username',
       Leaderboard: 'leaderboard',
       CreateEvent: 'create',
     },

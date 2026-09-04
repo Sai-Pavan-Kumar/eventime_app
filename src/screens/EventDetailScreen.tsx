@@ -121,15 +121,19 @@ export default function EventDetailScreen() {
     }
   }, []);
 
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
   const fetchEvent = useCallback(async () => {
     try {
+      const target = eventId || id || slug;
+      if (!target) return;
+
       let query = supabase.from('events').select('*, colleges(name), profiles(username, full_name), interested_events(count)');
 
-      const targetId = eventId || id;
-      if (targetId) {
-        query = query.eq('id', targetId);
-      } else if (slug) {
-        query = query.eq('slug', slug);
+      if (UUID_REGEX.test(target)) {
+        query = query.eq('id', target);
+      } else {
+        query = query.eq('slug', target);
       }
 
       const { data, error } = await query.maybeSingle();

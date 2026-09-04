@@ -609,8 +609,21 @@ export default function CreateEventScreen() {
 
     setIsCheckingDomain(true);
     try {
-      // 1. Duplicate check
-      let dupQuery = supabase.from('events').select('id, title').eq('registration_link', url.trim());
+      // 1. Duplicate check (matching website pattern matching & normalization)
+      let normalized = url.trim();
+      let eventIdSegment: string | null = null;
+      try {
+        const parsedUrl = new URL(url.trim());
+        const host = parsedUrl.hostname.replace(/^www\./, '');
+        normalized = `${host}${parsedUrl.pathname}`.replace(/\/$/, '');
+        const segments = parsedUrl.pathname.split('/').filter(Boolean);
+        eventIdSegment = segments[segments.length - 1] || null;
+      } catch {
+        // Fall back to raw string if not a standard URL
+      }
+
+      const linkPattern = eventIdSegment ? `%/${eventIdSegment}%` : `%${normalized}%`;
+      let dupQuery = supabase.from('events').select('id, title').ilike('registration_link', linkPattern).limit(1);
       if (editId) dupQuery = dupQuery.neq('id', editId);
       const { data: duplicate } = await dupQuery.maybeSingle();
 
