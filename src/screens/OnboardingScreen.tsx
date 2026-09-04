@@ -358,15 +358,25 @@ export default function OnboardingScreen() {
   };
 
   // Profile Setup Validation & Handlers (Step 6)
+  const USERNAME_REGEX = /^[a-z0-9_.-]{3,12}$/;
+
   const handleValidateUsername = async () => {
-    const clean = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const clean = username.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '');
     setUsername(clean);
     if (!clean) {
-      setUsernameError('Please pick a unique username.');
+      setUsernameError('Please enter a username.');
+      return;
+    }
+    if (clean.length < 3) {
+      setUsernameError('Username must be at least 3 characters.');
       return;
     }
     if (clean.length > 12) {
       setUsernameError('Username must be 12 characters or less.');
+      return;
+    }
+    if (!USERNAME_REGEX.test(clean)) {
+      setUsernameError('Letters, numbers, and . _ - only.');
       return;
     }
 
@@ -380,13 +390,14 @@ export default function OnboardingScreen() {
         .maybeSingle();
 
       if (data) {
-        setUsernameError('This username is already taken. Try another.');
+        setUsernameError('This username is already taken. Please choose another.');
       } else {
         setUsernameError('');
         setProfileSubStep(2); // Advance to Role/College
       }
     } catch (e) {
       console.error('[Onboarding] Username check error:', e);
+      setUsernameError('');
       setProfileSubStep(2);
     } finally {
       setIsCheckingUsername(false);
@@ -477,6 +488,16 @@ export default function OnboardingScreen() {
       const { error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id);
 
       if (error) {
+        if (
+          error.code === '23505' ||
+          error.message?.includes('profiles_username_key') ||
+          error.message?.toLowerCase().includes('unique')
+        ) {
+          setUsernameError('This username is already taken. Please choose another.');
+          setProfileSubStep(1);
+          Alert.alert('Username Taken', 'This username was just claimed by another curator. Please choose another.');
+          return;
+        }
         throw error;
       }
 
@@ -931,7 +952,7 @@ export default function OnboardingScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   onChangeText={(t) => {
-                    setUsername(t.toLowerCase().replace(/[^a-z0-9_]/g, ''));
+                    setUsername(t.toLowerCase().replace(/[^a-z0-9_.-]/g, ''));
                     setUsernameError('');
                   }}
                 />

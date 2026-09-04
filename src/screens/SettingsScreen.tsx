@@ -226,6 +226,19 @@ export default function SettingsScreen() {
       Alert.alert('Validation Error', 'Username is required.');
       return;
     }
+    if (cleanUsername.length < 3) {
+      Alert.alert('Validation Error', 'Username must be at least 3 characters.');
+      return;
+    }
+    if (cleanUsername.length > 12) {
+      Alert.alert('Validation Error', 'Username must be 12 characters or less.');
+      return;
+    }
+    const USERNAME_REGEX = /^[a-z0-9_.-]{3,12}$/;
+    if (!USERNAME_REGEX.test(cleanUsername)) {
+      Alert.alert('Validation Error', 'Username can only contain letters, numbers, and . _ -');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -235,10 +248,11 @@ export default function SettingsScreen() {
           .from('profiles')
           .select('id')
           .eq('username', cleanUsername)
+          .neq('id', user.id)
           .maybeSingle();
 
-        if (existing && existing.id !== user.id) {
-          Alert.alert('Username Taken', 'This username is already in use by another curator.');
+        if (existing) {
+          Alert.alert('Username Taken', 'This username is already taken. Please choose another.');
           setIsSaving(false);
           return;
         }
@@ -369,10 +383,11 @@ export default function SettingsScreen() {
             <TextInput
               style={styles.input}
               value={username}
-              onChangeText={(t) => setUsername(t.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+              onChangeText={(t) => setUsername(t.toLowerCase().replace(/[^a-z0-9_.-]/g, ''))}
               placeholder="username"
               placeholderTextColor={theme.colors.textMuted}
               autoCapitalize="none"
+              maxLength={12}
             />
           </View>
         </View>
