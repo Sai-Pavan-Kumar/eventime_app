@@ -56,6 +56,7 @@ import { INDIAN_COLLEGE_BRANCHES } from '../lib/constants/branches';
 import { CATEGORY_TEMPLATES, teamOptions } from '../lib/constants/event-options';
 import { uploadEventPoster } from '../lib/storage';
 import { sendRemotePushNotification } from '../lib/notifications';
+import { checkRateLimit, recordAction } from '../lib/rate-limiter';
 import { CuratorCelebrationModal, CelebrationEventData } from '../components/CuratorCelebrationModal';
 import type { RootStackParamList } from '../types';
 
@@ -818,6 +819,18 @@ export default function CreateEventScreen() {
       return;
     }
 
+    // Defensive Client-Side Rate Limit: prevent spam / accidental double-tap floods
+    if (!editId) {
+      const rateLimitCheck = checkRateLimit('CREATE_EVENT');
+      if (!rateLimitCheck.allowed) {
+        Alert.alert(
+          'Submission Cooldown',
+          `To protect community feed quality, please wait ${rateLimitCheck.retryAfterSeconds} seconds before publishing another event.`
+        );
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -900,6 +913,9 @@ export default function CreateEventScreen() {
           .maybeSingle();
 
         if (error) throw error;
+
+        // Record action to enforce cooldown policy
+        recordAction('CREATE_EVENT');
 
         // Award +100 ET points if approved live
         if (status === 'approved') {

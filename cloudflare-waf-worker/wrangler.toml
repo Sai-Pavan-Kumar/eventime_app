@@ -1,0 +1,11 @@
+name = "eventime-edge-waf"
+main = "worker.ts"
+compatibility_date = "2024-09-01"
+
+[vars]
+UPSTREAM_SUPABASE_URL = "https://pgqcdygsbafladcczubn.supabase.co"
+
+# To bind Cloudflare KV for global distributed rate limiting across all edge PoPs:
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT_KV"
+# id = "<your_kv_namespace_id>"

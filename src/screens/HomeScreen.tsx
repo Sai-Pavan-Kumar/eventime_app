@@ -27,6 +27,7 @@ import {
   X,
   Clock,
   Sparkles,
+  WifiOff,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -42,6 +43,16 @@ import { parseEventDateString } from '../lib/utils/date';
 import { getGuestPreferences, OnboardingData } from '../lib/guest-preferences';
 import { haptic } from '../lib/haptics';
 import { withTimeout } from '../lib/api-resilience';
+import {
+  loadCachedHomeEvents,
+  saveCachedHomeEvents,
+  loadCachedCampusEvents,
+  saveCachedCampusEvents,
+  loadCachedPlatformStats,
+  saveCachedPlatformStats,
+  loadCachedSavedEventIds,
+  saveCachedSavedEventIds,
+} from '../lib/offline-cache';
 import { HomeHeader } from '../components/home/HomeHeader';
 import { HomeSegmentedTabs } from '../components/home/HomeSegmentedTabs';
 import { HomeActiveDateBanner } from '../components/home/HomeActiveDateBanner';
@@ -49,23 +60,6 @@ import { CalendarPickerModal } from '../components/CalendarPickerModal';
 import type { EventRow, RootStackParamList } from '../types';
 
 const { width } = Dimensions.get('window');
-
-// In-memory cache to prevent unnecessary refetching across tab switches
-let homeEventsCache: {
-  allEvents: EventRow[];
-  timestamp: number;
-} | null = null;
-
-// In-memory cache for platform stats (15-minute TTL to guarantee 0 database bills)
-let cachedPlatformStats: {
-  data: {
-    event_count: number;
-    city_count: number;
-    category_count: number;
-    user_count: number;
-  };
-  timestamp: number;
-} | null = null;
 
 const getTimeOfDayGreeting = (name?: string) => {
   const h = new Date().getHours();
@@ -166,16 +160,23 @@ export default function HomeScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  const [events, setEvents] = useState<EventRow[]>(homeEventsCache?.allEvents || []);
+  const [events, setEvents] = useState<EventRow[]>([]);
   const [campusEvents, setCampusEvents] = useState<EventRow[]>([]);
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(new Set());
-  const [isLoading, setIsLoading] = useState(!homeEventsCache);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
 
-  // Pagination states
+  // Pagination states for Public Feeds
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+
+  // Pagination states for Campus Feed
+  const [campusPage, setCampusPage] = useState(0);
+  const [hasMoreCampus, setHasMoreCampus] = useState(true);
+  const [isFetchingMoreCampus, setIsFetchingMoreCampus] = useState(false);
+
   const PAGE_SIZE = 15;
 
   // Platform stats for live ticker (Matching website parity)
@@ -184,25 +185,42 @@ export default function HomeScreen() {
     city_count: number;
     category_count: number;
     user_count: number;
-  }>(
-    cachedPlatformStats?.data || {
-      event_count: 0,
-      city_count: 12,
-      category_count: 36,
-      user_count: 0,
-    }
-  );
+  }>({
+    event_count: 0,
+    city_count: 12,
+    category_count: 36,
+    user_count: 0,
+  });
+
+  // 1. Instant 0ms Cold-Start Hydration from Local Storage (Stale-While-Revalidate)
+  useEffect(() => {
+    loadCachedHomeEvents().then((cached) => {
+      if (cached && cached.length > 0) {
+        setEvents(cached);
+        setIsLoading(false);
+      }
+    });
+
+    loadCachedCampusEvents().then((cEvents) => {
+      if (cEvents && cEvents.length > 0) {
+        setCampusEvents(cEvents);
+      }
+    });
+
+    loadCachedPlatformStats().then((cachedStats) => {
+      if (cachedStats) {
+        setPlatformStats(cachedStats);
+      }
+    });
+
+    loadCachedSavedEventIds().then((cachedIds) => {
+      if (cachedIds) {
+        setSavedEventIds(cachedIds);
+      }
+    });
+  }, []);
 
   const fetchPlatformStats = useCallback(async (forceRefresh: boolean = false) => {
-    const now = Date.now();
-    const FIFTEEN_MINUTES = 15 * 60 * 1000;
-
-    // Use cache if fresh and not forced
-    if (!forceRefresh && cachedPlatformStats && now - cachedPlatformStats.timestamp < FIFTEEN_MINUTES) {
-      setPlatformStats(cachedPlatformStats.data);
-      return;
-    }
-
     try {
       const { data: statsData, error } = await supabase.rpc('get_platform_stats').single();
       let freshStats: any;
@@ -220,8 +238,8 @@ export default function HomeScreen() {
           user_count: userCount || 0,
         };
       }
-      cachedPlatformStats = { data: freshStats, timestamp: now };
       setPlatformStats(freshStats);
+      saveCachedPlatformStats(freshStats);
     } catch (e) {
       console.warn('[HomeScreen] Failed to load stats', e);
     }
@@ -263,7 +281,9 @@ export default function HomeScreen() {
         .select('event_id')
         .eq('user_id', user.id);
       if (data) {
-        setSavedEventIds(new Set(data.map((d) => d.event_id).filter(Boolean) as string[]));
+        const idSet = new Set(data.map((d) => d.event_id).filter(Boolean) as string[]);
+        setSavedEventIds(idSet);
+        saveCachedSavedEventIds(idSet);
       }
     } catch (e) {
       console.error('[HomeScreen] Saved events error:', e);
@@ -272,7 +292,13 @@ export default function HomeScreen() {
 
   const fetchEvents = useCallback(async (pageIndex = 0, forceRefresh = false) => {
     try {
-      if (pageIndex === 0 && !forceRefresh) setIsLoading(true);
+      if (pageIndex === 0 && !forceRefresh) {
+        // Only trigger full spinner if we don't already have cached events
+        setEvents((prev) => {
+          if (prev.length === 0) setIsLoading(true);
+          return prev;
+        });
+      }
 
       const from = pageIndex * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
@@ -282,18 +308,25 @@ export default function HomeScreen() {
         .from('events')
         .select('*, colleges(name), profiles(username, full_name), interested_events(count)')
         .eq('status', 'approved')
-        .or('college_only.is.null,college_only.eq.false')
+        .or('college_only.is.null,college_only.eq.false');
+
+      if (selectedDate) {
+        query = query.eq('date_string', selectedDate);
+      }
+
+      query = query
+        .order('date_string', { ascending: true })
         .order('created_at', { ascending: false })
         .range(from, to);
 
       const { data, error } = await withTimeout(query, 8000);
 
       if (error) {
-        console.error('[HomeScreen] Fetch events error:', error);
-        return;
+        throw error;
       }
 
       const rawEvents = (data as any[]) || [];
+      setIsOffline(false);
       
       if (rawEvents.length < PAGE_SIZE) {
         setHasMore(false);
@@ -302,34 +335,74 @@ export default function HomeScreen() {
       }
 
       setEvents((prev) => {
-        const next = pageIndex === 0 ? rawEvents : [...prev, ...rawEvents];
-        homeEventsCache = { allEvents: next, timestamp: Date.now() };
-        return next;
-      });
-
-      // 2. If student, fetch their private campus events (only on first page load for simplicity, or handle similarly)
-      if (pageIndex === 0 && user && profile?.user_type === 'student' && profile?.college_id) {
-        const todayStr = new Date().toISOString().substring(0, 10);
-        const { data: cEvents } = await supabase
-          .from('events')
-          .select('*, colleges(name), profiles(username, full_name), interested_events(count)')
-          .eq('status', 'approved')
-          .eq('college_id', profile.college_id)
-          .gte('date_string', todayStr)
-          .order('created_at', { ascending: false });
-
-        if (cEvents) {
-          setCampusEvents(cEvents as any[]);
+        if (pageIndex === 0) {
+          saveCachedHomeEvents(rawEvents);
+          return rawEvents;
         }
-      }
+        const existingIds = new Set(prev.map((e) => e.id));
+        const freshOnly = rawEvents.filter((e) => !existingIds.has(e.id));
+        const merged = [...prev, ...freshOnly];
+        saveCachedHomeEvents(merged);
+        return merged;
+      });
     } catch (err) {
-      console.error('[HomeScreen] Fetch error:', err);
+      console.warn('[HomeScreen] Fetch error, keeping cached data:', err);
+      setIsOffline(true);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
       setIsFetchingMore(false);
     }
-  }, [user, profile]);
+  }, [selectedDate]);
+
+  const fetchCampusEvents = useCallback(async (pageIndex = 0, forceRefresh = false) => {
+    if (!user || profile?.user_type !== 'student' || !profile?.college_id) return;
+    try {
+      const from = pageIndex * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = supabase
+        .from('events')
+        .select('*, colleges(name), profiles(username, full_name), interested_events(count)')
+        .eq('status', 'approved')
+        .eq('college_id', profile.college_id);
+
+      if (selectedDate) {
+        query = query.eq('date_string', selectedDate);
+      }
+
+      query = query
+        .order('date_string', { ascending: true })
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      const { data, error } = await withTimeout(query, 8000);
+      if (error) throw error;
+
+      const rawCampus = (data as any[]) || [];
+      if (rawCampus.length < PAGE_SIZE) {
+        setHasMoreCampus(false);
+      } else {
+        setHasMoreCampus(true);
+      }
+
+      setCampusEvents((prev) => {
+        if (pageIndex === 0) {
+          saveCachedCampusEvents(rawCampus);
+          return rawCampus;
+        }
+        const existingIds = new Set(prev.map((e) => e.id));
+        const freshOnly = rawCampus.filter((e) => !existingIds.has(e.id));
+        const merged = [...prev, ...freshOnly];
+        saveCachedCampusEvents(merged);
+        return merged;
+      });
+    } catch (err) {
+      console.warn('[HomeScreen] Campus fetch error:', err);
+    } finally {
+      setIsFetchingMoreCampus(false);
+    }
+  }, [user, profile, selectedDate]);
 
   const loadMoreEvents = () => {
     if (!hasMore || isFetchingMore || isLoading || isRefreshing) return;
@@ -339,23 +412,34 @@ export default function HomeScreen() {
     fetchEvents(nextPage);
   };
 
+  const loadMoreCampusEvents = () => {
+    if (!hasMoreCampus || isFetchingMoreCampus || isLoading || isRefreshing) return;
+    setIsFetchingMoreCampus(true);
+    const nextPage = campusPage + 1;
+    setCampusPage(nextPage);
+    fetchCampusEvents(nextPage);
+  };
+
   useEffect(() => {
-    if (!homeEventsCache) {
-      setIsLoading(true);
-    }
     setPage(0);
     setHasMore(true);
+    setCampusPage(0);
+    setHasMoreCampus(true);
     fetchEvents(0);
+    fetchCampusEvents(0);
     fetchSavedEventIds();
-  }, [fetchEvents, fetchSavedEventIds]);
+  }, [fetchEvents, fetchCampusEvents, fetchSavedEventIds, selectedDate]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
     setPage(0);
     setHasMore(true);
+    setCampusPage(0);
+    setHasMoreCampus(true);
     fetchEvents(0, true);
+    fetchCampusEvents(0, true);
     fetchSavedEventIds();
-    fetchPlatformStats();
+    fetchPlatformStats(true);
   };
 
   // 1. Base date-filtered pool
@@ -374,13 +458,16 @@ export default function HomeScreen() {
       });
     }
 
-    return events.filter((ev) => {
+    const upcoming = events.filter((ev) => {
       const parsed = parseEventDateString(ev.date_string || '');
       if (!parsed) return true;
       const evDate = new Date(parsed);
       evDate.setHours(0, 0, 0, 0);
       return evDate.getTime() >= today.getTime();
     });
+
+    // Graceful fallback: If upcoming events exist, show them; otherwise fallback to full events pool
+    return upcoming.length > 0 ? upcoming : events;
   }, [events, selectedDate]);
 
   const preferredCities: string[] = useMemo(() => {
@@ -509,6 +596,7 @@ export default function HomeScreen() {
               const next = new Set(prev);
               if (isSaved) next.add(id);
               else next.delete(id);
+              saveCachedSavedEventIds(next);
               return next;
             });
           }}
@@ -544,6 +632,13 @@ export default function HomeScreen() {
             selectedDate={selectedDate}
             onClearDate={() => setSelectedDate(null)}
           />
+        )}
+
+        {isOffline && events.length > 0 && (
+          <View style={styles.offlineBanner}>
+            <WifiOff size={13} color="#92400E" />
+            <Text style={styles.offlineBannerText}>Offline • Showing saved events</Text>
+          </View>
         )}
       </View>
 
@@ -771,10 +866,10 @@ export default function HomeScreen() {
                 windowSize={5}
                 removeClippedSubviews={Platform.OS === 'android'}
                 updateCellsBatchingPeriod={50}
-                onEndReached={loadMoreEvents}
+                onEndReached={loadMoreCampusEvents}
                 onEndReachedThreshold={0.5}
                 ListFooterComponent={
-                  isFetchingMore ? (
+                  isFetchingMoreCampus ? (
                     <View style={{ paddingVertical: 20 }}>
                       <ActivityIndicator size="small" color={theme.colors.brand} />
                     </View>
@@ -1060,5 +1155,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748B',
     textAlign: 'center',
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    backgroundColor: '#FEF3C7',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FDE68A',
+  },
+  offlineBannerText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 11,
+    color: '#92400E',
   },
 });
