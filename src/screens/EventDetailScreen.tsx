@@ -46,6 +46,7 @@ import { scheduleEventReminder, cancelEventReminder, sendRemotePushNotification 
 import { useAuth } from '../context/AuthContext';
 import { EventCard } from '../components/EventCard';
 import { EmptyState } from '../components/EmptyState';
+import { EventReportModal } from '../components/EventReportModal';
 import { formatEventDateDetailed, parseEventDateString, formatEventTime } from '../lib/utils/date';
 import type { EventRow, RootStackParamList } from '../types';
 
@@ -71,8 +72,6 @@ export default function EventDetailScreen() {
 
   // Report Modal state
   const [showReportModal, setShowReportModal] = useState(false);
-  const [reportReason, setReportReason] = useState('');
-  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
   const isStudent = profile?.user_type === 'student';
   const userCollege = profile?.college || event?.colleges?.name || '';
@@ -357,37 +356,6 @@ export default function EventDetailScreen() {
     } catch (err) {
       console.error('[EventDetail] Open registration link error:', err);
       Alert.alert('Unable to Open Link', 'The registration link provided for this event is invalid or cannot be opened.');
-    }
-  };
-
-  const handleSendReport = async () => {
-    if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to report an issue.');
-      return;
-    }
-    if (!reportReason.trim()) {
-      Alert.alert('Reason Required', 'Please provide a reason for reporting this event.');
-      return;
-    }
-    if (!event) return;
-
-    setIsSubmittingReport(true);
-    try {
-      const { error } = await supabase.from('event_reports').insert({
-        event_id: event.id,
-        reporter_id: user.id,
-        curator_id: event.creator_id,
-        reason: reportReason.trim(),
-        status: 'pending',
-      });
-      if (error) throw error;
-      Alert.alert('Report Submitted', 'Thank you. Our moderation team will review this event.');
-      setShowReportModal(false);
-      setReportReason('');
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Could not submit report.');
-    } finally {
-      setIsSubmittingReport(false);
     }
   };
 
@@ -799,48 +767,16 @@ export default function EventDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Report Modal */}
-      <Modal visible={showReportModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Report Event</Text>
-            <Text style={styles.modalSubtitle}>
-              Please describe what is incorrect or inappropriate about this listing:
-            </Text>
-
-            <TextInput
-              style={styles.reportInput}
-              placeholder="e.g. Expired date, broken link, offensive content..."
-              placeholderTextColor={theme.colors.textMuted}
-              multiline
-              numberOfLines={4}
-              value={reportReason}
-              onChangeText={setReportReason}
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setShowReportModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalSubmitBtn}
-                onPress={handleSendReport}
-                disabled={isSubmittingReport}
-              >
-                {isSubmittingReport ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <Text style={styles.modalSubmitText}>Submit Report</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Event Report Modal matching website */}
+      {event && (
+        <EventReportModal
+          visible={showReportModal}
+          eventId={event.id}
+          curatorId={event.creator_id}
+          eventTitle={event.title}
+          onClose={() => setShowReportModal(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }
