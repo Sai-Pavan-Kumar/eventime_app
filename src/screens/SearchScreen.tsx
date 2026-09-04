@@ -18,7 +18,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Search,
   X,
-  MapPin,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -128,25 +127,35 @@ export default function SearchScreen() {
     fetchSavedEventIds();
   };
 
-  // Category and City counts across all platform events
+  // Category and City counts across upcoming platform events (Today + Future)
   const { categoryCounts, cityCounts, eventDates } = useMemo(() => {
     const catMap: Record<string, number> = {};
     const cityMap: Record<string, number> = {};
     const datesSet = new Set<string>();
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     allEvents.forEach((row: any) => {
-      if (row.category) {
-        catMap[row.category] = (catMap[row.category] || 0) + 1;
-      }
-      if (row.city) {
-        cityMap[row.city] = (cityMap[row.city] || 0) + 1;
-      }
       const parsed = parseEventDateString(row.date_string || '');
+      let isUpcomingOrToday = true;
       if (parsed) {
+        const evDate = new Date(parsed);
+        evDate.setHours(0, 0, 0, 0);
+        isUpcomingOrToday = evDate.getTime() >= today.getTime();
         const y = parsed.getFullYear();
         const m = String(parsed.getMonth() + 1).padStart(2, '0');
         const d = String(parsed.getDate()).padStart(2, '0');
         datesSet.add(`${y}-${m}-${d}`);
+      }
+
+      if (isUpcomingOrToday) {
+        if (row.category) {
+          catMap[row.category] = (catMap[row.category] || 0) + 1;
+        }
+        if (row.city) {
+          cityMap[row.city] = (cityMap[row.city] || 0) + 1;
+        }
       }
     });
 
@@ -380,7 +389,6 @@ export default function SearchScreen() {
             onPress={() => setShowCityModal(true)}
             activeOpacity={0.8}
           >
-            <MapPin size={13} color={selectedCity ? '#FFF' : '#64748B'} />
             <Text style={[styles.chipText, selectedCity && styles.chipTextActive]}>
               {selectedCity
                 ? `${selectedCity}${cityCounts[selectedCity] !== undefined ? ` (${cityCounts[selectedCity]})` : ''}`

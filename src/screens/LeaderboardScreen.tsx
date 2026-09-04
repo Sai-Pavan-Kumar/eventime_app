@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,9 @@ import {
   RefreshControl,
   ScrollView,
   Modal,
+  useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import {
@@ -43,17 +44,36 @@ export type CohortType = 'campus' | 'city' | 'all_time';
 export default function LeaderboardScreen() {
   const navigation = useNavigation<any>();
   const { user, profile } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const pagerRef = useRef<ScrollView>(null);
 
   const isStudent = profile?.user_type === 'student';
   const userCollege = profile?.college || '';
-  const primaryCity = profile?.preferred_cities?.[0] || 'Hyderabad';
 
-  const [activeCohort, setActiveCohort] = useState<CohortType>('campus');
-  const [leaderboard, setLeaderboard] = useState<LeaderboardViewRow[]>([]);
+  // Multi-city support for preferred cities
+  const preferredCities = useMemo(() => {
+    return profile?.preferred_cities?.length ? profile.preferred_cities : ['Hyderabad'];
+  }, [profile?.preferred_cities]);
+
+  const [selectedLeaderboardCity, setSelectedLeaderboardCity] = useState(preferredCities[0]);
+
+  // Keep selected city synced if profile changes
+  useEffect(() => {
+    if (!preferredCities.includes(selectedLeaderboardCity)) {
+      setSelectedLeaderboardCity(preferredCities[0]);
+    }
+  }, [preferredCities, selectedLeaderboardCity]);
+
+  const [activeTabIndex, setActiveTabIndex] = useState(0);
+  const [cohortData, setCohortData] = useState<Record<CohortType, LeaderboardViewRow[]>>({
+    campus: [],
+    city: [],
+    all_time: [],
+  });
   const [isLeaderboardEnabled, setIsLeaderboardEnabled] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [myRank, setMyRank] = useState<number | null>(null);
   const [showScoreInfo, setShowScoreInfo] = useState(false);
 
   // Dynamic Cohort Tabs based on user role (strictly role-gated)
@@ -61,181 +81,238 @@ export default function LeaderboardScreen() {
     if (isStudent) {
       return [
         { id: 'campus' as CohortType, label: 'Your College' },
-        { id: 'city' as CohortType, label: primaryCity },
+        { id: 'city' as CohortType, label: selectedLeaderboardCity },
         { id: 'all_time' as CohortType, label: 'All-Time' },
       ];
     }
     return [
-      { id: 'campus' as CohortType, label: 'Top Users' },
-      { id: 'city' as CohortType, label: primaryCity },
+      { id: 'campus' as CohortType, label: 'Top Curators' },
+      { id: 'city' as CohortType, label: selectedLeaderboardCity },
       { id: 'all_time' as CohortType, label: 'All-Time' },
     ];
-  }, [isStudent, primaryCity]);
+  }, [isStudent, selectedLeaderboardCity]);
 
-  const fetchLeaderboard = useCallback(async (cohort: CohortType = activeCohort) => {
-    try {
-      // 1. Check if leaderboard is enabled in app_settings
-      const { data: settings } = await supabase
-        .from('app_settings')
-        .select('leaderboard_enabled')
-        .eq('id', 1)
-        .maybeSingle();
+  const activeCohort = cohortTabs[activeTabIndex]?.id || 'campus';
 
-      if (settings && settings.leaderboard_enabled === false) {
-        setIsLeaderboardEnabled(false);
-        setIsLoading(false);
-        return;
-      }
-      setIsLeaderboardEnabled(true);
+  const fetchCohort = useCallback(
+    async (cohort: CohortType, cityOverride?: string) => {
+      try {
+        const cityTarget = cityOverride || selectedLeaderboardCity;
 
-      // 2. Resolve excluded user IDs
-      const rawEnvEmails = process.env.EXPO_PUBLIC_LEADERBOARD_EXCLUDED_EMAILS || '';
-      const envEmailList = rawEnvEmails
-        .split(',')
-        .map((e: string) => e.trim().toLowerCase())
-        .filter(Boolean);
+        // 1. Check if leaderboard is enabled in app_settings
+        const { data: settings } = await supabase
+          .from('app_settings')
+          .select('leaderboard_enabled')
+          .eq('id', 1)
+          .maybeSingle();
 
-      const allExcludedEmails = Array.from(new Set([...DEFAULT_EXCLUDED_EMAILS, ...envEmailList]));
-
-      const { data: excludedProfiles } = await supabase
-        .from('profiles')
-        .select('id, username, email')
-        .in('email', allExcludedEmails);
-
-      const excludedIds = new Set<string>((excludedProfiles || []).map((p) => p.id));
-
-      const { data: excludedByUsername } = await supabase
-        .from('profiles')
-        .select('id, username')
-        .in('username', DEFAULT_EXCLUDED_USERNAMES);
-
-      (excludedByUsername || []).forEach((p) => excludedIds.add(p.id));
-
-      let cleanRows: LeaderboardViewRow[] = [];
-
-      // 3. Cohort-Filtered Queries
-      if (cohort === 'campus' && isStudent && userCollege) {
-        // Query campus-matched profiles
-        const { data: collegeProfs, error: collegeErr } = await supabase
-          .from('profiles')
-          .select('id, full_name, username, avatar_url, college, et_score')
-          .ilike('college', `%${userCollege.trim()}%`)
-          .order('et_score', { ascending: false })
-          .limit(50);
-
-        if (!collegeErr && collegeProfs && collegeProfs.length > 0) {
-          cleanRows = collegeProfs
-            .filter((p) => !excludedIds.has(p.id))
-            .map((p, idx) => ({
-              user_id: p.id,
-              full_name: p.full_name,
-              username: p.username,
-              avatar_url: p.avatar_url,
-              college: p.college,
-              et_score: p.et_score ?? 100,
-              base_score: 100,
-              events_posted: 0,
-              impact_saves: 0,
-              rank: idx + 1,
-            }));
+        if (settings && settings.leaderboard_enabled === false) {
+          setIsLeaderboardEnabled(false);
+          return [];
         }
-      } else if (cohort === 'city' && primaryCity) {
-        // Query city-matched profiles
-        const { data: cityProfs, error: cityErr } = await supabase
+        setIsLeaderboardEnabled(true);
+
+        // 2. Resolve excluded user IDs
+        const rawEnvEmails = process.env.EXPO_PUBLIC_LEADERBOARD_EXCLUDED_EMAILS || '';
+        const envEmailList = rawEnvEmails
+          .split(',')
+          .map((e: string) => e.trim().toLowerCase())
+          .filter(Boolean);
+
+        const allExcludedEmails = Array.from(new Set([...DEFAULT_EXCLUDED_EMAILS, ...envEmailList]));
+
+        const { data: excludedProfiles } = await supabase
           .from('profiles')
-          .select('id, full_name, username, avatar_url, college, et_score, preferred_cities')
-          .contains('preferred_cities', [primaryCity])
-          .order('et_score', { ascending: false })
-          .limit(50);
+          .select('id, username, email')
+          .in('email', allExcludedEmails);
 
-        if (!cityErr && cityProfs && cityProfs.length > 0) {
-          cleanRows = cityProfs
-            .filter((p) => !excludedIds.has(p.id))
-            .map((p, idx) => ({
-              user_id: p.id,
-              full_name: p.full_name,
-              username: p.username,
-              avatar_url: p.avatar_url,
-              college: p.college,
-              et_score: p.et_score ?? 100,
-              base_score: 100,
-              events_posted: 0,
-              impact_saves: 0,
-              rank: idx + 1,
-            }));
-        }
-      }
+        const excludedIds = new Set<string>((excludedProfiles || []).map((p) => p.id));
 
-      // Default/Fallback: Global All-Time Leaderboard
-      if (cleanRows.length === 0 && cohort === 'all_time') {
-        const { data, error } = await supabase
-          .from('leaderboard_view')
-          .select('*')
-          .order('et_score', { ascending: false })
-          .limit(100);
+        const { data: excludedByUsername } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('username', DEFAULT_EXCLUDED_USERNAMES);
 
-        if (!error && data && data.length > 0) {
-          cleanRows = data
-            .filter((r) => r.user_id && !excludedIds.has(r.user_id))
-            .map((r, idx) => ({
-              ...r,
-              et_score: r.et_score ?? 100,
-              rank: idx + 1,
-            }));
-        } else {
-          // Fallback to profiles table
-          const { data: profs, error: profError } = await supabase
-            .from('profiles')
-            .select('id, full_name, username, avatar_url, college, et_score')
+        (excludedByUsername || []).forEach((p) => excludedIds.add(p.id));
+
+        let cleanRows: LeaderboardViewRow[] = [];
+
+        // 3. Cohort-Filtered Queries
+        if (cohort === 'campus') {
+          if (isStudent && userCollege) {
+            // Student: query campus-matched profiles
+            const { data: collegeProfs, error: collegeErr } = await supabase
+              .from('profiles')
+              .select('id, full_name, username, avatar_url, college, et_score')
+              .ilike('college', `%${userCollege.trim()}%`)
+              .order('et_score', { ascending: false })
+              .limit(50);
+
+            if (!collegeErr && collegeProfs && collegeProfs.length > 0) {
+              cleanRows = collegeProfs
+                .filter((p) => !excludedIds.has(p.id))
+                .map((p, idx) => ({
+                  user_id: p.id,
+                  full_name: p.full_name,
+                  username: p.username,
+                  avatar_url: p.avatar_url,
+                  college: p.college,
+                  et_score: p.et_score ?? 100,
+                  base_score: 100,
+                  events_posted: 0,
+                  impact_saves: 0,
+                  rank: idx + 1,
+                }));
+            }
+          } else {
+            // Professional or curator: query top curators/professionals
+            const { data: proProfs, error: proErr } = await supabase
+              .from('profiles')
+              .select('id, full_name, username, avatar_url, college, et_score, user_type')
+              .order('et_score', { ascending: false })
+              .limit(50);
+
+            if (!proErr && proProfs && proProfs.length > 0) {
+              cleanRows = proProfs
+                .filter((p) => !excludedIds.has(p.id))
+                .map((p, idx) => ({
+                  user_id: p.id,
+                  full_name: p.full_name,
+                  username: p.username,
+                  avatar_url: p.avatar_url,
+                  college: p.college,
+                  et_score: p.et_score ?? 100,
+                  base_score: 100,
+                  events_posted: 0,
+                  impact_saves: 0,
+                  rank: idx + 1,
+                }));
+            }
+          }
+        } else if (cohort === 'city') {
+          if (cityTarget) {
+            const { data: cityProfs, error: cityErr } = await supabase
+              .from('profiles')
+              .select('id, full_name, username, avatar_url, college, et_score, preferred_cities')
+              .contains('preferred_cities', [cityTarget])
+              .order('et_score', { ascending: false })
+              .limit(50);
+
+            if (!cityErr && cityProfs && cityProfs.length > 0) {
+              cleanRows = cityProfs
+                .filter((p) => !excludedIds.has(p.id))
+                .map((p, idx) => ({
+                  user_id: p.id,
+                  full_name: p.full_name,
+                  username: p.username,
+                  avatar_url: p.avatar_url,
+                  college: p.college,
+                  et_score: p.et_score ?? 100,
+                  base_score: 100,
+                  events_posted: 0,
+                  impact_saves: 0,
+                  rank: idx + 1,
+                }));
+            }
+          }
+        } else if (cohort === 'all_time') {
+          const { data, error } = await supabase
+            .from('leaderboard_view')
+            .select('*')
             .order('et_score', { ascending: false })
             .limit(100);
 
-          if (!profError && profs) {
-            cleanRows = profs
-              .filter((p) => !excludedIds.has(p.id))
-              .map((p, idx) => ({
-                user_id: p.id,
-                full_name: p.full_name,
-                username: p.username,
-                avatar_url: p.avatar_url,
-                college: p.college,
-                et_score: p.et_score ?? 100,
-                base_score: 100,
-                events_posted: 0,
-                impact_saves: 0,
+          if (!error && data && data.length > 0) {
+            cleanRows = data
+              .filter((r) => r.user_id && !excludedIds.has(r.user_id))
+              .map((r, idx) => ({
+                ...r,
+                et_score: r.et_score ?? 100,
                 rank: idx + 1,
               }));
+          } else {
+            const { data: profs, error: profError } = await supabase
+              .from('profiles')
+              .select('id, full_name, username, avatar_url, college, et_score')
+              .order('et_score', { ascending: false })
+              .limit(100);
+
+            if (!profError && profs) {
+              cleanRows = profs
+                .filter((p) => !excludedIds.has(p.id))
+                .map((p, idx) => ({
+                  user_id: p.id,
+                  full_name: p.full_name,
+                  username: p.username,
+                  avatar_url: p.avatar_url,
+                  college: p.college,
+                  et_score: p.et_score ?? 100,
+                  base_score: 100,
+                  events_posted: 0,
+                  impact_saves: 0,
+                  rank: idx + 1,
+                }));
+            }
           }
         }
-      }
 
-      setLeaderboard(cleanRows);
-
-      if (user) {
-        const foundIndex = cleanRows.findIndex((r) => r.user_id === user.id);
-        setMyRank(foundIndex !== -1 ? foundIndex + 1 : null);
+        return cleanRows;
+      } catch (err) {
+        console.error('Fetch leaderboard error:', err);
+        return [];
       }
-    } catch (err) {
-      console.error('Fetch leaderboard error:', err);
-    } finally {
+    },
+    [isStudent, userCollege, selectedLeaderboardCity]
+  );
+
+  const fetchAllCohorts = useCallback(
+    async (cityToUse?: string) => {
+      const [campusRows, cityRows, allTimeRows] = await Promise.all([
+        fetchCohort('campus'),
+        fetchCohort('city', cityToUse),
+        fetchCohort('all_time'),
+      ]);
+
+      setCohortData({
+        campus: campusRows,
+        city: cityRows,
+        all_time: allTimeRows,
+      });
       setIsLoading(false);
       setIsRefreshing(false);
-    }
-  }, [activeCohort, isStudent, userCollege, primaryCity, user]);
+    },
+    [fetchCohort]
+  );
 
   useEffect(() => {
     setIsLoading(true);
-    fetchLeaderboard(activeCohort);
-  }, [activeCohort, fetchLeaderboard]);
+    fetchAllCohorts();
+  }, [fetchAllCohorts]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
-    fetchLeaderboard(activeCohort);
+    fetchAllCohorts();
   };
 
-  const handleCohortChange = (cohort: CohortType) => {
-    if (cohort === activeCohort) return;
-    setActiveCohort(cohort);
+  const handleCitySelect = async (city: string) => {
+    if (city === selectedLeaderboardCity) return;
+    setSelectedLeaderboardCity(city);
+    const cityRows = await fetchCohort('city', city);
+    setCohortData((prev) => ({ ...prev, city: cityRows }));
+  };
+
+  const handleTabPress = (idx: number) => {
+    if (idx === activeTabIndex) return;
+    setActiveTabIndex(idx);
+    pagerRef.current?.scrollTo({ x: idx * width, animated: true });
+  };
+
+  const onMomentumScrollEnd = (e: any) => {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const newIdx = Math.round(offsetX / width);
+    if (newIdx >= 0 && newIdx < cohortTabs.length && newIdx !== activeTabIndex) {
+      setActiveTabIndex(newIdx);
+    }
   };
 
   const handleCuratorPress = (item: LeaderboardViewRow) => {
@@ -246,18 +323,26 @@ export default function LeaderboardScreen() {
     });
   };
 
-  // User metrics for Proximal Rival Card
+  // User metrics for Proximal Rival Card in currently active cohort
+  const currentCohortList = cohortData[activeCohort] || [];
   const currentUserEntry = useMemo(
-    () => leaderboard.find((r) => r.user_id === user?.id),
-    [leaderboard, user?.id]
+    () => currentCohortList.find((r) => r.user_id === user?.id),
+    [currentCohortList, user?.id]
   );
+
+  const myRank = useMemo(() => {
+    if (!user) return null;
+    const foundIndex = currentCohortList.findIndex((r) => r.user_id === user.id);
+    return foundIndex !== -1 ? foundIndex + 1 : null;
+  }, [currentCohortList, user]);
+
   const userScore = profile?.et_score ?? currentUserEntry?.et_score ?? 100;
 
   // Previous rival (person immediately ahead of user in current cohort)
   const prevRival = useMemo(() => {
     if (!myRank || myRank <= 1) return null;
-    return leaderboard[myRank - 2] || null;
-  }, [leaderboard, myRank]);
+    return currentCohortList[myRank - 2] || null;
+  }, [currentCohortList, myRank]);
 
   const deltaToPass = useMemo(() => {
     if (!prevRival) return null;
@@ -282,9 +367,6 @@ export default function LeaderboardScreen() {
     return { label: 'Member', color: '#64748B', bg: '#F1F5F9' };
   }, [myRank]);
 
-  const topThree = leaderboard.slice(0, 3);
-  const restList = leaderboard.slice(3);
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
@@ -307,13 +389,13 @@ export default function LeaderboardScreen() {
 
       {/* Winnable Cohorts Segmented Control */}
       <View style={styles.cohortTrack}>
-        {cohortTabs.map((tab) => {
-          const isActive = tab.id === activeCohort;
+        {cohortTabs.map((tab, idx) => {
+          const isActive = idx === activeTabIndex;
           return (
             <TouchableOpacity
               key={tab.id}
               style={[styles.cohortPill, isActive && styles.cohortPillActive]}
-              onPress={() => handleCohortChange(tab.id)}
+              onPress={() => handleTabPress(idx)}
               activeOpacity={0.7}
             >
               <Text style={[styles.cohortPillText, isActive && styles.cohortPillTextActive]} numberOfLines={1}>
@@ -324,6 +406,7 @@ export default function LeaderboardScreen() {
         })}
       </View>
 
+      {/* Horizontally Swipeable Cohort Pager */}
       {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.colors.brand} />
@@ -336,242 +419,392 @@ export default function LeaderboardScreen() {
             The leaderboard is currently undergoing scheduled updates. Please check back soon.
           </Text>
         </View>
-      ) : leaderboard.length === 0 ? (
-        /* Empty State: Only shown when absolutely no curators exist in this cohort */
-        <ScrollView
-          contentContainerStyle={styles.emptyContainer}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={onRefresh}
-              tintColor={theme.colors.brand}
-              colors={[theme.colors.brand]}
-            />
-          }
-        >
-          <Image
-            source={APP_ASSETS.illustrations.throneEmpty}
-            style={styles.emptyIllustration}
-            contentFit="contain"
-          />
-          <Text style={styles.emptyTitle}>
-            {activeCohort === 'campus'
-              ? 'No one from your college is ranked yet'
-              : activeCohort === 'city'
-              ? `No rankings in ${primaryCity} yet`
-              : 'Leaderboard is empty'}
-          </Text>
-          <Text style={styles.emptySubtitle}>
-            {activeCohort === 'campus'
-              ? 'Share or save an event to be the first one on your college leaderboard!'
-              : activeCohort === 'city'
-              ? `Share or save an event in ${primaryCity} to get on the board!`
-              : 'Share or save events to climb up the ranks!'}
-          </Text>
-        </ScrollView>
       ) : (
-        /* Leaderboard View with Podium + Ranks 4+ */
-        <FlatList
-          data={restList}
-          keyExtractor={(item, idx) => item.user_id || String(idx)}
-          contentContainerStyle={[styles.listContent, user ? { paddingBottom: 100 } : null]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={onRefresh}
-              tintColor={theme.colors.brand}
-              colors={[theme.colors.brand]}
-            />
-          }
-          ListHeaderComponent={
-            <View>
-              {/* Podium for Top 3 */}
-              <View style={styles.podiumContainer}>
-                {/* 2nd Place */}
-                {topThree[1] ? (
-                  <TouchableOpacity
-                    style={[styles.podiumColumn, styles.silverColumn]}
-                    onPress={() => handleCuratorPress(topThree[1])}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.podiumAvatarWrap}>
-                      {topThree[1].avatar_url ? (
-                        <Image source={{ uri: topThree[1].avatar_url }} style={styles.podiumAvatar} />
-                      ) : (
-                        <View style={[styles.podiumAvatar, styles.avatarFallback]}>
-                          <Text style={styles.avatarLetter}>{topThree[1].full_name?.charAt(0) || '2'}</Text>
-                        </View>
-                      )}
-                      <View style={[styles.rankBadge, { backgroundColor: '#94A3B8' }]}>
-                        <Text style={styles.rankBadgeText}>2</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.podiumName} numberOfLines={1}>
-                      {topThree[1].full_name || topThree[1].username || 'Member'}
-                    </Text>
-                    <Text style={styles.podiumScore}>{topThree[1].et_score || 100} ET</Text>
-                    <View style={[styles.podiumPedestal, { height: 75, backgroundColor: '#E2E8F0' }]}>
-                      <Text style={styles.podiumPedestalNumber}>2</Text>
-                    </View>
-                  </TouchableOpacity>
-                ) : (
-                  <View style={[styles.podiumColumn, styles.silverColumn, { opacity: 0.35 }]}>
-                    <View style={[styles.podiumAvatarWrap]}>
-                      <View style={[styles.podiumAvatar, styles.avatarFallback]}>
-                        <Text style={styles.avatarLetter}>2</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.podiumName}>Open</Text>
-                    <Text style={styles.podiumScore}>-</Text>
-                    <View style={[styles.podiumPedestal, { height: 75, backgroundColor: '#E2E8F0' }]}>
-                      <Text style={styles.podiumPedestalNumber}>2</Text>
-                    </View>
+        <ScrollView
+          ref={pagerRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          directionalLockEnabled={true}
+          nestedScrollEnabled={true}
+          onMomentumScrollEnd={onMomentumScrollEnd}
+          style={{ flex: 1 }}
+        >
+          {cohortTabs.map((tab) => {
+            const list = cohortData[tab.id] || [];
+            const topThree = list.slice(0, 3);
+            const restList = list.slice(3);
+
+            return (
+              <View key={tab.id} style={{ width, flex: 1 }}>
+                {/* Multi-City Switcher Row (when on City tab with multiple preferred cities) */}
+                {tab.id === 'city' && preferredCities.length > 1 && (
+                  <View style={styles.citySwitcherContainer}>
+                    <Text style={styles.citySwitcherLabel}>YOUR CITIES:</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.cityChipsScroll}
+                    >
+                      {preferredCities.map((city) => {
+                        const isCitySelected = city === selectedLeaderboardCity;
+                        return (
+                          <TouchableOpacity
+                            key={city}
+                            style={[styles.cityChip, isCitySelected && styles.cityChipActive]}
+                            onPress={() => handleCitySelect(city)}
+                            activeOpacity={0.7}
+                          >
+                            <Text
+                              style={[
+                                styles.cityChipText,
+                                isCitySelected && styles.cityChipTextActive,
+                              ]}
+                            >
+                              {city}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
                   </View>
                 )}
 
-                {/* 1st Place (Center / Tallest) */}
-                {topThree[0] ? (
-                  <TouchableOpacity
-                    style={[styles.podiumColumn, styles.goldColumn]}
-                    onPress={() => handleCuratorPress(topThree[0])}
-                    activeOpacity={0.8}
+                {list.length === 0 ? (
+                  /* Empty State */
+                  <ScrollView
+                    contentContainerStyle={styles.emptyContainer}
+                    refreshControl={
+                      <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={onRefresh}
+                        tintColor={theme.colors.brand}
+                        colors={[theme.colors.brand]}
+                      />
+                    }
                   >
-                    <View style={styles.podiumAvatarWrap}>
-                      {topThree[0].avatar_url ? (
-                        <Image source={{ uri: topThree[0].avatar_url }} style={[styles.podiumAvatar, styles.goldAvatar]} />
-                      ) : (
-                        <View style={[styles.podiumAvatar, styles.goldAvatar, styles.avatarFallback]}>
-                          <Text style={styles.avatarLetter}>{topThree[0].full_name?.charAt(0) || '1'}</Text>
-                        </View>
-                      )}
-                      <View style={[styles.rankBadge, { backgroundColor: '#F59E0B' }]}>
-                        <Text style={styles.rankBadgeText}>1</Text>
-                      </View>
-                    </View>
-                    <Text style={[styles.podiumName, { fontWeight: '900' }]} numberOfLines={1}>
-                      {topThree[0].full_name || topThree[0].username || 'Member'}
+                    <Image
+                      source={APP_ASSETS.illustrations.throneEmpty}
+                      style={styles.emptyIllustration}
+                      contentFit="contain"
+                    />
+                    <Text style={styles.emptyTitle}>
+                      {tab.id === 'campus'
+                        ? isStudent
+                          ? 'No one from your college is ranked yet'
+                          : 'No top curators ranked yet'
+                        : tab.id === 'city'
+                        ? `No rankings in ${selectedLeaderboardCity} yet`
+                        : 'Leaderboard is empty'}
                     </Text>
-                    <Text style={[styles.podiumScore, { color: '#B45309', fontWeight: '900' }]}>
-                      {topThree[0].et_score || 100} ET
+                    <Text style={styles.emptySubtitle}>
+                      {tab.id === 'campus'
+                        ? isStudent
+                          ? 'Share or save an event to be the first one on your college leaderboard!'
+                          : 'Be the first curator to rank on EvenTime by curating or saving events!'
+                        : tab.id === 'city'
+                        ? `Share or save an event in ${selectedLeaderboardCity} to get on the board!`
+                        : 'Share or save events to climb up the ranks!'}
                     </Text>
-                    <View style={[styles.podiumPedestal, { height: 100, backgroundColor: '#FEF3C7' }]}>
-                      <Text style={[styles.podiumPedestalNumber, { color: '#B45309', fontSize: 26 }]}>1</Text>
-                    </View>
-                  </TouchableOpacity>
+                  </ScrollView>
                 ) : (
-                  <View style={[styles.podiumColumn, styles.goldColumn, { opacity: 0.35 }]}>
-                    <View style={styles.podiumAvatarWrap}>
-                      <View style={[styles.podiumAvatar, styles.goldAvatar, styles.avatarFallback]}>
-                        <Text style={styles.avatarLetter}>1</Text>
-                      </View>
-                    </View>
-                    <Text style={[styles.podiumName, { fontWeight: '900' }]}>Open</Text>
-                    <Text style={[styles.podiumScore, { color: '#B45309' }]}>-</Text>
-                    <View style={[styles.podiumPedestal, { height: 100, backgroundColor: '#FEF3C7' }]}>
-                      <Text style={[styles.podiumPedestalNumber, { color: '#B45309', fontSize: 26 }]}>1</Text>
-                    </View>
-                  </View>
-                )}
+                  /* Leaderboard View with Podium + Ranks 4+ */
+                  <FlatList
+                    data={restList}
+                    keyExtractor={(item, idx) => item.user_id || String(idx)}
+                    contentContainerStyle={[
+                      styles.listContent,
+                      { paddingBottom: user ? Math.max(insets.bottom, 12) + 90 : 32 },
+                    ]}
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={
+                      <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={onRefresh}
+                        tintColor={theme.colors.brand}
+                        colors={[theme.colors.brand]}
+                      />
+                    }
+                    ListHeaderComponent={
+                      <View>
+                        {/* Podium for Top 3 */}
+                        <View style={styles.podiumContainer}>
+                          {/* 2nd Place */}
+                          {topThree[1] ? (
+                            <TouchableOpacity
+                              style={[styles.podiumColumn, styles.silverColumn]}
+                              onPress={() => handleCuratorPress(topThree[1])}
+                              activeOpacity={0.8}
+                            >
+                              <View style={styles.podiumAvatarWrap}>
+                                {topThree[1].avatar_url ? (
+                                  <Image
+                                    source={{ uri: topThree[1].avatar_url }}
+                                    style={styles.podiumAvatar}
+                                  />
+                                ) : (
+                                  <View style={[styles.podiumAvatar, styles.avatarFallback]}>
+                                    <Text style={styles.avatarLetter}>
+                                      {topThree[1].full_name?.charAt(0) || '2'}
+                                    </Text>
+                                  </View>
+                                )}
+                                <View style={[styles.rankBadge, { backgroundColor: '#94A3B8' }]}>
+                                  <Text style={styles.rankBadgeText}>2</Text>
+                                </View>
+                              </View>
+                              <Text style={styles.podiumName} numberOfLines={1}>
+                                {topThree[1].full_name || topThree[1].username || 'Member'}
+                              </Text>
+                              <Text style={styles.podiumScore}>{topThree[1].et_score || 100} ET</Text>
+                              <View
+                                style={[
+                                  styles.podiumPedestal,
+                                  { height: 75, backgroundColor: '#E2E8F0' },
+                                ]}
+                              >
+                                <Text style={styles.podiumPedestalNumber}>2</Text>
+                              </View>
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={[styles.podiumColumn, styles.silverColumn, { opacity: 0.35 }]}>
+                              <View style={styles.podiumAvatarWrap}>
+                                <View style={[styles.podiumAvatar, styles.avatarFallback]}>
+                                  <Text style={styles.avatarLetter}>2</Text>
+                                </View>
+                              </View>
+                              <Text style={styles.podiumName}>Open</Text>
+                              <Text style={styles.podiumScore}>-</Text>
+                              <View
+                                style={[
+                                  styles.podiumPedestal,
+                                  { height: 75, backgroundColor: '#E2E8F0' },
+                                ]}
+                              >
+                                <Text style={styles.podiumPedestalNumber}>2</Text>
+                              </View>
+                            </View>
+                          )}
 
-                {/* 3rd Place */}
-                {topThree[2] ? (
-                  <TouchableOpacity
-                    style={[styles.podiumColumn, styles.bronzeColumn]}
-                    onPress={() => handleCuratorPress(topThree[2])}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.podiumAvatarWrap}>
-                      {topThree[2].avatar_url ? (
-                        <Image source={{ uri: topThree[2].avatar_url }} style={styles.podiumAvatar} />
-                      ) : (
-                        <View style={[styles.podiumAvatar, styles.avatarFallback]}>
-                          <Text style={styles.avatarLetter}>{topThree[2].full_name?.charAt(0) || '3'}</Text>
+                          {/* 1st Place (Center / Tallest) */}
+                          {topThree[0] ? (
+                            <TouchableOpacity
+                              style={[styles.podiumColumn, styles.goldColumn]}
+                              onPress={() => handleCuratorPress(topThree[0])}
+                              activeOpacity={0.8}
+                            >
+                              <View style={styles.podiumAvatarWrap}>
+                                {topThree[0].avatar_url ? (
+                                  <Image
+                                    source={{ uri: topThree[0].avatar_url }}
+                                    style={[styles.podiumAvatar, styles.goldAvatar]}
+                                  />
+                                ) : (
+                                  <View
+                                    style={[
+                                      styles.podiumAvatar,
+                                      styles.goldAvatar,
+                                      styles.avatarFallback,
+                                    ]}
+                                  >
+                                    <Text style={styles.avatarLetter}>
+                                      {topThree[0].full_name?.charAt(0) || '1'}
+                                    </Text>
+                                  </View>
+                                )}
+                                <View style={[styles.rankBadge, { backgroundColor: '#F59E0B' }]}>
+                                  <Text style={styles.rankBadgeText}>1</Text>
+                                </View>
+                              </View>
+                              <Text style={[styles.podiumName, { fontWeight: '900' }]} numberOfLines={1}>
+                                {topThree[0].full_name || topThree[0].username || 'Member'}
+                              </Text>
+                              <Text style={[styles.podiumScore, { color: '#B45309', fontWeight: '900' }]}>
+                                {topThree[0].et_score || 100} ET
+                              </Text>
+                              <View
+                                style={[
+                                  styles.podiumPedestal,
+                                  { height: 100, backgroundColor: '#FEF3C7' },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.podiumPedestalNumber,
+                                    { color: '#B45309', fontSize: 26 },
+                                  ]}
+                                >
+                                  1
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={[styles.podiumColumn, styles.goldColumn, { opacity: 0.35 }]}>
+                              <View style={styles.podiumAvatarWrap}>
+                                <View
+                                  style={[
+                                    styles.podiumAvatar,
+                                    styles.goldAvatar,
+                                    styles.avatarFallback,
+                                  ]}
+                                >
+                                  <Text style={styles.avatarLetter}>1</Text>
+                                </View>
+                              </View>
+                              <Text style={[styles.podiumName, { fontWeight: '900' }]}>Open</Text>
+                              <Text style={[styles.podiumScore, { color: '#B45309' }]}>-</Text>
+                              <View
+                                style={[
+                                  styles.podiumPedestal,
+                                  { height: 100, backgroundColor: '#FEF3C7' },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.podiumPedestalNumber,
+                                    { color: '#B45309', fontSize: 26 },
+                                  ]}
+                                >
+                                  1
+                                </Text>
+                              </View>
+                            </View>
+                          )}
+
+                          {/* 3rd Place */}
+                          {topThree[2] ? (
+                            <TouchableOpacity
+                              style={[styles.podiumColumn, styles.bronzeColumn]}
+                              onPress={() => handleCuratorPress(topThree[2])}
+                              activeOpacity={0.8}
+                            >
+                              <View style={styles.podiumAvatarWrap}>
+                                {topThree[2].avatar_url ? (
+                                  <Image
+                                    source={{ uri: topThree[2].avatar_url }}
+                                    style={styles.podiumAvatar}
+                                  />
+                                ) : (
+                                  <View style={[styles.podiumAvatar, styles.avatarFallback]}>
+                                    <Text style={styles.avatarLetter}>
+                                      {topThree[2].full_name?.charAt(0) || '3'}
+                                    </Text>
+                                  </View>
+                                )}
+                                <View style={[styles.rankBadge, { backgroundColor: '#D97706' }]}>
+                                  <Text style={styles.rankBadgeText}>3</Text>
+                                </View>
+                              </View>
+                              <Text style={styles.podiumName} numberOfLines={1}>
+                                {topThree[2].full_name || topThree[2].username || 'Member'}
+                              </Text>
+                              <Text style={styles.podiumScore}>{topThree[2].et_score || 100} ET</Text>
+                              <View
+                                style={[
+                                  styles.podiumPedestal,
+                                  { height: 55, backgroundColor: '#FFEDD5' },
+                                ]}
+                              >
+                                <Text style={[styles.podiumPedestalNumber, { color: '#D97706' }]}>
+                                  3
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={[styles.podiumColumn, styles.bronzeColumn, { opacity: 0.35 }]}>
+                              <View style={styles.podiumAvatarWrap}>
+                                <View style={[styles.podiumAvatar, styles.avatarFallback]}>
+                                  <Text style={styles.avatarLetter}>3</Text>
+                                </View>
+                              </View>
+                              <Text style={styles.podiumName}>Open</Text>
+                              <Text style={styles.podiumScore}>-</Text>
+                              <View
+                                style={[
+                                  styles.podiumPedestal,
+                                  { height: 55, backgroundColor: '#FFEDD5' },
+                                ]}
+                              >
+                                <Text style={[styles.podiumPedestalNumber, { color: '#D97706' }]}>
+                                  3
+                                </Text>
+                              </View>
+                            </View>
+                          )}
                         </View>
-                      )}
-                      <View style={[styles.rankBadge, { backgroundColor: '#D97706' }]}>
-                        <Text style={styles.rankBadgeText}>3</Text>
+
+                        {/* Ranks 4+ List Header */}
+                        {restList.length > 0 && (
+                          <Text style={styles.listSectionTitle}>
+                            {tab.id === 'campus'
+                              ? isStudent
+                                ? 'College Leaderboard'
+                                : 'Top Curators'
+                              : tab.id === 'city'
+                              ? `Top in ${selectedLeaderboardCity}`
+                              : 'Top Ranked'}
+                          </Text>
+                        )}
                       </View>
-                    </View>
-                    <Text style={styles.podiumName} numberOfLines={1}>
-                      {topThree[2].full_name || topThree[2].username || 'Member'}
-                    </Text>
-                    <Text style={styles.podiumScore}>{topThree[2].et_score || 100} ET</Text>
-                    <View style={[styles.podiumPedestal, { height: 55, backgroundColor: '#FFEDD5' }]}>
-                      <Text style={[styles.podiumPedestalNumber, { color: '#D97706' }]}>3</Text>
-                    </View>
-                  </TouchableOpacity>
-                ) : (
-                  <View style={[styles.podiumColumn, styles.bronzeColumn, { opacity: 0.35 }]}>
-                    <View style={styles.podiumAvatarWrap}>
-                      <View style={[styles.podiumAvatar, styles.avatarFallback]}>
-                        <Text style={styles.avatarLetter}>3</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.podiumName}>Open</Text>
-                    <Text style={styles.podiumScore}>-</Text>
-                    <View style={[styles.podiumPedestal, { height: 55, backgroundColor: '#FFEDD5' }]}>
-                      <Text style={[styles.podiumPedestalNumber, { color: '#D97706' }]}>3</Text>
-                    </View>
-                  </View>
+                    }
+                    renderItem={({ item, index }) => {
+                      const rank = item.rank ?? index + 4;
+                      const isMe = user?.id === item.user_id;
+                      return (
+                        <TouchableOpacity
+                          style={[styles.rankRow, isMe && styles.rankRowMe]}
+                          onPress={() => handleCuratorPress(item)}
+                        >
+                          <Text style={[styles.rankNumber, isMe && styles.rankNumberMe]}>
+                            #{rank}
+                          </Text>
+
+                          {item.avatar_url ? (
+                            <Image source={{ uri: item.avatar_url }} style={styles.rowAvatar} />
+                          ) : (
+                            <View style={styles.rowAvatarFallback}>
+                              <Text style={styles.rowAvatarLetter}>
+                                {item.full_name ? item.full_name.charAt(0).toUpperCase() : 'U'}
+                              </Text>
+                            </View>
+                          )}
+
+                          <View style={styles.rowDetails}>
+                            <Text
+                              style={[styles.rowName, isMe && styles.rowNameMe]}
+                              numberOfLines={1}
+                            >
+                              {item.full_name || item.username || 'Member'} {isMe ? '(You)' : ''}
+                            </Text>
+                            {item.college && (
+                              <Text style={styles.rowCollege} numberOfLines={1}>
+                                {item.college}
+                              </Text>
+                            )}
+                          </View>
+
+                          <View style={styles.rowScoreBadge}>
+                            <Text style={styles.rowScoreText}>{item.et_score || 100} ET</Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    }}
+                  />
                 )}
               </View>
-
-              {/* Ranks 4+ List Header */}
-              {restList.length > 0 && (
-                <Text style={styles.listSectionTitle}>
-                  {activeCohort === 'campus'
-                    ? 'College Leaderboard'
-                    : activeCohort === 'city'
-                    ? `Top in ${primaryCity}`
-                    : 'Top Ranked'}
-                </Text>
-              )}
-            </View>
-          }
-          renderItem={({ item, index }) => {
-            const rank = item.rank ?? index + 4;
-            const isMe = user?.id === item.user_id;
-            return (
-              <TouchableOpacity
-                style={[styles.rankRow, isMe && styles.rankRowMe]}
-                onPress={() => handleCuratorPress(item)}
-              >
-                <Text style={[styles.rankNumber, isMe && styles.rankNumberMe]}>#{rank}</Text>
-
-                {item.avatar_url ? (
-                  <Image source={{ uri: item.avatar_url }} style={styles.rowAvatar} />
-                ) : (
-                  <View style={styles.rowAvatarFallback}>
-                    <Text style={styles.rowAvatarLetter}>
-                      {item.full_name ? item.full_name.charAt(0).toUpperCase() : 'U'}
-                    </Text>
-                  </View>
-                )}
-
-                <View style={styles.rowDetails}>
-                  <Text style={[styles.rowName, isMe && styles.rowNameMe]} numberOfLines={1}>
-                    {item.full_name || item.username || 'Member'} {isMe ? '(You)' : ''}
-                  </Text>
-                  {item.college && (
-                    <Text style={styles.rowCollege} numberOfLines={1}>
-                      {item.college}
-                    </Text>
-                  )}
-                </View>
-
-                <View style={styles.rowScoreBadge}>
-                  <Text style={styles.rowScoreText}>{item.et_score || 100} ET</Text>
-                </View>
-              </TouchableOpacity>
             );
-          }}
-        />
+          })}
+        </ScrollView>
       )}
 
       {/* Sticky Bottom Proximal Rival Card */}
       {user && isLeaderboardEnabled && (
-        <View style={styles.rivalCard}>
+        <View
+          style={[
+            styles.rivalCard,
+            { paddingBottom: Math.max(insets.bottom, 12) + 4 },
+          ]}
+        >
           <View style={styles.rivalLeft}>
             <View style={[styles.rivalRankBadge, myRank === 1 && styles.rivalRankBadgeGold]}>
               <Text style={styles.rivalRankText}>{myRank ? `#${myRank}` : '—'}</Text>
@@ -583,7 +816,9 @@ export default function LeaderboardScreen() {
                   {myRank === 1 ? 'You · Rank #1' : myRank ? `You · #${myRank}` : 'You · Unranked'}
                 </Text>
                 <View style={[styles.tierPill, { backgroundColor: tierBadge.bg }]}>
-                  <Text style={[styles.tierPillText, { color: tierBadge.color }]}>{tierBadge.label}</Text>
+                  <Text style={[styles.tierPillText, { color: tierBadge.color }]}>
+                    {tierBadge.label}
+                  </Text>
                 </View>
               </View>
 
@@ -600,7 +835,7 @@ export default function LeaderboardScreen() {
                 </View>
               ) : (
                 <Text style={styles.rivalSubtitle}>
-                  Save or share events (+10 ET) to join this leaderboard.
+                  Save or share events to join this leaderboard.
                 </Text>
               )}
             </View>
@@ -612,10 +847,18 @@ export default function LeaderboardScreen() {
         </View>
       )}
 
-      {/* How ET Score Works Modal */}
-      <Modal visible={showScoreInfo} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.scoreModalCard}>
+      {/* How ET Score Works Modal (Tap anywhere outside to close) */}
+      <Modal visible={showScoreInfo} transparent animationType="fade" onRequestClose={() => setShowScoreInfo(false)}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowScoreInfo(false)}
+        >
+          <TouchableOpacity
+            style={styles.scoreModalCard}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation?.()}
+          >
             <View style={styles.scoreModalHeader}>
               <Text style={styles.scoreModalTitle}>How Points Work</Text>
               <TouchableOpacity style={styles.scoreModalClose} onPress={() => setShowScoreInfo(false)}>
@@ -647,7 +890,7 @@ export default function LeaderboardScreen() {
               </View>
               <View style={styles.scoreRow}>
                 <View style={styles.scoreRowLeft}>
-                  <Text style={styles.scoreRowLabel}>Someone Attends</Text>
+                  <Text style={styles.scoreRowLabel}>Someone Interested</Text>
                   <Text style={styles.scoreRowDesc}>When someone marks 'Interested' on your event</Text>
                 </View>
                 <Text style={styles.scoreRowValue}>+25</Text>
@@ -667,8 +910,8 @@ export default function LeaderboardScreen() {
                 <Text style={[styles.scoreRowValue, { color: '#EF4444' }]}>−25</Text>
               </View>
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
@@ -714,79 +957,114 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 6,
   },
   headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   headerTitle: {
     fontFamily: 'Outfit-Bold',
-    fontSize: 17,
+    fontSize: 18,
     color: '#0F172A',
+  },
+  infoBtn: {
+    padding: 6,
   },
   // Winnable Cohorts Segmented Control
   cohortTrack: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F1F5F9',
     marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 4,
+    marginVertical: 10,
     padding: 4,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 4,
   },
   cohortPill: {
     flex: 1,
-    flexDirection: 'row',
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
     borderRadius: 10,
-    gap: 6,
   },
   cohortPillActive: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
   },
   cohortPillText: {
     fontFamily: 'Switzer-Bold',
-    fontSize: 12,
+    fontSize: 13,
     color: '#64748B',
   },
   cohortPillTextActive: {
+    color: '#0F172A',
+  },
+  // Multi-City Switcher Container
+  citySwitcherContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  citySwitcherLabel: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 10,
+    color: '#94A3B8',
+    letterSpacing: 0.8,
+    marginRight: 8,
+  },
+  cityChipsScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cityChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cityChipActive: {
+    backgroundColor: theme.colors.brand,
+    borderColor: theme.colors.brand,
+  },
+  cityChipText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 12,
+    color: '#64748B',
+  },
+  cityChipTextActive: {
     color: '#FFFFFF',
   },
   listContent: {
-    padding: 16,
-    paddingBottom: 80,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
+  // Top 3 Visual Podium
   podiumContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'center',
-    marginVertical: 18,
-    gap: 8,
+    marginBottom: 24,
+    paddingHorizontal: 8,
+    gap: 12,
   },
   podiumColumn: {
     flex: 1,
     alignItems: 'center',
   },
   goldColumn: {
-    flex: 1.1,
+    transform: [{ translateY: -10 }],
   },
   silverColumn: {},
   bronzeColumn: {},
@@ -795,61 +1073,59 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   podiumAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     borderWidth: 2,
-    borderColor: '#CBD5E1',
+    borderColor: '#94A3B8',
   },
   goldAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderColor: '#F59E0B',
     borderWidth: 3,
   },
   avatarFallback: {
-    backgroundColor: '#EDE9FE',
+    backgroundColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarLetter: {
     fontFamily: 'Outfit-Bold',
-    fontSize: 18,
-    color: theme.colors.brand,
+    fontSize: 22,
+    color: '#475569',
   },
   rankBadge: {
     position: 'absolute',
     bottom: -4,
     alignSelf: 'center',
-    width: 20,
-    height: 20,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   rankBadgeText: {
     fontFamily: 'Switzer-Bold',
-    color: '#FFF',
-    fontSize: 11,
+    fontSize: 10,
+    color: '#FFFFFF',
   },
   podiumName: {
-    fontFamily: 'Outfit-Bold',
-    fontSize: 13,
+    fontFamily: 'Switzer-Bold',
+    fontSize: 12,
     color: '#0F172A',
+    marginBottom: 2,
     textAlign: 'center',
-    maxWidth: 90,
   },
   podiumScore: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 11,
-    color: theme.colors.brand,
-    marginBottom: 8,
+    fontFamily: 'Outfit-Bold',
+    fontSize: 12,
+    color: '#475569',
+    marginBottom: 6,
   },
   podiumPedestal: {
     width: '100%',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -860,32 +1136,34 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   listSectionTitle: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 14,
+    fontFamily: 'Outfit-Bold',
+    fontSize: 15,
     color: '#64748B',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginVertical: 14,
+    letterSpacing: 0.5,
+    marginBottom: 10,
+    marginTop: 6,
   },
+  // Ranks 4+ Row Items
   rankRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     padding: 12,
-    borderRadius: 16,
+    borderRadius: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F1F5F9',
   },
   rankRowMe: {
     backgroundColor: '#F5F3FF',
     borderColor: '#DDD6FE',
   },
   rankNumber: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 14,
-    color: '#94A3B8',
-    width: 32,
+    fontFamily: 'Outfit-Bold',
+    fontSize: 15,
+    color: '#64748B',
+    width: 34,
   },
   rankNumberMe: {
     color: theme.colors.brand,
@@ -894,27 +1172,28 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 10,
+    marginRight: 12,
   },
   rowAvatarFallback: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   rowAvatarLetter: {
     fontFamily: 'Outfit-Bold',
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: 16,
+    color: '#475569',
   },
   rowDetails: {
     flex: 1,
+    marginRight: 8,
   },
   rowName: {
-    fontFamily: 'Switzer-Semibold',
+    fontFamily: 'Switzer-Bold',
     fontSize: 14,
     color: '#0F172A',
   },
@@ -923,7 +1202,7 @@ const styles = StyleSheet.create({
   },
   rowCollege: {
     fontFamily: 'Switzer-Regular',
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
     marginTop: 2,
   },
@@ -948,8 +1227,8 @@ const styles = StyleSheet.create({
     minHeight: 400,
   },
   emptyIllustration: {
-    width: 160,
-    height: 160,
+    width: 230,
+    height: 230,
     marginBottom: 16,
   },
   emptyTitle: {
@@ -977,7 +1256,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#334155',
     shadowColor: '#000',
@@ -1018,81 +1297,74 @@ const styles = StyleSheet.create({
   },
   rivalTitle: {
     fontFamily: 'Switzer-Bold',
-    color: '#FFFFFF',
     fontSize: 13,
+    color: '#FFF',
   },
   tierPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
   tierPillText: {
     fontFamily: 'Switzer-Bold',
-    fontSize: 10,
+    fontSize: 9,
+    textTransform: 'uppercase',
+  },
+  rivalSubtitle: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 11,
+    color: '#94A3B8',
+    lineHeight: 15,
   },
   rivalDeltaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  rivalSubtitle: {
-    fontFamily: 'Switzer-Regular',
-    color: '#94A3B8',
-    fontSize: 11,
-    lineHeight: 16,
   },
   rivalHighlight: {
+    color: '#38BDF8',
     fontFamily: 'Switzer-Bold',
-    color: '#F59E0B',
   },
   rivalScoreWrap: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#1E293B',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: '#334155',
   },
   rivalScoreText: {
     fontFamily: 'Outfit-Bold',
     color: '#F59E0B',
-    fontSize: 14,
+    fontSize: 13,
   },
-  infoBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#EEF2FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  // Points Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   scoreModalCard: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: 380,
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    borderRadius: 20,
     padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowRadius: 16,
+    elevation: 8,
   },
   scoreModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   scoreModalTitle: {
     fontFamily: 'Outfit-Bold',
@@ -1107,30 +1379,30 @@ const styles = StyleSheet.create({
   },
   scoreRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: '#F8FAFC',
   },
   scoreRowLeft: {
     flex: 1,
-    paddingRight: 10,
+    marginRight: 12,
   },
   scoreRowLabel: {
     fontFamily: 'Switzer-Bold',
     fontSize: 13,
     color: '#0F172A',
+    marginBottom: 2,
   },
   scoreRowDesc: {
     fontFamily: 'Switzer-Regular',
     fontSize: 11,
     color: '#64748B',
-    marginTop: 1,
   },
   scoreRowValue: {
     fontFamily: 'Outfit-Bold',
     fontSize: 14,
-    color: '#0F172A',
+    color: '#10B981',
   },
 });

@@ -410,22 +410,6 @@ export default function EventDetailScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Interested Button in Header */}
-          <TouchableOpacity
-            style={[styles.interestedHeaderBtn, isInterested && styles.interestedHeaderBtnActive]}
-            onPress={handleInterestedToggle}
-            activeOpacity={0.8}
-          >
-            <Heart
-              size={15}
-              color={isInterested ? '#EF4444' : '#64748B'}
-              fill={isInterested ? '#EF4444' : 'none'}
-            />
-            <Text style={[styles.interestedHeaderText, isInterested && styles.interestedHeaderTextActive]}>
-              {interestCount > 0 ? `${interestCount}` : 'Interested'}
-            </Text>
-          </TouchableOpacity>
-
           <TouchableOpacity style={styles.iconBtn} onPress={handleShare}>
             <Share2 size={18} color={theme.colors.textPrimary} />
           </TouchableOpacity>
@@ -500,7 +484,7 @@ export default function EventDetailScreen() {
             </View>
 
             <View style={styles.socialProofTextBox}>
-              <Text style={[styles.socialProofTitle, isInterested && styles.socialProofTitleActive]} numberOfLines={1}>
+              <Text style={[styles.socialProofTitle, isInterested && styles.socialProofTitleActive]} numberOfLines={2}>
                 {isStudent
                   ? interestCount > 0
                     ? isInterested
@@ -543,21 +527,6 @@ export default function EventDetailScreen() {
             >
               <CalendarPlus size={16} color={theme.colors.brand} />
               <Text style={styles.calendarActionText}>Add to Calendar</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.interestedBigBtn, isInterested && styles.interestedBigBtnActive]}
-              onPress={handleInterestedToggle}
-              activeOpacity={0.8}
-            >
-              <Heart
-                size={16}
-                color={isInterested ? '#EF4444' : '#0F172A'}
-                fill={isInterested ? '#EF4444' : 'none'}
-              />
-              <Text style={[styles.interestedBigText, isInterested && styles.interestedBigTextActive]}>
-                {isInterested ? 'Interested' : 'I\'m Interested'} ({interestCount})
-              </Text>
             </TouchableOpacity>
           </View>
 

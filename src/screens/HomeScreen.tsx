@@ -388,6 +388,13 @@ export default function HomeScreen() {
       : (guestPrefs?.preferredCities || []);
   }, [profile?.preferred_cities, guestPrefs?.preferredCities]);
 
+  const citiesLabel = useMemo(() => {
+    if (!preferredCities.length) return 'your city';
+    if (preferredCities.length === 1) return preferredCities[0];
+    if (preferredCities.length === 2) return `${preferredCities[0]} & ${preferredCities[1]}`;
+    return `${preferredCities[0]}, ${preferredCities[1]} +${preferredCities.length - 2}`;
+  }, [preferredCities]);
+
   const preferredGoals: string[] = useMemo(() => {
     return profile?.goals?.length
       ? profile.goals
@@ -732,18 +739,34 @@ export default function HomeScreen() {
               ListEmptyComponent={
                 <EmptyState
                   illustration={APP_ASSETS.illustrations.empty}
-                  title={selectedDate ? 'No Events Scheduled' : 'No Matching Events For You'}
+                  title={
+                    selectedDate
+                      ? 'No Events Scheduled'
+                      : aroundYouEvents.length > 0
+                      ? 'No Events In Your Categories'
+                      : `No Events in ${citiesLabel}`
+                  }
                   message={
                     selectedDate
                       ? `There are no events scheduled for ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}. Be the first to host one!`
-                      : 'No upcoming events match both your selected cities and categories. Update your preferences in Profile or explore all events in Around You!'
+                      : aroundYouEvents.length > 0
+                      ? `Events are happening in ${citiesLabel}, but none currently match your selected interest categories. Explore 'Around You' to discover them, or update your preferences in Profile!`
+                      : `No upcoming events found in ${citiesLabel}. Add more cities in your Profile or host an event yourself to get the community buzzing!`
                   }
-                  buttonText={selectedDate ? 'Clear Date' : 'Explore Around You'}
+                  buttonText={
+                    selectedDate
+                      ? 'Clear Date'
+                      : aroundYouEvents.length > 0
+                      ? 'Explore Around You'
+                      : 'Update Preferences'
+                  }
                   onButtonPress={() => {
                     if (selectedDate) {
                       setSelectedDate(null);
-                    } else {
+                    } else if (aroundYouEvents.length > 0) {
                       handleSelectTab(1);
+                    } else {
+                      (navigation as any).navigate('ProfileTab');
                     }
                   }}
                 />
@@ -794,16 +817,32 @@ export default function HomeScreen() {
               ListEmptyComponent={
                 <EmptyState
                   illustration={APP_ASSETS.illustrations.empty}
-                  title={selectedDate ? 'No Events Scheduled' : 'No Events In Your Cities'}
+                  title={
+                    selectedDate
+                      ? 'No Events Scheduled'
+                      : forYouEvents.length > 0
+                      ? `All caught up in ${citiesLabel}!`
+                      : `No Events in ${citiesLabel}`
+                  }
                   message={
                     selectedDate
                       ? `There are no events scheduled for ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}. Be the first to host one!`
-                      : 'No upcoming events found in your preferred cities. Add more cities in your Profile or host an event yourself!'
+                      : forYouEvents.length > 0
+                      ? `All scheduled events in ${citiesLabel} currently match your selected interests and are waiting in 'For You'. Check back soon as new categories are added!`
+                      : `No upcoming events found in ${citiesLabel}. Add more cities in your Profile or host an event yourself to get the community started!`
                   }
-                  buttonText={selectedDate ? 'Clear Date' : 'Update Cities'}
+                  buttonText={
+                    selectedDate
+                      ? 'Clear Date'
+                      : forYouEvents.length > 0
+                      ? 'View For You'
+                      : 'Update Cities'
+                  }
                   onButtonPress={() => {
                     if (selectedDate) {
                       setSelectedDate(null);
+                    } else if (forYouEvents.length > 0) {
+                      handleSelectTab(0);
                     } else {
                       (navigation as any).navigate('ProfileTab');
                     }
