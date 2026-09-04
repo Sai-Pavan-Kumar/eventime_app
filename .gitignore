@@ -54,3 +54,7 @@ android/app/google-services.json
 PLAY_STORE_*.md
 cloudflare-waf-worker/*.md
 docs/
+
+# Local Proton Drive Backup folder
+Proton_Drive_Backup/
+proton-drive-backup/
