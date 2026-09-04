@@ -137,19 +137,21 @@ export default function LeaderboardScreen() {
         let cleanRows: LeaderboardViewRow[] = [];
 
         // 3. Cohort-Filtered Queries
+        // 3. Cohort-Filtered Queries (Only active contributors > 100 ET)
         if (cohort === 'campus') {
           if (isStudent && userCollege) {
-            // Student: query campus-matched profiles
+            // Student: query campus-matched profiles with active score > 100 ET
             const { data: collegeProfs, error: collegeErr } = await supabase
               .from('profiles')
               .select('id, full_name, username, avatar_url, college, et_score')
               .ilike('college', `%${userCollege.trim()}%`)
+              .gt('et_score', 100)
               .order('et_score', { ascending: false })
               .limit(50);
 
             if (!collegeErr && collegeProfs && collegeProfs.length > 0) {
               cleanRows = collegeProfs
-                .filter((p) => !excludedIds.has(p.id))
+                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 100)
                 .map((p, idx) => ({
                   user_id: p.id,
                   full_name: p.full_name,
@@ -164,16 +166,17 @@ export default function LeaderboardScreen() {
                 }));
             }
           } else {
-            // Professional or curator: query top curators/professionals
+            // Professional or curator: query active curators/professionals > 100 ET
             const { data: proProfs, error: proErr } = await supabase
               .from('profiles')
               .select('id, full_name, username, avatar_url, college, et_score, user_type')
+              .gt('et_score', 100)
               .order('et_score', { ascending: false })
               .limit(50);
 
             if (!proErr && proProfs && proProfs.length > 0) {
               cleanRows = proProfs
-                .filter((p) => !excludedIds.has(p.id))
+                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 100)
                 .map((p, idx) => ({
                   user_id: p.id,
                   full_name: p.full_name,
@@ -194,19 +197,20 @@ export default function LeaderboardScreen() {
               .from('profiles')
               .select('id, full_name, username, avatar_url, college, et_score, preferred_cities')
               .contains('preferred_cities', [cityTarget])
+              .gt('et_score', 100)
               .order('et_score', { ascending: false })
               .limit(50);
 
             if (!cityErr && cityProfs && cityProfs.length > 0) {
               // Priority 1 Home City filter: curators whose #1 home city is cityTarget
-              // If not enough users with #1 city, include all users with city in preferred_cities
+              // If not enough users with #1 city, include all active users with city in preferred_cities
               const homeCityCurators = cityProfs.filter(
                 (p) => p.preferred_cities && p.preferred_cities[0] === cityTarget
               );
               const finalCityPool = homeCityCurators.length > 0 ? homeCityCurators : cityProfs;
 
               cleanRows = finalCityPool
-                .filter((p) => !excludedIds.has(p.id))
+                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 100)
                 .map((p, idx) => ({
                   user_id: p.id,
                   full_name: p.full_name,
@@ -225,12 +229,13 @@ export default function LeaderboardScreen() {
           const { data, error } = await supabase
             .from('leaderboard_view')
             .select('*')
+            .gt('et_score', 100)
             .order('et_score', { ascending: false })
             .limit(100);
 
           if (!error && data && data.length > 0) {
             cleanRows = data
-              .filter((r) => r.user_id && !excludedIds.has(r.user_id))
+              .filter((r) => r.user_id && !excludedIds.has(r.user_id) && (r.et_score ?? 0) > 100)
               .map((r, idx) => ({
                 ...r,
                 et_score: r.et_score ?? 100,
@@ -240,12 +245,13 @@ export default function LeaderboardScreen() {
             const { data: profs, error: profError } = await supabase
               .from('profiles')
               .select('id, full_name, username, avatar_url, college, et_score')
+              .gt('et_score', 100)
               .order('et_score', { ascending: false })
               .limit(100);
 
             if (!profError && profs) {
               cleanRows = profs
-                .filter((p) => !excludedIds.has(p.id))
+                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 100)
                 .map((p, idx) => ({
                   user_id: p.id,
                   full_name: p.full_name,
@@ -346,13 +352,13 @@ export default function LeaderboardScreen() {
     [currentCohortList, user?.id]
   );
 
+  const userScore = profile?.et_score ?? currentUserEntry?.et_score ?? 100;
+
   const myRank = useMemo(() => {
-    if (!user) return null;
+    if (!user || userScore <= 100) return null;
     const foundIndex = currentCohortList.findIndex((r) => r.user_id === user.id);
     return foundIndex !== -1 ? foundIndex + 1 : null;
-  }, [currentCohortList, user]);
-
-  const userScore = profile?.et_score ?? currentUserEntry?.et_score ?? 100;
+  }, [currentCohortList, user, userScore]);
 
   // Previous rival (person immediately ahead of user in current cohort)
   const prevRival = useMemo(() => {
@@ -874,9 +880,13 @@ export default function LeaderboardScreen() {
                 <Text style={styles.rivalSubtitle}>
                   Viewing {selectedLeaderboardCity}. Your Home Turf is {preferredCities[0]}.
                 </Text>
+              ) : userScore <= 100 ? (
+                <Text style={styles.rivalSubtitle}>
+                  Save or share an event (+10 ET) to earn points and claim your spot on the leaderboard.
+                </Text>
               ) : (
                 <Text style={styles.rivalSubtitle}>
-                  Save or share events to join this leaderboard.
+                  Save or share events to climb up the leaderboard ranks.
                 </Text>
               )}
             </View>
