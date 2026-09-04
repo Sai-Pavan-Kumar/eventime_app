@@ -546,6 +546,9 @@ export default function SettingsScreen() {
                 </Text>
               </View>
             </View>
+            <Text style={styles.sectionSubtitle}>
+              Select in order of preference. #1 is your Home City for leaderboards; #2 & #3 curate your feed.
+            </Text>
             {isAdmin && (
               <View style={styles.adminControlsRow}>
                 <Text style={styles.adminNoticeText}>Admin Access: All 32 Cities Unlocked</Text>
@@ -561,18 +564,21 @@ export default function SettingsScreen() {
           <View style={styles.chipGrid}>
             {CITIES.map((c) => {
               const isSelected = preferredCities.includes(c);
-              const count = cityCounts[c] || 0;
+              const priorityIndex = isSelected ? preferredCities.indexOf(c) + 1 : null;
               return (
                 <TouchableOpacity
                   key={c}
                   style={[styles.chip, isSelected && styles.chipActive]}
                   onPress={() => toggleCity(c)}
                 >
+                  {isSelected && priorityIndex !== null && (
+                    <View style={styles.priorityBadge}>
+                      <Text style={styles.priorityBadgeText}>{priorityIndex}</Text>
+                    </View>
+                  )}
                   <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
                     {c}
-                    {count > 0 ? ` (${count})` : ''}
                   </Text>
-                  {isSelected && <CheckCircle2 size={13} color="#FFF" style={{ marginLeft: 4 }} />}
                 </TouchableOpacity>
               );
             })}
@@ -1048,6 +1054,21 @@ const styles = StyleSheet.create({
   chipActive: {
     backgroundColor: theme.colors.brand,
     borderColor: theme.colors.brand,
+  },
+  priorityBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  priorityBadgeText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 10,
+    color: theme.colors.brand,
+    lineHeight: 12,
   },
   chipText: {
     fontFamily: 'Switzer-Medium',

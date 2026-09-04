@@ -81,18 +81,17 @@ export default function LeaderboardScreen() {
     if (isStudent) {
       return [
         { id: 'campus' as CohortType, label: 'Your College' },
-        { id: 'city' as CohortType, label: selectedLeaderboardCity },
+        { id: 'city' as CohortType, label: 'City' },
         { id: 'all_time' as CohortType, label: 'All-Time' },
       ];
     }
     return [
-      { id: 'campus' as CohortType, label: 'Top Curators' },
-      { id: 'city' as CohortType, label: selectedLeaderboardCity },
+      { id: 'city' as CohortType, label: 'City' },
       { id: 'all_time' as CohortType, label: 'All-Time' },
     ];
-  }, [isStudent, selectedLeaderboardCity]);
+  }, [isStudent]);
 
-  const activeCohort = cohortTabs[activeTabIndex]?.id || 'campus';
+  const activeCohort = cohortTabs[activeTabIndex]?.id || (isStudent ? 'campus' : 'city');
 
   const fetchCohort = useCallback(
     async (cohort: CohortType, cityOverride?: string) => {
@@ -199,7 +198,14 @@ export default function LeaderboardScreen() {
               .limit(50);
 
             if (!cityErr && cityProfs && cityProfs.length > 0) {
-              cleanRows = cityProfs
+              // Priority 1 Home City filter: curators whose #1 home city is cityTarget
+              // If not enough users with #1 city, include all users with city in preferred_cities
+              const homeCityCurators = cityProfs.filter(
+                (p) => p.preferred_cities && p.preferred_cities[0] === cityTarget
+              );
+              const finalCityPool = homeCityCurators.length > 0 ? homeCityCurators : cityProfs;
+
+              cleanRows = finalCityPool
                 .filter((p) => !excludedIds.has(p.id))
                 .map((p, idx) => ({
                   user_id: p.id,
@@ -267,21 +273,31 @@ export default function LeaderboardScreen() {
 
   const fetchAllCohorts = useCallback(
     async (cityToUse?: string) => {
-      const [campusRows, cityRows, allTimeRows] = await Promise.all([
-        fetchCohort('campus'),
-        fetchCohort('city', cityToUse),
-        fetchCohort('all_time'),
-      ]);
+      const promises: Promise<any>[] = [];
+      if (isStudent) {
+        promises.push(fetchCohort('campus'));
+      }
+      promises.push(fetchCohort('city', cityToUse));
+      promises.push(fetchCohort('all_time'));
 
-      setCohortData({
-        campus: campusRows,
-        city: cityRows,
-        all_time: allTimeRows,
-      });
+      const results = await Promise.all(promises);
+      if (isStudent) {
+        setCohortData({
+          campus: results[0] || [],
+          city: results[1] || [],
+          all_time: results[2] || [],
+        });
+      } else {
+        setCohortData({
+          campus: [],
+          city: results[0] || [],
+          all_time: results[1] || [],
+        });
+      }
       setIsLoading(false);
       setIsRefreshing(false);
     },
-    [fetchCohort]
+    [fetchCohort, isStudent]
   );
 
   useEffect(() => {
@@ -446,8 +462,9 @@ export default function LeaderboardScreen() {
                       showsHorizontalScrollIndicator={false}
                       contentContainerStyle={styles.cityChipsScroll}
                     >
-                      {preferredCities.map((city) => {
+                      {preferredCities.map((city, cIdx) => {
                         const isCitySelected = city === selectedLeaderboardCity;
+                        const isHome = cIdx === 0;
                         return (
                           <TouchableOpacity
                             key={city}
@@ -455,6 +472,13 @@ export default function LeaderboardScreen() {
                             onPress={() => handleCitySelect(city)}
                             activeOpacity={0.7}
                           >
+                            {isHome && (
+                              <View style={[styles.cityHomeTag, isCitySelected && styles.cityHomeTagActive]}>
+                                <Text style={[styles.cityHomeTagText, isCitySelected && styles.cityHomeTagTextActive]}>
+                                  #1 Home
+                                </Text>
+                              </View>
+                            )}
                             <Text
                               style={[
                                 styles.cityChipText,
@@ -467,6 +491,19 @@ export default function LeaderboardScreen() {
                         );
                       })}
                     </ScrollView>
+                  </View>
+                )}
+
+                {/* Single City Header Banner */}
+                {tab.id === 'city' && preferredCities.length === 1 && (
+                  <View style={styles.singleCityBanner}>
+                    <MapPin size={13} color="#6C47FF" />
+                    <Text style={styles.singleCityBannerText}>
+                      Home Turf:{' '}
+                      <Text style={{ fontFamily: 'Switzer-Bold', color: '#1E293B' }}>
+                        {selectedLeaderboardCity}
+                      </Text>
+                    </Text>
                   </View>
                 )}
 
@@ -833,6 +870,10 @@ export default function LeaderboardScreen() {
                     {prevRival.username || prevRival.full_name || 'user'} for #{myRank! - 1}
                   </Text>
                 </View>
+              ) : activeCohort === 'city' && selectedLeaderboardCity !== preferredCities[0] ? (
+                <Text style={styles.rivalSubtitle}>
+                  Viewing {selectedLeaderboardCity}. Your Home Turf is {preferredCities[0]}.
+                </Text>
               ) : (
                 <Text style={styles.rivalSubtitle}>
                   Save or share events to join this leaderboard.
@@ -1027,6 +1068,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cityChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 14,
@@ -1037,6 +1081,38 @@ const styles = StyleSheet.create({
   cityChipActive: {
     backgroundColor: theme.colors.brand,
     borderColor: theme.colors.brand,
+  },
+  cityHomeTag: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  cityHomeTagActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  cityHomeTagText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 9,
+    color: '#475569',
+  },
+  cityHomeTagTextActive: {
+    color: '#FFFFFF',
+  },
+  singleCityBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  singleCityBannerText: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 12,
+    color: '#64748B',
   },
   cityChipText: {
     fontFamily: 'Switzer-Bold',

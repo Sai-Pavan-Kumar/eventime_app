@@ -1134,6 +1134,10 @@ export default function OnboardingScreen() {
                 </TouchableOpacity>
               </View>
 
+              <Text style={styles.priorityHelperText}>
+                Tap in order of preference — #1 is your Home City for leaderboards.
+              </Text>
+
               {showAllCities && (
                 <View style={[styles.searchBox, { marginBottom: 12 }]}>
                   <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
@@ -1155,7 +1159,7 @@ export default function OnboardingScreen() {
               <View style={styles.selectionGrid}>
                 {filteredCities.map((c) => {
                   const isSelected = selectedCities.includes(c);
-                  const count = cityCounts[c] || 0;
+                  const priorityIndex = isSelected ? selectedCities.indexOf(c) + 1 : null;
                   return (
                     <TouchableOpacity
                       key={c}
@@ -1163,9 +1167,13 @@ export default function OnboardingScreen() {
                       onPress={() => toggleCity(c)}
                       activeOpacity={0.7}
                     >
+                      {isSelected && priorityIndex !== null && (
+                        <View style={styles.priorityBadge}>
+                          <Text style={styles.priorityBadgeText}>{priorityIndex}</Text>
+                        </View>
+                      )}
                       <Text style={[styles.gridChipText, isSelected && styles.gridChipTextActive]}>
                         {c}
-                        {count > 0 ? ` (${count})` : ''}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -1974,6 +1982,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#FFFFFF',
   },
+  priorityHelperText: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 12,
+    lineHeight: 16,
+  },
   selectionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1992,6 +2007,21 @@ const styles = StyleSheet.create({
   gridChipActive: {
     backgroundColor: '#F3F0FF',
     borderColor: '#6C47FF',
+  },
+  priorityBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#6C47FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  priorityBadgeText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 10,
+    color: '#FFFFFF',
+    lineHeight: 12,
   },
   gridChipText: {
     fontFamily: 'Switzer-Medium',
