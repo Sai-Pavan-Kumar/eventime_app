@@ -43,3 +43,8 @@ release-builds/
 # Google Services & Firebase
 google-services.json
 android/app/google-services.json
+
+# Internal launch & strategy documentation (Local laptop only)
+PLAY_STORE_*.md
+cloudflare-waf-worker/*.md
+docs/
