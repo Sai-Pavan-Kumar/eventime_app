@@ -485,7 +485,6 @@ export default function EventDetailScreen() {
             <View style={styles.goalTagsContainer}>
               {event.goal_tags.map((goal, idx) => (
                 <View key={idx} style={styles.goalChip}>
-                  <Sparkles size={12} color="#6C47FF" />
                   <Text style={styles.goalChipText}>{goal}</Text>
                 </View>
               ))}
@@ -643,8 +642,8 @@ export default function EventDetailScreen() {
             {/* 5. Registration Price (if it is a paid event) */}
             {(event.is_free === false || Boolean(event.price)) && (
               <View style={styles.detailRow}>
-                <View style={[styles.detailIconWrapper, { backgroundColor: '#FEF3C7' }]}>
-                  <Tag size={18} color="#D97706" />
+                <View style={styles.detailIconWrapper}>
+                  <Tag size={18} color={theme.colors.brand} />
                 </View>
                 <View style={styles.detailTextWrapper}>
                   <Text style={styles.detailLabel}>Registration Fee</Text>
@@ -658,12 +657,12 @@ export default function EventDetailScreen() {
             {/* Registration Deadline (If present) */}
             {event.registration_deadline && (
               <View style={styles.detailRow}>
-                <View style={[styles.detailIconWrapper, { backgroundColor: '#FEF2F2' }]}>
-                  <Hourglass size={18} color="#EF4444" />
+                <View style={styles.detailIconWrapper}>
+                  <Hourglass size={18} color={theme.colors.brand} />
                 </View>
                 <View style={styles.detailTextWrapper}>
-                  <Text style={[styles.detailLabel, { color: '#EF4444' }]}>Registration Deadline</Text>
-                  <Text style={[styles.detailValue, { color: '#B91C1C' }]}>{event.registration_deadline}</Text>
+                  <Text style={styles.detailLabel}>Registration Deadline</Text>
+                  <Text style={styles.detailValue}>{event.registration_deadline}</Text>
                 </View>
               </View>
             )}
@@ -672,7 +671,7 @@ export default function EventDetailScreen() {
             {(event.colleges?.name || event.college_only) && (
               <View style={styles.detailRow}>
                 <View style={styles.detailIconWrapper}>
-                  <Building size={18} color="#3B82F6" />
+                  <Building size={18} color={theme.colors.brand} />
                 </View>
                 <View style={styles.detailTextWrapper}>
                   <Text style={styles.detailLabel}>College Hosted</Text>
@@ -688,7 +687,7 @@ export default function EventDetailScreen() {
             {(event.college_branch || (event.branch_tags && event.branch_tags.length > 0)) && (
               <View style={styles.detailRow}>
                 <View style={styles.detailIconWrapper}>
-                  <GraduationCap size={18} color="#8B5CF6" />
+                  <GraduationCap size={18} color={theme.colors.brand} />
                 </View>
                 <View style={styles.detailTextWrapper}>
                   <Text style={styles.detailLabel}>Eligible Branches</Text>
@@ -703,7 +702,7 @@ export default function EventDetailScreen() {
             {event.prizes && (
               <View style={styles.detailRow}>
                 <View style={styles.detailIconWrapper}>
-                  <Award size={18} color="#EAB308" />
+                  <Award size={18} color={theme.colors.brand} />
                 </View>
                 <View style={styles.detailTextWrapper}>
                   <Text style={styles.detailLabel}>Prizes / Rewards</Text>

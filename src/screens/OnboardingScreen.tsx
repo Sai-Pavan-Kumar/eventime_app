@@ -33,6 +33,7 @@ import {
   Lock,
   Sparkles,
   ShieldCheck,
+  Compass,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -1084,7 +1085,6 @@ export default function OnboardingScreen() {
 
                   {Boolean(branch) && (
                     <View style={styles.selectedBranchBadge}>
-                      <Check size={13} color="#059669" />
                       <Text style={styles.selectedBranchText}>Selected: {branch}</Text>
                     </View>
                   )}
@@ -1167,7 +1167,6 @@ export default function OnboardingScreen() {
                         {c}
                         {count > 0 ? ` (${count})` : ''}
                       </Text>
-                      {isSelected && <Check size={14} color="#6C47FF" style={{ marginLeft: 6 }} />}
                     </TouchableOpacity>
                   );
                 })}
@@ -1255,7 +1254,6 @@ export default function OnboardingScreen() {
                         {cat}
                         {count > 0 ? ` (${count})` : ''}
                       </Text>
-                      {isSelected && <Check size={14} color="#6C47FF" style={{ marginLeft: 6 }} />}
                     </TouchableOpacity>
                   );
                 })}
@@ -1286,7 +1284,6 @@ export default function OnboardingScreen() {
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
                     <>
-                      <Sparkles size={16} color="#FFFFFF" />
                       <Text style={styles.stepNextBtnText}>Complete Profile</Text>
                       <View style={styles.claimEtBadge}>
                         <Text style={styles.claimEtBadgeText}>+50 ET</Text>
@@ -1314,7 +1311,7 @@ export default function OnboardingScreen() {
                       ]}
                     />
                     <View style={styles.radarCore}>
-                      <Sparkles size={26} color="#6C47FF" />
+                      <Compass size={24} color="#6C47FF" />
                     </View>
                   </View>
 
@@ -1352,7 +1349,7 @@ export default function OnboardingScreen() {
                         <Text style={styles.passTitle}>You're All Set!</Text>
                       </View>
                       <View style={styles.passBadge}>
-                        <ShieldCheck size={13} color="#059669" />
+                        <View style={styles.passBadgeDot} />
                         <Text style={styles.passBadgeText}>READY</Text>
                       </View>
                     </View>
@@ -2150,6 +2147,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#A7F3D0',
+  },
+  passBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#059669',
+    marginRight: 2,
   },
   passBadgeText: {
     fontFamily: 'Switzer-Bold',

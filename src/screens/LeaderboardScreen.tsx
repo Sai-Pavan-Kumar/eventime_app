@@ -60,15 +60,15 @@ export default function LeaderboardScreen() {
   const cohortTabs = useMemo(() => {
     if (isStudent) {
       return [
-        { id: 'campus' as CohortType, label: 'Your College', icon: GraduationCap },
-        { id: 'city' as CohortType, label: primaryCity, icon: MapPin },
-        { id: 'all_time' as CohortType, label: 'All-Time', icon: Trophy },
+        { id: 'campus' as CohortType, label: 'Your College' },
+        { id: 'city' as CohortType, label: primaryCity },
+        { id: 'all_time' as CohortType, label: 'All-Time' },
       ];
     }
     return [
-      { id: 'campus' as CohortType, label: 'Top Users', icon: ShieldCheck },
-      { id: 'city' as CohortType, label: primaryCity, icon: MapPin },
-      { id: 'all_time' as CohortType, label: 'All-Time', icon: Trophy },
+      { id: 'campus' as CohortType, label: 'Top Users' },
+      { id: 'city' as CohortType, label: primaryCity },
+      { id: 'all_time' as CohortType, label: 'All-Time' },
     ];
   }, [isStudent, primaryCity]);
 
@@ -268,18 +268,18 @@ export default function LeaderboardScreen() {
   // Simple, recognizable rank badges
   const tierBadge = useMemo(() => {
     if (myRank === 1) {
-      return { label: 'Rank #1', icon: Crown, color: '#F59E0B', bg: '#FEF3C7' };
+      return { label: 'Rank #1', color: '#B45309', bg: '#FEF3C7' };
     }
     if (myRank && myRank <= 3) {
-      return { label: 'Top 3', icon: Award, color: '#D97706', bg: '#FFEDD5' };
+      return { label: 'Top 3', color: '#D97706', bg: '#FFEDD5' };
     }
     if (myRank && myRank <= 10) {
-      return { label: 'Top 10', icon: ShieldCheck, color: '#6C47FF', bg: '#F5F3FF' };
+      return { label: 'Top 10', color: '#6C47FF', bg: '#F5F3FF' };
     }
     if (myRank && myRank <= 25) {
-      return { label: 'Top 25', icon: Sparkles, color: '#0284C7', bg: '#E0F2FE' };
+      return { label: 'Top 25', color: '#0284C7', bg: '#E0F2FE' };
     }
-    return { label: 'Member', icon: Compass, color: '#64748B', bg: '#F1F5F9' };
+    return { label: 'Member', color: '#64748B', bg: '#F1F5F9' };
   }, [myRank]);
 
   const topThree = leaderboard.slice(0, 3);
@@ -309,7 +309,6 @@ export default function LeaderboardScreen() {
       <View style={styles.cohortTrack}>
         {cohortTabs.map((tab) => {
           const isActive = tab.id === activeCohort;
-          const TabIcon = tab.icon;
           return (
             <TouchableOpacity
               key={tab.id}
@@ -317,7 +316,6 @@ export default function LeaderboardScreen() {
               onPress={() => handleCohortChange(tab.id)}
               activeOpacity={0.7}
             >
-              <TabIcon size={14} color={isActive ? '#FFFFFF' : '#64748B'} />
               <Text style={[styles.cohortPillText, isActive && styles.cohortPillTextActive]} numberOfLines={1}>
                 {tab.label}
               </Text>
@@ -414,7 +412,7 @@ export default function LeaderboardScreen() {
                     </Text>
                     <Text style={styles.podiumScore}>{topThree[1].et_score || 100} ET</Text>
                     <View style={[styles.podiumPedestal, { height: 75, backgroundColor: '#E2E8F0' }]}>
-                      <Medal size={22} color="#64748B" />
+                      <Text style={styles.podiumPedestalNumber}>2</Text>
                     </View>
                   </TouchableOpacity>
                 ) : (
@@ -427,7 +425,7 @@ export default function LeaderboardScreen() {
                     <Text style={styles.podiumName}>Open</Text>
                     <Text style={styles.podiumScore}>-</Text>
                     <View style={[styles.podiumPedestal, { height: 75, backgroundColor: '#E2E8F0' }]}>
-                      <Medal size={22} color="#64748B" />
+                      <Text style={styles.podiumPedestalNumber}>2</Text>
                     </View>
                   </View>
                 )}
@@ -439,7 +437,6 @@ export default function LeaderboardScreen() {
                     onPress={() => handleCuratorPress(topThree[0])}
                     activeOpacity={0.8}
                   >
-                    <Crown size={24} color="#F59E0B" style={{ marginBottom: -6 }} />
                     <View style={styles.podiumAvatarWrap}>
                       {topThree[0].avatar_url ? (
                         <Image source={{ uri: topThree[0].avatar_url }} style={[styles.podiumAvatar, styles.goldAvatar]} />
@@ -459,12 +456,11 @@ export default function LeaderboardScreen() {
                       {topThree[0].et_score || 100} ET
                     </Text>
                     <View style={[styles.podiumPedestal, { height: 100, backgroundColor: '#FEF3C7' }]}>
-                      <Trophy size={28} color="#F59E0B" />
+                      <Text style={[styles.podiumPedestalNumber, { color: '#B45309', fontSize: 26 }]}>1</Text>
                     </View>
                   </TouchableOpacity>
                 ) : (
                   <View style={[styles.podiumColumn, styles.goldColumn, { opacity: 0.35 }]}>
-                    <Crown size={24} color="#F59E0B" style={{ marginBottom: -6 }} />
                     <View style={styles.podiumAvatarWrap}>
                       <View style={[styles.podiumAvatar, styles.goldAvatar, styles.avatarFallback]}>
                         <Text style={styles.avatarLetter}>1</Text>
@@ -473,7 +469,7 @@ export default function LeaderboardScreen() {
                     <Text style={[styles.podiumName, { fontWeight: '900' }]}>Open</Text>
                     <Text style={[styles.podiumScore, { color: '#B45309' }]}>-</Text>
                     <View style={[styles.podiumPedestal, { height: 100, backgroundColor: '#FEF3C7' }]}>
-                      <Trophy size={28} color="#F59E0B" />
+                      <Text style={[styles.podiumPedestalNumber, { color: '#B45309', fontSize: 26 }]}>1</Text>
                     </View>
                   </View>
                 )}
@@ -502,12 +498,12 @@ export default function LeaderboardScreen() {
                     </Text>
                     <Text style={styles.podiumScore}>{topThree[2].et_score || 100} ET</Text>
                     <View style={[styles.podiumPedestal, { height: 55, backgroundColor: '#FFEDD5' }]}>
-                      <Award size={20} color="#D97706" />
+                      <Text style={[styles.podiumPedestalNumber, { color: '#D97706' }]}>3</Text>
                     </View>
                   </TouchableOpacity>
                 ) : (
                   <View style={[styles.podiumColumn, styles.bronzeColumn, { opacity: 0.35 }]}>
-                    <View style={[styles.podiumAvatarWrap]}>
+                    <View style={styles.podiumAvatarWrap}>
                       <View style={[styles.podiumAvatar, styles.avatarFallback]}>
                         <Text style={styles.avatarLetter}>3</Text>
                       </View>
@@ -515,7 +511,7 @@ export default function LeaderboardScreen() {
                     <Text style={styles.podiumName}>Open</Text>
                     <Text style={styles.podiumScore}>-</Text>
                     <View style={[styles.podiumPedestal, { height: 55, backgroundColor: '#FFEDD5' }]}>
-                      <Award size={20} color="#D97706" />
+                      <Text style={[styles.podiumPedestalNumber, { color: '#D97706' }]}>3</Text>
                     </View>
                   </View>
                 )}
@@ -587,18 +583,16 @@ export default function LeaderboardScreen() {
                   {myRank === 1 ? 'You · Rank #1' : myRank ? `You · #${myRank}` : 'You · Unranked'}
                 </Text>
                 <View style={[styles.tierPill, { backgroundColor: tierBadge.bg }]}>
-                  <tierBadge.icon size={11} color={tierBadge.color} />
                   <Text style={[styles.tierPillText, { color: tierBadge.color }]}>{tierBadge.label}</Text>
                 </View>
               </View>
 
               {myRank === 1 ? (
                 <Text style={styles.rivalSubtitle}>
-                  👑 You're in 1st place! Keep sharing events to stay on top.
+                  You're in 1st place! Keep sharing events to stay on top.
                 </Text>
               ) : prevRival && deltaToPass ? (
                 <View style={styles.rivalDeltaRow}>
-                  <Zap size={12} color="#F59E0B" />
                   <Text style={styles.rivalSubtitle} numberOfLines={1}>
                     Just <Text style={styles.rivalHighlight}>{deltaToPass} ET</Text> more to pass @
                     {prevRival.username || prevRival.full_name || 'user'} for #{myRank! - 1}
@@ -858,6 +852,12 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  podiumPedestalNumber: {
+    fontFamily: 'Outfit-Bold',
+    fontSize: 22,
+    color: '#64748B',
+    opacity: 0.8,
   },
   listSectionTitle: {
     fontFamily: 'Switzer-Bold',

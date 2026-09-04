@@ -602,7 +602,7 @@ export default function HomeScreen() {
               onPress={() => navigation.navigate('Leaderboard')}
               activeOpacity={0.8}
             >
-              <Trophy size={18} color="#D97706" />
+              <Trophy size={18} color="#0F172A" />
             </TouchableOpacity>
           </View>
         </View>
