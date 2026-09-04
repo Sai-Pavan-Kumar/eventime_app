@@ -50,6 +50,7 @@ export default function SettingsScreen() {
 
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [username, setUsername] = useState(profile?.username || '');
+  const isUsernameLocked = !isAdmin && Boolean(profile?.is_onboarded || profile?.username);
   const [userType, setUserType] = useState<'student' | 'professional'>((profile?.user_type as any) || 'student');
   const [college, setCollege] = useState(profile?.college || '');
   const [collegeId, setCollegeId] = useState<string | null>(profile?.college_id || null);
@@ -221,29 +222,34 @@ export default function SettingsScreen() {
 
   const handleSave = async () => {
     if (!user) return;
-    const cleanUsername = username.trim().toLowerCase();
+    const cleanUsername = isUsernameLocked
+      ? (profile?.username || username)
+      : username.trim().toLowerCase();
+
     if (!cleanUsername) {
       Alert.alert('Validation Error', 'Username is required.');
       return;
     }
-    if (cleanUsername.length < 3) {
-      Alert.alert('Validation Error', 'Username must be at least 3 characters.');
-      return;
-    }
-    if (cleanUsername.length > 12) {
-      Alert.alert('Validation Error', 'Username must be 12 characters or less.');
-      return;
-    }
-    const USERNAME_REGEX = /^[a-z0-9_.-]{3,12}$/;
-    if (!USERNAME_REGEX.test(cleanUsername)) {
-      Alert.alert('Validation Error', 'Username can only contain letters, numbers, and . _ -');
-      return;
+    if (!isUsernameLocked) {
+      if (cleanUsername.length < 3) {
+        Alert.alert('Validation Error', 'Username must be at least 3 characters.');
+        return;
+      }
+      if (cleanUsername.length > 12) {
+        Alert.alert('Validation Error', 'Username must be 12 characters or less.');
+        return;
+      }
+      const USERNAME_REGEX = /^[a-z0-9_.-]{3,12}$/;
+      if (!USERNAME_REGEX.test(cleanUsername)) {
+        Alert.alert('Validation Error', 'Username can only contain letters, numbers, and . _ -');
+        return;
+      }
     }
 
     setIsSaving(true);
     try {
-      // Check username uniqueness if changed
-      if (cleanUsername !== profile?.username) {
+      // Check username uniqueness if changed and not locked
+      if (!isUsernameLocked && cleanUsername !== profile?.username) {
         const { data: existing } = await supabase
           .from('profiles')
           .select('id')
@@ -379,16 +385,43 @@ export default function SettingsScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Username</Text>
-            <TextInput
-              style={styles.input}
-              value={username}
-              onChangeText={(t) => setUsername(t.toLowerCase().replace(/[^a-z0-9_.-]/g, ''))}
-              placeholder="username"
-              placeholderTextColor={theme.colors.textMuted}
-              autoCapitalize="none"
-              maxLength={12}
-            />
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Username</Text>
+              {isUsernameLocked && (
+                <View style={styles.lockedPill}>
+                  <Lock size={10} color="#64748B" />
+                  <Text style={styles.lockedPillText}>Permanent</Text>
+                </View>
+              )}
+            </View>
+
+            {isUsernameLocked ? (
+              <View style={styles.lockedInputContainer}>
+                <Text style={styles.lockedAtSymbol}>@</Text>
+                <Text style={styles.lockedUsernameText}>{profile?.username || username}</Text>
+                <Lock size={14} color="#94A3B8" />
+              </View>
+            ) : (
+              <TextInput
+                style={styles.input}
+                value={username}
+                onChangeText={(t) => setUsername(t.toLowerCase().replace(/[^a-z0-9_.-]/g, ''))}
+                placeholder="username"
+                placeholderTextColor={theme.colors.textMuted}
+                autoCapitalize="none"
+                maxLength={12}
+              />
+            )}
+
+            {isUsernameLocked ? (
+              <Text style={styles.lockedHelperText}>
+                Curator handles are permanent and cannot be modified.
+              </Text>
+            ) : (
+              <Text style={styles.inputHelperText}>
+                3–12 characters. Letters, numbers, underscores, and dashes only.
+              </Text>
+            )}
           </View>
         </View>
 
@@ -927,11 +960,66 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 14,
   },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
   label: {
     fontFamily: 'Switzer-Bold',
     fontSize: 13,
     color: theme.colors.textPrimary,
-    marginBottom: 6,
+  },
+  lockedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+  },
+  lockedPillText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 10.5,
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  lockedInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  lockedAtSymbol: {
+    fontFamily: 'Outfit-Bold',
+    fontSize: 14,
+    color: '#94A3B8',
+    marginRight: 4,
+  },
+  lockedUsernameText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 14,
+    color: '#475569',
+    flex: 1,
+  },
+  lockedHelperText: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 5,
+  },
+  inputHelperText: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 5,
   },
   input: {
     fontFamily: 'Switzer-Regular',

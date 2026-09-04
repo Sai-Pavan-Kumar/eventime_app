@@ -929,7 +929,7 @@ export default function OnboardingScreen() {
                 {profileSubStep === 4 && 'Personalize Your Feed'}
               </Text>
               <Text style={styles.setupSubtitle}>
-                {profileSubStep === 1 && 'Your unique handle for sharing, curating, and discovering events across India.'}
+                {profileSubStep === 1 && 'Choose your unique curator handle. Once claimed, it is locked permanently.'}
                 {profileSubStep === 2 && 'Connect your university to unlock internal campus fests and department hackathons.'}
                 {profileSubStep === 3 && 'Choose cities you want to track. We will curate meetups and fests in your area.'}
                 {profileSubStep === 4 && 'Pick categories you care about to train your personal recommendation feed.'}
@@ -940,7 +940,13 @@ export default function OnboardingScreen() {
           {/* SUB-STEP 1: Username */}
           {profileSubStep === 1 && (
             <View style={styles.setupCard}>
-              <Text style={styles.inputLabel}>Username (Unique handle)</Text>
+              <View style={styles.inputLabelRow}>
+                <Text style={styles.inputLabel}>Curator Username</Text>
+                <View style={styles.permanentPill}>
+                  <Lock size={10} color="#6C47FF" />
+                  <Text style={styles.permanentPillText}>One-Time Setup</Text>
+                </View>
+              </View>
               <View style={styles.usernameInputRow}>
                 <Text style={styles.atSymbol}>@</Text>
                 <TextInput
@@ -960,6 +966,19 @@ export default function OnboardingScreen() {
               {Boolean(usernameError) && (
                 <Text style={styles.errorMessage}>{usernameError}</Text>
               )}
+
+              {/* Apple-grade Permanent Curator Notice */}
+              <View style={styles.permanentCallout}>
+                <View style={styles.permanentCalloutIconWrap}>
+                  <Lock size={13} color="#6C47FF" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.permanentCalloutTitle}>Permanent Identity</Text>
+                  <Text style={styles.permanentCalloutDesc}>
+                    To protect curator authenticity, usernames cannot be edited once set. This becomes your permanent eventime handle and public storefront link.
+                  </Text>
+                </View>
+              </View>
 
               <TouchableOpacity
                 style={[styles.tourPrimaryBtn, { marginTop: 24 }]}
@@ -1832,6 +1851,30 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
   },
+  inputLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  permanentPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  permanentPillText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 10.5,
+    color: '#6C47FF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
   usernameInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1860,6 +1903,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#EF4444',
     marginTop: 6,
+  },
+  permanentCallout: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 14,
+    gap: 10,
+  },
+  permanentCalloutIconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: '#F5F3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  permanentCalloutTitle: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 12,
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  permanentCalloutDesc: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 11.5,
+    color: '#64748B',
+    lineHeight: 16,
   },
   roleTabsRow: {
     flexDirection: 'row',
