@@ -59,3 +59,4 @@ docs/
 Proton_Drive_Backup/
 proton-drive-backup/
 build-release.ps1
+.playwright-mcp/
