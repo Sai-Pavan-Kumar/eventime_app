@@ -307,7 +307,7 @@ export default function EventDetailScreen() {
 
   const handleBookmarkToggle = async () => {
     if (isOwner) {
-      triggerOwnerNotice("You're the host · This event is already in your My Events tab");
+      triggerOwnerNotice('Already in My Events');
       return;
     }
     if (!user) {
@@ -347,7 +347,7 @@ export default function EventDetailScreen() {
 
   const handleInterestedToggle = async () => {
     if (isOwner) {
-      triggerOwnerNotice('Hosts cannot mark interest in their own event · Self-points are restricted');
+      triggerOwnerNotice("Host can't mark interest");
       return;
     }
     if (isPast) return;
@@ -679,7 +679,7 @@ export default function EventDetailScreen() {
                 </Text>
                 <Text style={[styles.socialProofSub, isOwner && styles.socialProofSubOwner]}>
                   {isOwner
-                    ? 'You are the host of this event · Tap for info'
+                    ? 'You are hosting this event'
                     : isInterested
                     ? 'You are marked as interested · Tap to remove'
                     : 'Tap to show you are interested'}
