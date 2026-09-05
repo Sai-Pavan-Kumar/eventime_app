@@ -58,6 +58,7 @@ import { uploadEventPoster } from '../lib/storage';
 import { sendRemotePushNotification } from '../lib/notifications';
 import { checkRateLimit, recordAction } from '../lib/rate-limiter';
 import { CuratorCelebrationModal, CelebrationEventData } from '../components/CuratorCelebrationModal';
+import { formatEventDateDetailed } from '../lib/utils/date';
 import type { RootStackParamList } from '../types';
 
 const COLLEGE_YEAR_OPTIONS = ['All Years', '1st Year', '2nd Year', '3rd Year', '4th Year'];
@@ -209,7 +210,9 @@ function DatePickerModal({
 
   const handlePickDay = (day: number) => {
     setSelectedDay(day);
-    const formatted = `${day} ${MONTHS_SHORT[viewMonth]} ${viewYear}`;
+    const m = String(viewMonth + 1).padStart(2, '0');
+    const d = String(day).padStart(2, '0');
+    const formatted = `${viewYear}-${m}-${d}`;
     onSelect(formatted);
     onClose();
   };
@@ -1345,7 +1348,7 @@ export default function CreateEventScreen() {
                         style={{ marginRight: 10 }}
                       />
                       <Text style={[styles.pickerTriggerText, !dateString && styles.placeholderText]}>
-                        {dateString || 'Select event date'}
+                        {dateString ? formatEventDateDetailed(dateString) : 'Select event date'}
                       </Text>
                     </View>
                     <ChevronDown size={18} color="#64748B" />
@@ -1368,7 +1371,7 @@ export default function CreateEventScreen() {
                           style={{ marginRight: 10 }}
                         />
                         <Text style={[styles.pickerTriggerText, !endDateString && styles.placeholderText]}>
-                          {endDateString || 'Select end date'}
+                          {endDateString ? formatEventDateDetailed(endDateString) : 'Select end date'}
                         </Text>
                       </View>
                       <ChevronDown size={18} color="#64748B" />

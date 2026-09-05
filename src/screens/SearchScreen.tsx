@@ -139,7 +139,7 @@ export default function SearchScreen() {
 
     allEvents.forEach((row: any) => {
       const parsed = parseEventDateString(row.date_string || '');
-      let isUpcomingOrToday = true;
+      let isUpcomingOrToday = false;
       if (parsed) {
         const evDate = new Date(parsed);
         evDate.setHours(0, 0, 0, 0);
@@ -175,7 +175,7 @@ export default function SearchScreen() {
     if (!selectedDate) {
       pool = pool.filter((ev) => {
         const parsed = parseEventDateString(ev.date_string || '');
-        if (!parsed) return true;
+        if (!parsed) return false;
         const evDate = new Date(parsed);
         evDate.setHours(0, 0, 0, 0);
         return evDate.getTime() >= today.getTime();

@@ -27,6 +27,7 @@ import {
   DEFAULT_NOTIFICATION_PREFERENCES,
 } from '../lib/notifications';
 import { haptic } from '../lib/haptics';
+import { parseEventDateString } from '../lib/utils/date';
 
 const GRAD_YEARS = ['2024', '2025', '2026', '2027', '2028', '2029', '2030'];
 
@@ -74,15 +75,34 @@ export default function SettingsScreen() {
   useEffect(() => {
     (async () => {
       try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${y}-${m}-${d}`;
+
         const { data, error } = await supabase
           .from('events')
-          .select('category, city')
-          .eq('status', 'approved');
+          .select('category, city, date_string')
+          .eq('status', 'approved')
+          .gte('date_string', todayStr);
 
         if (!error && data) {
           const catMap: Record<string, number> = {};
           const cityMap: Record<string, number> = {};
           data.forEach((ev) => {
+            const parsed = parseEventDateString(ev.date_string || '');
+            if (parsed) {
+              const evDate = new Date(parsed);
+              evDate.setHours(0, 0, 0, 0);
+              if (evDate.getTime() < today.getTime()) {
+                return;
+              }
+            } else {
+              return;
+            }
+
             if (ev.category) {
               const cat = ev.category.trim();
               catMap[cat] = (catMap[cat] || 0) + 1;

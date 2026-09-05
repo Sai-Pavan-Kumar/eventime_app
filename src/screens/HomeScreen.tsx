@@ -312,6 +312,14 @@ export default function HomeScreen() {
 
       if (selectedDate) {
         query = query.eq('date_string', selectedDate);
+      } else {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${y}-${m}-${d}`;
+        query = query.gte('date_string', todayStr);
       }
 
       query = query
@@ -369,6 +377,14 @@ export default function HomeScreen() {
 
       if (selectedDate) {
         query = query.eq('date_string', selectedDate);
+      } else {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${y}-${m}-${d}`;
+        query = query.gte('date_string', todayStr);
       }
 
       query = query
@@ -460,14 +476,13 @@ export default function HomeScreen() {
 
     const upcoming = events.filter((ev) => {
       const parsed = parseEventDateString(ev.date_string || '');
-      if (!parsed) return true;
+      if (!parsed) return false;
       const evDate = new Date(parsed);
       evDate.setHours(0, 0, 0, 0);
       return evDate.getTime() >= today.getTime();
     });
 
-    // Graceful fallback: If upcoming events exist, show them; otherwise fallback to full events pool
-    return upcoming.length > 0 ? upcoming : events;
+    return upcoming;
   }, [events, selectedDate]);
 
   const preferredCities: string[] = useMemo(() => {
@@ -557,7 +572,7 @@ export default function HomeScreen() {
     } else {
       list = list.filter((ev) => {
         const parsed = parseEventDateString(ev.date_string || '');
-        if (!parsed) return true;
+        if (!parsed) return false;
         const evDate = new Date(parsed);
         evDate.setHours(0, 0, 0, 0);
         return evDate.getTime() >= today.getTime();

@@ -44,6 +44,7 @@ import { setHasCompletedOnboarding } from '../lib/guest-preferences';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { theme } from '../config/theme';
 import { haptic } from '../lib/haptics';
+import { parseEventDateString } from '../lib/utils/date';
 
 interface CollegeItem {
   id: string;
@@ -240,19 +241,38 @@ export default function OnboardingScreen() {
     return () => clearTimeout(timer);
   }, [collegeSearch, role, currentSlide, profileSubStep]);
 
-  // Load live active event counts for categories and cities
+  // Load live active event counts for categories and cities (Upcoming / Today only)
   useEffect(() => {
     (async () => {
       try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${y}-${m}-${d}`;
+
         const { data, error } = await supabase
           .from('events')
-          .select('category, city')
-          .eq('status', 'approved');
+          .select('category, city, date_string')
+          .eq('status', 'approved')
+          .gte('date_string', todayStr);
 
         if (!error && data) {
           const catMap: Record<string, number> = {};
           const cityMap: Record<string, number> = {};
           data.forEach((ev) => {
+            const parsed = parseEventDateString(ev.date_string || '');
+            if (parsed) {
+              const evDate = new Date(parsed);
+              evDate.setHours(0, 0, 0, 0);
+              if (evDate.getTime() < today.getTime()) {
+                return;
+              }
+            } else {
+              return;
+            }
+
             if (ev.category) {
               const cat = ev.category.trim();
               catMap[cat] = (catMap[cat] || 0) + 1;

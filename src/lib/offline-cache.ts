@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { EventRow } from '../types';
+import { parseEventDateString } from './utils/date';
 
 /**
  * Offline-First Caching Layer (Stale-While-Revalidate Engine)
@@ -35,25 +36,41 @@ const memoryCache = {
   savedIds: null as CacheEnvelope<string[]> | null,
 };
 
+function filterUpcomingOnly(events: EventRow[]): EventRow[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return events.filter((ev) => {
+    const parsed = parseEventDateString(ev.date_string || '');
+    if (!parsed) return false;
+    const evDate = new Date(parsed);
+    evDate.setHours(0, 0, 0, 0);
+    return evDate.getTime() >= today.getTime();
+  });
+}
+
 // ==========================================
 // 1. HOME FEED EVENTS CACHE
 // ==========================================
 
 export function getMemoryHomeEvents(): EventRow[] | null {
-  return memoryCache.homeEvents?.data || null;
+  if (!memoryCache.homeEvents?.data) return null;
+  return filterUpcomingOnly(memoryCache.homeEvents.data);
 }
 
 export async function loadCachedHomeEvents(): Promise<EventRow[] | null> {
   if (memoryCache.homeEvents?.data && memoryCache.homeEvents.data.length > 0) {
-    return memoryCache.homeEvents.data;
+    const upcoming = filterUpcomingOnly(memoryCache.homeEvents.data);
+    memoryCache.homeEvents.data = upcoming;
+    return upcoming;
   }
   try {
     const raw = await AsyncStorage.getItem(CACHE_KEYS.HOME_EVENTS);
     if (!raw) return null;
     const parsed: CacheEnvelope<EventRow[]> = JSON.parse(raw);
     if (Array.isArray(parsed?.data)) {
-      memoryCache.homeEvents = parsed;
-      return parsed.data;
+      const upcomingData = filterUpcomingOnly(parsed.data);
+      memoryCache.homeEvents = { ...parsed, data: upcomingData };
+      return upcomingData;
     }
   } catch (err) {
     console.warn('[OfflineCache] Failed to load cached home events:', err);
@@ -81,20 +98,24 @@ export async function saveCachedHomeEvents(events: EventRow[]): Promise<void> {
 // ==========================================
 
 export function getMemoryCampusEvents(): EventRow[] | null {
-  return memoryCache.campusEvents?.data || null;
+  if (!memoryCache.campusEvents?.data) return null;
+  return filterUpcomingOnly(memoryCache.campusEvents.data);
 }
 
 export async function loadCachedCampusEvents(): Promise<EventRow[] | null> {
   if (memoryCache.campusEvents?.data && memoryCache.campusEvents.data.length > 0) {
-    return memoryCache.campusEvents.data;
+    const upcoming = filterUpcomingOnly(memoryCache.campusEvents.data);
+    memoryCache.campusEvents.data = upcoming;
+    return upcoming;
   }
   try {
     const raw = await AsyncStorage.getItem(CACHE_KEYS.CAMPUS_EVENTS);
     if (!raw) return null;
     const parsed: CacheEnvelope<EventRow[]> = JSON.parse(raw);
     if (Array.isArray(parsed?.data)) {
-      memoryCache.campusEvents = parsed;
-      return parsed.data;
+      const upcomingData = filterUpcomingOnly(parsed.data);
+      memoryCache.campusEvents = { ...parsed, data: upcomingData };
+      return upcomingData;
     }
   } catch (err) {
     console.warn('[OfflineCache] Failed to load cached campus events:', err);
