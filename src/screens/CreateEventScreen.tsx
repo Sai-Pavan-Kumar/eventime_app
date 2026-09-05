@@ -61,7 +61,21 @@ import { CuratorCelebrationModal, CelebrationEventData } from '../components/Cur
 import { formatEventDateDetailed } from '../lib/utils/date';
 import type { RootStackParamList } from '../types';
 
-const COLLEGE_YEAR_OPTIONS = ['All Years', '1st Year', '2nd Year', '3rd Year', '4th Year'];
+const BRANCH_OPTIONS = ['All Branches', ...INDIAN_COLLEGE_BRANCHES];
+const COLLEGE_YEAR_OPTIONS = [
+  'All Years',
+  '2024',
+  '2025',
+  '2026',
+  '2027',
+  '2028',
+  '2029',
+  '2030',
+  '1st Year',
+  '2nd Year',
+  '3rd Year',
+  '4th Year',
+];
 
 // Reusable Select Modal for Category and City Selection
 function SelectPickerModal({
@@ -82,6 +96,12 @@ function SelectPickerModal({
   searchPlaceholder?: string;
 }) {
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (!visible) {
+      setSearchQuery('');
+    }
+  }, [visible]);
 
   const filteredItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -127,7 +147,7 @@ function SelectPickerModal({
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={modalStyles.listContent}
             renderItem={({ item }) => {
-              const isSelected = item.toLowerCase() === selectedItem.toLowerCase();
+              const isSelected = selectedItem ? item.toLowerCase() === selectedItem.toLowerCase() : false;
               return (
                 <TouchableOpacity
                   style={[modalStyles.itemRow, isSelected && modalStyles.itemRowActive]}
@@ -497,6 +517,8 @@ export default function CreateEventScreen() {
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [showBranchModal, setShowBranchModal] = useState(false);
+  const [showYearModal, setShowYearModal] = useState(false);
 
   // Trust check & link extraction states
   const [isTrusted, setIsTrusted] = useState(false);
@@ -1279,37 +1301,47 @@ export default function CreateEventScreen() {
                   {/* Branch & Year Selection */}
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.subLabel}>Branch</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalChips}>
-                        {['All Branches', 'CSE', 'ECE', 'IT', 'EEE', 'Mechanical', 'Civil'].map((b) => (
-                          <TouchableOpacity
-                            key={b}
-                            style={[styles.smallChip, collegeBranch === b && styles.smallChipActive]}
-                            onPress={() => setCollegeBranch(b)}
+                      <Text style={styles.subLabel}>Target Branch</Text>
+                      <TouchableOpacity
+                        style={styles.selectTrigger}
+                        onPress={() => setShowBranchModal(true)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={[styles.selectTriggerLeft, { flex: 1, marginRight: 6 }]}>
+                          <Text
+                            style={[
+                              styles.selectTriggerText,
+                              (!collegeBranch || collegeBranch === 'All Branches') && styles.placeholderText,
+                            ]}
+                            numberOfLines={1}
                           >
-                            <Text style={[styles.smallChipText, collegeBranch === b && styles.smallChipTextActive]}>
-                              {b}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
+                            {collegeBranch || 'All Branches'}
+                          </Text>
+                        </View>
+                        <ChevronDown size={16} color="#64748B" />
+                      </TouchableOpacity>
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.subLabel}>Year</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalChips}>
-                        {COLLEGE_YEAR_OPTIONS.map((yr) => (
-                          <TouchableOpacity
-                            key={yr}
-                            style={[styles.smallChip, collegeYear === yr && styles.smallChipActive]}
-                            onPress={() => setCollegeYear(yr)}
+                      <Text style={styles.subLabel}>Graduation Year</Text>
+                      <TouchableOpacity
+                        style={styles.selectTrigger}
+                        onPress={() => setShowYearModal(true)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={[styles.selectTriggerLeft, { flex: 1, marginRight: 6 }]}>
+                          <Text
+                            style={[
+                              styles.selectTriggerText,
+                              (!collegeYear || collegeYear === 'All Years') && styles.placeholderText,
+                            ]}
+                            numberOfLines={1}
                           >
-                            <Text style={[styles.smallChipText, collegeYear === yr && styles.smallChipTextActive]}>
-                              {yr}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
+                            {collegeYear || 'All Years'}
+                          </Text>
+                        </View>
+                        <ChevronDown size={16} color="#64748B" />
+                      </TouchableOpacity>
                     </View>
                   </View>
                 </View>
@@ -1771,6 +1803,28 @@ export default function CreateEventScreen() {
         }}
         onClose={() => setShowCityModal(false)}
         searchPlaceholder="Search Indian cities..."
+      />
+
+      {/* Branch Selection Modal */}
+      <SelectPickerModal
+        visible={showBranchModal}
+        title="Select Target Branch"
+        items={BRANCH_OPTIONS}
+        selectedItem={collegeBranch || 'All Branches'}
+        onSelect={(b) => setCollegeBranch(b)}
+        onClose={() => setShowBranchModal(false)}
+        searchPlaceholder="Search branch (e.g. CSE, ECE, AI & ML...)"
+      />
+
+      {/* Graduation Year Selection Modal */}
+      <SelectPickerModal
+        visible={showYearModal}
+        title="Select Target Year"
+        items={COLLEGE_YEAR_OPTIONS}
+        selectedItem={collegeYear || 'All Years'}
+        onSelect={(yr) => setCollegeYear(yr)}
+        onClose={() => setShowYearModal(false)}
+        searchPlaceholder="Search year (e.g. 2026, 1st Year...)"
       />
 
       {/* Event Date Picker Modal */}
