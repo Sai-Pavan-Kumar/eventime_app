@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Supabase Edge Function: send-push-notification
 // Sends push notifications to iOS and Android devices via Expo Push API
 // Automatically chunks batches of 100, respects user preferences, and prunes stale tokens.

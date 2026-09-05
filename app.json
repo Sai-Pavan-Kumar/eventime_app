@@ -23,7 +23,7 @@
         "backgroundColor": "#6C47FF"
       },
       "package": "com.eventime.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "softwareKeyboardLayoutMode": "pan",
       "googleServicesFile": "./google-services.json",
       "permissions": [

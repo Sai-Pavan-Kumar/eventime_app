@@ -109,6 +109,15 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
     return null;
   })();
 
+  const isPast = (() => {
+    if (!parsedDate) return false;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const evDate = new Date(parsedDate);
+    evDate.setHours(0, 0, 0, 0);
+    return evDate.getTime() < now.getTime();
+  })();
+
   const handlePress = () => {
     haptic.light();
     if (props.onPress) {
@@ -145,6 +154,7 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
       Alert.alert('Sign In Required', 'Please sign in to save events to your profile.');
       return;
     }
+    if (isPast && !isSaved) return;
 
     const nextState = !isSaved;
     if (nextState) {
@@ -199,8 +209,6 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
       console.error('[EventCard] Share error:', err);
     }
   };
-
-  const isPast = statusInfo?.label === 'Past Event';
 
   return (
     <TouchableOpacity
@@ -334,18 +342,20 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
 
           {/* Action Buttons: Save & Share */}
           <View style={styles.actionButtons}>
-            <TouchableOpacity
-              onPress={handleBookmarkPress}
-              disabled={isSaving}
-              style={[styles.actionBtn, isSaved && styles.actionBtnSaved]}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Bookmark
-                size={16}
-                color={isSaved ? '#6C47FF' : '#94A3B8'}
-                fill={isSaved ? '#6C47FF' : 'none'}
-              />
-            </TouchableOpacity>
+            {(!isPast || isSaved) && (
+              <TouchableOpacity
+                onPress={handleBookmarkPress}
+                disabled={isSaving}
+                style={[styles.actionBtn, isSaved && styles.actionBtnSaved]}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Bookmark
+                  size={16}
+                  color={isSaved ? '#6C47FF' : '#94A3B8'}
+                  fill={isSaved ? '#6C47FF' : 'none'}
+                />
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               onPress={handleSharePress}

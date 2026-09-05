@@ -41,6 +41,7 @@ release-builds/
 *.aab
 android/app/build/
 android/.gradle/
+android/.kotlin/
 android/build/
 *.jks
 *.keystore

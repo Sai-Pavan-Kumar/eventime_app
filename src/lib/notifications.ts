@@ -125,7 +125,10 @@ export async function registerForPushNotificationsAsync(userId?: string): Promis
       try {
         await supabase
           .from('profiles')
-          .update({ push_token: effectiveToken } as any)
+          .update({
+            push_token: effectiveToken,
+            fcm_token: effectiveToken,
+          } as any)
           .eq('id', userId);
       } catch (dbErr) {
         console.warn('[Notifications] Error syncing push token to profile:', dbErr);
@@ -149,7 +152,10 @@ export function setupPushTokenRefreshListener(userId?: string) {
         try {
           await supabase
             .from('profiles')
-            .update({ push_token: token } as any)
+            .update({
+              push_token: token,
+              fcm_token: token,
+            } as any)
             .eq('id', userId);
         } catch (err) {
           console.warn('[Notifications] Failed to update refreshed push token:', err);

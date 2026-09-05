@@ -267,7 +267,7 @@ export default function EventDetailScreen() {
       Alert.alert('Sign In Required', 'Please sign in to save this event to your profile.');
       return;
     }
-    if (!event) return;
+    if (!event || (isPast && !isSaved)) return;
 
     const nextState = !isSaved;
     setIsSaved(nextState);
@@ -291,14 +291,15 @@ export default function EventDetailScreen() {
         }
       }
     } catch (e) {
-      console.error('Bookmark error:', e);
       setIsSaved(!nextState);
+      console.error('Bookmark error:', e);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleInterestedToggle = async () => {
+    if (isPast) return;
     if (!user) {
       Alert.alert('Sign In Required', 'Please sign in to mark your interest in this event.');
       return;
@@ -369,7 +370,7 @@ export default function EventDetailScreen() {
   };
 
   const handleAddToCalendar = async () => {
-    if (!event) return;
+    if (!event || isPast) return;
     try {
       const base = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
       const title = encodeURIComponent(`${event.title} · via EvenTime`);
@@ -470,17 +471,19 @@ export default function EventDetailScreen() {
             <Share2 size={18} color={theme.colors.textPrimary} />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.iconBtn, isSaved && styles.iconBtnSaved]}
-            onPress={handleBookmarkToggle}
-            disabled={isSaving}
-          >
-            <Bookmark
-              size={18}
-              color={isSaved ? '#FFF' : theme.colors.textPrimary}
-              fill={isSaved ? '#FFF' : 'transparent'}
-            />
-          </TouchableOpacity>
+          {(!isPast || isSaved) && (
+            <TouchableOpacity
+              style={[styles.iconBtn, isSaved && styles.iconBtnSaved]}
+              onPress={handleBookmarkToggle}
+              disabled={isSaving}
+            >
+              <Bookmark
+                size={18}
+                color={isSaved ? '#FFF' : theme.colors.textPrimary}
+                fill={isSaved ? '#FFF' : 'transparent'}
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -525,66 +528,70 @@ export default function EventDetailScreen() {
             </View>
           )}
 
-          {/* Role-Gated Real-Action Attendance Bar (Linked 1:1 to interested_events) */}
-          <TouchableOpacity
-            style={[styles.socialProofBar, isInterested && styles.socialProofBarActive]}
-            onPress={handleInterestedToggle}
-            activeOpacity={0.85}
-          >
-            <View style={[styles.socialProofIconBox, isInterested && styles.socialProofIconBoxActive]}>
-              {isStudent ? (
-                <GraduationCap size={16} color={isInterested ? '#EF4444' : '#6C47FF'} />
-              ) : (
-                <Users size={16} color={isInterested ? '#EF4444' : '#6C47FF'} />
-              )}
-            </View>
+          {/* Role-Gated Real-Action Attendance Bar (Only for upcoming events) */}
+          {!isPast && (
+            <TouchableOpacity
+              style={[styles.socialProofBar, isInterested && styles.socialProofBarActive]}
+              onPress={handleInterestedToggle}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.socialProofIconBox, isInterested && styles.socialProofIconBoxActive]}>
+                {isStudent ? (
+                  <GraduationCap size={16} color={isInterested ? '#EF4444' : '#6C47FF'} />
+                ) : (
+                  <Users size={16} color={isInterested ? '#EF4444' : '#6C47FF'} />
+                )}
+              </View>
 
-            <View style={styles.socialProofTextBox}>
-              <Text style={[styles.socialProofTitle, isInterested && styles.socialProofTitleActive]} numberOfLines={2}>
-                {isStudent
-                  ? interestCount > 0
+              <View style={styles.socialProofTextBox}>
+                <Text style={[styles.socialProofTitle, isInterested && styles.socialProofTitleActive]} numberOfLines={2}>
+                  {isStudent
+                    ? interestCount > 0
+                      ? isInterested
+                        ? interestCount === 1
+                          ? "You're going"
+                          : `You & ${interestCount - 1} ${interestCount - 1 === 1 ? 'other' : 'others'} are going`
+                        : `${interestCount} ${interestCount === 1 ? 'student is' : 'students are'} going`
+                      : 'Be the first to show interest'
+                    : interestCount > 0
                     ? isInterested
                       ? interestCount === 1
                         ? "You're going"
                         : `You & ${interestCount - 1} ${interestCount - 1 === 1 ? 'other' : 'others'} are going`
-                      : `${interestCount} ${interestCount === 1 ? 'student is' : 'students are'} going`
-                    : 'Be the first to show interest'
-                  : interestCount > 0
-                  ? isInterested
-                    ? interestCount === 1
-                      ? "You're going"
-                      : `You & ${interestCount - 1} ${interestCount - 1 === 1 ? 'other' : 'others'} are going`
-                    : `${interestCount} ${interestCount === 1 ? 'person is' : 'people are'} interested`
-                  : 'Be the first to show interest'}
-              </Text>
-              <Text style={styles.socialProofSub}>
-                {isInterested ? 'You are marked as interested · Tap to remove' : 'Tap to show you are interested'}
-              </Text>
-            </View>
+                      : `${interestCount} ${interestCount === 1 ? 'person is' : 'people are'} interested`
+                    : 'Be the first to show interest'}
+                </Text>
+                <Text style={styles.socialProofSub}>
+                  {isInterested ? 'You are marked as interested · Tap to remove' : 'Tap to show you are interested'}
+                </Text>
+              </View>
 
-            <View style={[styles.socialProofPill, isInterested && styles.socialProofPillActive]}>
-              <Heart
-                size={12}
-                color={isInterested ? '#FFFFFF' : '#6C47FF'}
-                fill={isInterested ? '#FFFFFF' : 'none'}
-              />
-              <Text style={[styles.socialProofPillText, isInterested && styles.socialProofPillTextActive]}>
-                {isInterested ? 'Interested' : "I'm Interested"}
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Quick Action Strip: Add to Calendar */}
-          <View style={styles.actionStrip}>
-            <TouchableOpacity
-              style={styles.calendarActionBtn}
-              onPress={handleAddToCalendar}
-              activeOpacity={0.8}
-            >
-              <CalendarPlus size={16} color={theme.colors.brand} />
-              <Text style={styles.calendarActionText}>Add to Calendar</Text>
+              <View style={[styles.socialProofPill, isInterested && styles.socialProofPillActive]}>
+                <Heart
+                  size={12}
+                  color={isInterested ? '#FFFFFF' : '#6C47FF'}
+                  fill={isInterested ? '#FFFFFF' : 'none'}
+                />
+                <Text style={[styles.socialProofPillText, isInterested && styles.socialProofPillTextActive]}>
+                  {isInterested ? 'Interested' : "I'm Interested"}
+                </Text>
+              </View>
             </TouchableOpacity>
-          </View>
+          )}
+
+          {/* Quick Action Strip: Add to Calendar (Only for upcoming events) */}
+          {!isPast && (
+            <View style={styles.actionStrip}>
+              <TouchableOpacity
+                style={styles.calendarActionBtn}
+                onPress={handleAddToCalendar}
+                activeOpacity={0.8}
+              >
+                <CalendarPlus size={16} color={theme.colors.brand} />
+                <Text style={styles.calendarActionText}>Add to Calendar</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Meta Details Card */}
           <View style={styles.detailsCard}>
@@ -794,7 +801,7 @@ export default function EventDetailScreen() {
                 )}
               </TouchableOpacity>
             </View>
-          ) : (
+          ) : !isPast ? (
             <TouchableOpacity
               style={styles.reportRow}
               onPress={() => setShowReportModal(true)}
@@ -803,7 +810,7 @@ export default function EventDetailScreen() {
               <Flag size={14} color={theme.colors.textMuted} />
               <Text style={styles.reportText}>Report inaccurate info or spam</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </ScrollView>
 
