@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -85,6 +85,16 @@ export default function EventDetailScreen() {
     endOfDay.setHours(23, 59, 59, 999);
     return endOfDay.getTime() < Date.now();
   })();
+
+  const venueLocation = useMemo(() => {
+    if (!event || event.is_virtual || !event.location) return null;
+    const loc = event.location.trim();
+    const city = (event.city || '').trim();
+    if (!loc || loc.toLowerCase() === city.toLowerCase() || loc.toLowerCase() === 'virtual event') {
+      return null;
+    }
+    return loc;
+  }, [event?.location, event?.city, event?.is_virtual]);
 
   const fetchSimilarEvents = useCallback(async (currentEvent: EventRow) => {
     try {
@@ -565,43 +575,48 @@ export default function EventDetailScreen() {
               </View>
             )}
 
-            {/* 3. Location (if available or virtual) */}
-            {(Boolean(event.location) || Boolean(event.is_virtual)) && (
+            {/* 3. Venue / Specific Landmark (Only if explicitly provided and distinct from city) */}
+            {venueLocation ? (
               <View style={styles.detailRow}>
                 <View style={styles.detailIconWrapper}>
-                  {event.is_virtual ? (
-                    <Video size={18} color={theme.colors.brand} />
-                  ) : (
-                    <MapPin size={18} color={theme.colors.brand} />
-                  )}
+                  <MapPin size={18} color={theme.colors.brand} />
                 </View>
                 <View style={styles.detailTextWrapper}>
-                  <Text style={styles.detailLabel}>
-                    {event.is_virtual ? 'Event Mode' : 'Location / Venue'}
-                  </Text>
-                  <Text style={styles.detailValue}>
-                    {event.is_virtual ? 'Virtual / Online Event' : event.location}
-                  </Text>
+                  <Text style={styles.detailLabel}>Location / Venue</Text>
+                  <Text style={styles.detailValue}>{venueLocation}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            {/* 4. Event Mode (For Virtual Events) */}
+            {event.is_virtual && (
+              <View style={styles.detailRow}>
+                <View style={styles.detailIconWrapper}>
+                  <Video size={18} color={theme.colors.brand} />
+                </View>
+                <View style={styles.detailTextWrapper}>
+                  <Text style={styles.detailLabel}>Event Mode</Text>
+                  <Text style={styles.detailValue}>Virtual / Online Event</Text>
                 </View>
               </View>
             )}
 
-            {/* 4. City */}
-            <TouchableOpacity
-              style={styles.detailRow}
-              onPress={() => event.city && !event.is_virtual && navigation.navigate('CityEvents', { city: event.city })}
-              activeOpacity={event.is_virtual ? 1 : 0.7}
-            >
-              <View style={styles.detailIconWrapper}>
-                <Building size={18} color={theme.colors.brand} />
-              </View>
-              <View style={styles.detailTextWrapper}>
-                <Text style={styles.detailLabel}>City</Text>
-                <Text style={styles.detailValue}>
-                  {event.is_virtual ? 'Online / Remote' : event.city || 'India'}
-                </Text>
-              </View>
-            </TouchableOpacity>
+            {/* 5. City (For In-Person Events) */}
+            {!event.is_virtual && (
+              <TouchableOpacity
+                style={styles.detailRow}
+                onPress={() => event.city && navigation.navigate('CityEvents', { city: event.city })}
+                activeOpacity={0.7}
+              >
+                <View style={styles.detailIconWrapper}>
+                  <Building size={18} color={theme.colors.brand} />
+                </View>
+                <View style={styles.detailTextWrapper}>
+                  <Text style={styles.detailLabel}>City</Text>
+                  <Text style={styles.detailValue}>{event.city || 'India'}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
 
             {/* 5. Registration Price (if it is a paid event) */}
             {(event.is_free === false || Boolean(event.price)) && (

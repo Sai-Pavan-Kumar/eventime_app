@@ -452,7 +452,13 @@ export default function CreateEventScreen() {
   // Location & City
   const [isVirtual, setIsVirtual] = useState<boolean>(Boolean(initialEvent?.is_virtual));
   const [city, setCity] = useState<string>(initialEvent?.city || '');
-  const [location, setLocation] = useState(initialEvent?.location || '');
+  const [location, setLocation] = useState(
+    initialEvent?.location &&
+      initialEvent.location.trim().toLowerCase() !== (initialEvent.city || '').trim().toLowerCase() &&
+      initialEvent.location.trim().toLowerCase() !== 'virtual event'
+      ? initialEvent.location
+      : ''
+  );
 
   // Pricing
   const [isFree, setIsFree] = useState<boolean>(initialEvent?.is_free !== false);
@@ -573,7 +579,11 @@ export default function CreateEventScreen() {
           setEndTime(data.end_time || '');
           setIsVirtual(Boolean(data.is_virtual));
           setCity(data.city || CITIES[0]);
-          setLocation(data.location || '');
+          const rawLoc = data.location || '';
+          const isRedundant =
+            rawLoc.trim().toLowerCase() === (data.city || '').trim().toLowerCase() ||
+            rawLoc.trim().toLowerCase() === 'virtual event';
+          setLocation(isRedundant ? '' : rawLoc);
           setIsFree(data.is_free !== false);
           setPrice(data.price ? String(data.price) : '');
           setOrganizerName(data.organizer_name || '');
@@ -845,7 +855,7 @@ export default function CreateEventScreen() {
       }
 
       const effectiveCity = isVirtual ? 'online' : city;
-      const effectiveLocation = isVirtual ? 'Virtual Event' : (location.trim() || city);
+      const effectiveLocation = isVirtual ? 'Virtual Event' : (location.trim() || null);
       const effectiveOrganizer = organizerName.trim() || profile?.full_name || user?.user_metadata?.full_name || 'Event Curator';
       const uniqueSlug = editId ? undefined : generateSlug(title, effectiveCity, dateString);
       const status = isAdmin || isTrusted ? 'approved' : 'pending';
@@ -1477,7 +1487,7 @@ export default function CreateEventScreen() {
                       <View style={styles.selectTriggerLeft}>
                         <MapPin size={16} color={city ? theme.colors.brand : '#94A3B8'} style={{ marginRight: 10 }} />
                         <Text style={[styles.selectTriggerText, !city && styles.placeholderText]}>
-                          {city || 'Select Location'}
+                          {city || 'Select City'}
                         </Text>
                       </View>
                       <ChevronDown size={18} color="#64748B" />
@@ -1754,9 +1764,6 @@ export default function CreateEventScreen() {
         selectedItem={city}
         onSelect={(c) => {
           setCity(c);
-          if (!location || location === city) {
-            setLocation(c);
-          }
         }}
         onClose={() => setShowCityModal(false)}
         searchPlaceholder="Search Indian cities..."
