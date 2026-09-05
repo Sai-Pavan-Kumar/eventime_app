@@ -848,6 +848,7 @@ export default function OnboardingScreen() {
                       onChangeText={setEmail}
                       keyboardType="email-address"
                       autoCapitalize="none"
+                      maxLength={100}
                     />
                   </View>
 
@@ -861,6 +862,7 @@ export default function OnboardingScreen() {
                         secureTextEntry={!showPassword}
                         value={password}
                         onChangeText={setPassword}
+                        maxLength={100}
                       />
                       <TouchableOpacity
                         style={styles.eyeBtn}
@@ -1066,6 +1068,7 @@ export default function OnboardingScreen() {
                         setSelectedCollege(null);
                         setCollegeSearch(t);
                       }}
+                      maxLength={100}
                     />
                     {isSearchingColleges && <ActivityIndicator size="small" color="#6C47FF" />}
                   </View>
@@ -1117,6 +1120,7 @@ export default function OnboardingScreen() {
                       placeholderTextColor="#94A3B8"
                       value={branchSearch || branch}
                       onChangeText={handleBranchSearchChange}
+                      maxLength={100}
                     />
                     {Boolean(branchSearch || branch) && (
                       <TouchableOpacity onPress={handleClearBranch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -1221,6 +1225,7 @@ export default function OnboardingScreen() {
                     placeholderTextColor="#94A3B8"
                     value={cityFilterQuery}
                     onChangeText={setCityFilterQuery}
+                    maxLength={50}
                   />
                   {Boolean(cityFilterQuery) && (
                     <TouchableOpacity onPress={() => setCityFilterQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -1312,6 +1317,7 @@ export default function OnboardingScreen() {
                     placeholderTextColor="#94A3B8"
                     value={categoryFilterQuery}
                     onChangeText={setCategoryFilterQuery}
+                    maxLength={50}
                   />
                   {Boolean(categoryFilterQuery) && (
                     <TouchableOpacity onPress={() => setCategoryFilterQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

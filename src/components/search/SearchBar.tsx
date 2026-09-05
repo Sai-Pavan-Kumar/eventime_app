@@ -24,6 +24,7 @@ export const SearchBar = React.memo<SearchBarProps>(({
         onChangeText={onChangeKeyword}
         returnKeyType="search"
         autoCapitalize="none"
+        maxLength={100}
       />
       {keyword.length > 0 && (
         <TouchableOpacity onPress={onClear} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

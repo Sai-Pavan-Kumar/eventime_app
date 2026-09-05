@@ -135,6 +135,7 @@ export default function CitiesScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
+            maxLength={50}
           />
         </View>
       </View>

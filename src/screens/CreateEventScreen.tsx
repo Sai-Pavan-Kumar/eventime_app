@@ -58,7 +58,7 @@ import { uploadEventPoster } from '../lib/storage';
 import { sendRemotePushNotification } from '../lib/notifications';
 import { checkRateLimit, recordAction } from '../lib/rate-limiter';
 import { CuratorCelebrationModal, CelebrationEventData } from '../components/CuratorCelebrationModal';
-import { formatEventDateDetailed } from '../lib/utils/date';
+import { formatEventDateDetailed, parseEventDateString } from '../lib/utils/date';
 import type { RootStackParamList } from '../types';
 
 const BRANCH_OPTIONS = ['All Branches', ...INDIAN_COLLEGE_BRANCHES];
@@ -134,6 +134,7 @@ function SelectPickerModal({
                 onChangeText={setSearchQuery}
                 autoCapitalize="none"
                 autoCorrect={false}
+                maxLength={100}
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -850,9 +851,49 @@ export default function CreateEventScreen() {
       return;
     }
 
+    if (title.trim().length > 100) {
+      Alert.alert('Title Too Long', 'Event title must be 100 characters or less.');
+      return;
+    }
+
     if (!dateString.trim()) {
       Alert.alert('Date Required', 'Please enter an event date (e.g. 24 Oct 2026).');
       return;
+    }
+
+    // Date range and past date validations
+    const evStartDate = parseEventDateString(dateString);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (evStartDate && evStartDate < today && !editId) {
+      Alert.alert('Invalid Event Date', 'Event date cannot be in the past.');
+      return;
+    }
+
+    if (hasEndDate && endDateString.trim()) {
+      const evEndDate = parseEventDateString(endDateString);
+      if (evStartDate && evEndDate && evEndDate < evStartDate) {
+        Alert.alert('Invalid Date Range', 'End date cannot be earlier than the event start date.');
+        return;
+      }
+    }
+
+    if (registrationDeadline.trim()) {
+      const deadlineDate = parseEventDateString(registrationDeadline.trim());
+      if (deadlineDate && evStartDate && deadlineDate > evStartDate) {
+        Alert.alert('Invalid Deadline', 'Registration deadline cannot be after the event start date.');
+        return;
+      }
+    }
+
+    // Pricing validation: If paid, must have positive price > 0
+    if (!isFree) {
+      const parsedPrice = parseFloat(price);
+      if (!price.trim() || isNaN(parsedPrice) || parsedPrice <= 0) {
+        Alert.alert('Price Required', 'Please enter a ticket price greater than 0, or mark the event as Free.');
+        return;
+      }
     }
 
     if (!description.trim()) {
@@ -921,6 +962,13 @@ export default function CreateEventScreen() {
           : `https://${cleanRegLink}`
         : null;
 
+      const cleanWebsite = website.trim();
+      const finalWebsite = cleanWebsite
+        ? /^https?:\/\//i.test(cleanWebsite)
+          ? cleanWebsite
+          : `https://${cleanWebsite}`
+        : null;
+
       const payload: any = {
         title: title.trim(),
         category,
@@ -933,10 +981,10 @@ export default function CreateEventScreen() {
         city: effectiveCity,
         location: effectiveLocation,
         is_free: isFree,
-        price: !isFree && price ? parseFloat(price) : 0,
+        price: !isFree && price ? Math.max(0, parseFloat(price) || 0) : 0,
         organizer_name: effectiveOrganizer,
         registration_link: finalRegLink,
-        website: website.trim() || null,
+        website: finalWebsite,
         description: description.trim(),
         prizes: prizes.trim() || null,
         team_size: teamSize || 'Solo',
@@ -1167,6 +1215,7 @@ export default function CreateEventScreen() {
                     onChangeText={checkLink}
                     autoCapitalize="none"
                     keyboardType="url"
+                    maxLength={500}
                   />
                   {isCheckingDomain || isExtracting ? (
                     <ActivityIndicator size="small" color={theme.colors.brand} />
@@ -1227,6 +1276,7 @@ export default function CreateEventScreen() {
                   placeholderTextColor={theme.colors.textMuted}
                   value={title}
                   onChangeText={setTitle}
+                  maxLength={100}
                 />
               </View>
 
@@ -1293,6 +1343,7 @@ export default function CreateEventScreen() {
                         setShowCollegeDropdown(true);
                       }}
                       onFocus={() => setShowCollegeDropdown(true)}
+                      maxLength={100}
                     />
 
                     {showCollegeDropdown && collegeSearchQuery.trim().length >= 2 && (
@@ -1395,6 +1446,7 @@ export default function CreateEventScreen() {
                   numberOfLines={4}
                   value={description}
                   onChangeText={setDescription}
+                  maxLength={3000}
                 />
               </View>
 
@@ -1572,6 +1624,7 @@ export default function CreateEventScreen() {
                         placeholderTextColor={theme.colors.textMuted}
                         value={location}
                         onChangeText={setLocation}
+                        maxLength={150}
                       />
                     </View>
                   </>
@@ -1614,9 +1667,15 @@ export default function CreateEventScreen() {
                       style={styles.input}
                       placeholder="Ticket Price (e.g. 199)"
                       placeholderTextColor={theme.colors.textMuted}
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
+                      maxLength={7}
                       value={price}
-                      onChangeText={setPrice}
+                      onChangeText={(t) => {
+                        const clean = t.replace(/[^0-9.]/g, '');
+                        const parts = clean.split('.');
+                        const sanitized = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : clean;
+                        setPrice(sanitized);
+                      }}
                     />
                   </View>
                 )}
@@ -1722,6 +1781,7 @@ export default function CreateEventScreen() {
                   placeholderTextColor={theme.colors.textMuted}
                   value={organizerName}
                   onChangeText={setOrganizerName}
+                  maxLength={80}
                 />
               </View>
 
@@ -1735,6 +1795,7 @@ export default function CreateEventScreen() {
                   onChangeText={setWebsite}
                   autoCapitalize="none"
                   keyboardType="url"
+                  maxLength={200}
                 />
               </View>
 
@@ -1746,6 +1807,7 @@ export default function CreateEventScreen() {
                   placeholderTextColor={theme.colors.textMuted}
                   value={prizes}
                   onChangeText={setPrizes}
+                  maxLength={120}
                 />
               </View>
 
@@ -1775,6 +1837,7 @@ export default function CreateEventScreen() {
                   placeholderTextColor={theme.colors.textMuted}
                   value={registrationDeadline}
                   onChangeText={setRegistrationDeadline}
+                  maxLength={30}
                 />
               </View>
 

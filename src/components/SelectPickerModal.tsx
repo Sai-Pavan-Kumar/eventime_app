@@ -80,6 +80,7 @@ export function SelectPickerModal({
               onChangeText={setSearchQuery}
               autoCapitalize="none"
               autoCorrect={false}
+              maxLength={100}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>

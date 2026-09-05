@@ -94,6 +94,15 @@ export default function LoginScreen() {
       Alert.alert('Validation Error', 'Please fill in both email and password.');
       return;
     }
+    const cleanEmail = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+    if (cleanEmail.length > 100 || password.length > 100) {
+      Alert.alert('Input Too Long', 'Email and password must be 100 characters or less.');
+      return;
+    }
 
     setIsLoading('email');
 
@@ -276,6 +285,7 @@ export default function LoginScreen() {
                       autoCorrect={false}
                       value={email}
                       onChangeText={setEmail}
+                      maxLength={100}
                     />
                   </View>
                 </View>
@@ -300,6 +310,7 @@ export default function LoginScreen() {
                       autoCapitalize="none"
                       value={password}
                       onChangeText={setPassword}
+                      maxLength={100}
                     />
                     <TouchableOpacity
                       onPress={() => setShowPassword(!showPassword)}

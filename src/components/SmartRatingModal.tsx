@@ -223,6 +223,7 @@ export function SmartRatingModal({ visible, onClose }: SmartRatingModalProps) {
                       numberOfLines={3}
                       value={feedbackText}
                       onChangeText={setFeedbackText}
+                      maxLength={500}
                     />
 
                     <TouchableOpacity

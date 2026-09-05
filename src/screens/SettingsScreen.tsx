@@ -235,6 +235,11 @@ export default function SettingsScreen() {
       ? (profile?.username || username)
       : username.trim().toLowerCase();
 
+    if (fullName.trim().length > 50) {
+      Alert.alert('Validation Error', 'Full name must be 50 characters or less.');
+      return;
+    }
+
     if (!cleanUsername) {
       Alert.alert('Validation Error', 'Username is required.');
       return;
@@ -391,6 +396,7 @@ export default function SettingsScreen() {
               onChangeText={setFullName}
               placeholder="Your Name"
               placeholderTextColor={theme.colors.textMuted}
+              maxLength={50}
             />
           </View>
 
@@ -481,6 +487,7 @@ export default function SettingsScreen() {
                     }}
                     placeholder="Search 52,000+ colleges across India..."
                     placeholderTextColor={theme.colors.textMuted}
+                    maxLength={100}
                   />
                   {isSearchingColleges && (
                     <ActivityIndicator size="small" color={theme.colors.brand} style={{ marginRight: 6 }} />
@@ -536,6 +543,7 @@ export default function SettingsScreen() {
                     onChangeText={handleBranchSearchChange}
                     placeholder="Search branch (e.g. CSE, B.Pharmacy, Biotech...)"
                     placeholderTextColor={theme.colors.textMuted}
+                    maxLength={100}
                   />
                   {branchSearch.length > 0 && (
                     <TouchableOpacity onPress={handleClearBranch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

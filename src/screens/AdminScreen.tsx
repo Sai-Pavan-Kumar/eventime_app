@@ -736,6 +736,7 @@ export default function AdminScreen() {
                     placeholderTextColor={theme.colors.textMuted}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
+                    maxLength={100}
                   />
                 </View>
 
@@ -883,6 +884,7 @@ export default function AdminScreen() {
                     placeholderTextColor={theme.colors.textMuted}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
+                    maxLength={100}
                   />
                 </View>
 
@@ -1033,6 +1035,7 @@ export default function AdminScreen() {
                       placeholderTextColor={theme.colors.textMuted}
                       value={searchQuery}
                       onChangeText={setSearchQuery}
+                      maxLength={100}
                     />
                   </View>
 
@@ -1079,6 +1082,7 @@ export default function AdminScreen() {
               numberOfLines={3}
               value={adminNotes}
               onChangeText={setAdminNotes}
+              maxLength={500}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -1109,6 +1113,7 @@ export default function AdminScreen() {
               placeholderTextColor={theme.colors.textMuted}
               value={collegeName}
               onChangeText={setCollegeName}
+              maxLength={150}
             />
             <TextInput
               style={styles.inputField}
@@ -1116,6 +1121,7 @@ export default function AdminScreen() {
               placeholderTextColor={theme.colors.textMuted}
               value={collegeState}
               onChangeText={setCollegeState}
+              maxLength={100}
             />
             <TextInput
               style={styles.inputField}
@@ -1125,6 +1131,7 @@ export default function AdminScreen() {
               onChangeText={setCollegeWebsite}
               autoCapitalize="none"
               keyboardType="url"
+              maxLength={200}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity
