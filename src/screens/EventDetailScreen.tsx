@@ -653,15 +653,10 @@ export default function EventDetailScreen() {
                   style={[
                     styles.socialProofTitle,
                     isInterested && styles.socialProofTitleActive,
-                    isOwner && styles.socialProofTitleOwner,
                   ]}
                   numberOfLines={2}
                 >
-                  {isOwner
-                    ? interestCount > 0
-                      ? `${interestCount} ${interestCount === 1 ? 'person is' : 'people are'} interested`
-                      : 'No attendees yet'
-                    : isStudent
+                  {isStudent
                     ? interestCount > 0
                       ? isInterested
                         ? interestCount === 1
@@ -677,12 +672,8 @@ export default function EventDetailScreen() {
                       : `${interestCount} ${interestCount === 1 ? 'person is' : 'people are'} interested`
                     : 'Be the first to show interest'}
                 </Text>
-                <Text style={[styles.socialProofSub, isOwner && styles.socialProofSubOwner]}>
-                  {isOwner
-                    ? 'You are hosting this event'
-                    : isInterested
-                    ? 'You are marked as interested · Tap to remove'
-                    : 'Tap to show you are interested'}
+                <Text style={styles.socialProofSub}>
+                  {isInterested ? 'You are marked as interested · Tap to remove' : 'Tap to show you are interested'}
                 </Text>
               </View>
 
