@@ -31,21 +31,6 @@ import { parseEventDateString } from '../lib/utils/date';
 
 const GRAD_YEARS = ['2024', '2025', '2026', '2027', '2028', '2029', '2030'];
 
-const POPULAR_BRANCHES = [
-  'CSE',
-  'IT',
-  'AI & ML',
-  'Data Science',
-  'Cyber Security',
-  'ECE',
-  'EEE',
-  'Mechanical Engineering',
-  'Civil Engineering',
-  'Chemical Engineering',
-  'AERO',
-  'BIOTECH',
-];
-
 export default function SettingsScreen() {
   const navigation = useNavigation();
   const { user, profile, isAdmin, refreshProfile } = useAuth();
@@ -137,7 +122,7 @@ export default function SettingsScreen() {
       setPreferredCities(preferredCities.filter((c) => c !== city));
     } else {
       if (!isAdmin && preferredCities.length >= 3) {
-        Alert.alert('Limit Reached', 'Non-admin users can select up to 3 preferred cities.');
+        Alert.alert('Limit Reached', 'You can select up to 3 preferred cities.');
         return;
       }
       setPreferredCities([...preferredCities, city]);
@@ -150,7 +135,7 @@ export default function SettingsScreen() {
       setGoals(goals.filter((g) => g !== cat));
     } else {
       if (!isAdmin && goals.length >= 6) {
-        Alert.alert('Limit Reached', 'Non-admin users can select up to 6 category interests.');
+        Alert.alert('Limit Reached', 'You can select up to 6 category interests.');
         return;
       }
       setGoals([...goals, cat]);
@@ -228,7 +213,7 @@ export default function SettingsScreen() {
     }
     const matches = INDIAN_COLLEGE_BRANCHES.filter((b) =>
       b.toLowerCase().includes(q)
-    ).slice(0, 8);
+    ).slice(0, 20);
     setBranchesList(matches);
   };
 
@@ -509,7 +494,11 @@ export default function SettingsScreen() {
 
                 {/* College Suggestions Dropdown */}
                 {collegesList.length > 0 && (
-                  <View style={styles.suggestionsBox}>
+                  <ScrollView
+                    style={styles.suggestionsBox}
+                    nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
+                  >
                     {collegesList.map((col) => (
                       <TouchableOpacity
                         key={col.id}
@@ -519,7 +508,7 @@ export default function SettingsScreen() {
                         <Text style={styles.suggestionText}>{col.name}</Text>
                       </TouchableOpacity>
                     ))}
-                  </View>
+                  </ScrollView>
                 )}
 
                 {Boolean(collegeId) && (
@@ -532,10 +521,10 @@ export default function SettingsScreen() {
 
               {/* Branch / Stream with Live Search & Autocomplete */}
               <View style={styles.inputGroup}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <Text style={styles.label}>Branch / Stream</Text>
-                  <TouchableOpacity onPress={() => setShowBranchModal(true)}>
-                    <Text style={styles.browseAllText}>Directory (170+) ›</Text>
+                  <TouchableOpacity onPress={() => setShowBranchModal(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={styles.browseAllText}>Directory ›</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -545,7 +534,7 @@ export default function SettingsScreen() {
                     style={styles.collegeSearchInput}
                     value={branchSearch}
                     onChangeText={handleBranchSearchChange}
-                    placeholder="Search 170+ branches (CSE, Mechanical, Biotech...)"
+                    placeholder="Search branch (e.g. CSE, B.Pharmacy, Biotech...)"
                     placeholderTextColor={theme.colors.textMuted}
                   />
                   {branchSearch.length > 0 && (
@@ -555,9 +544,13 @@ export default function SettingsScreen() {
                   )}
                 </View>
 
-                {/* Branch Suggestions Dropdown */}
+                {/* Branch Suggestions Dropdown (Scrollable) */}
                 {branchesList.length > 0 && (
-                  <View style={styles.suggestionsBox}>
+                  <ScrollView
+                    style={styles.suggestionsBox}
+                    nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
+                  >
                     {branchesList.map((b) => (
                       <TouchableOpacity
                         key={b}
@@ -567,26 +560,8 @@ export default function SettingsScreen() {
                         <Text style={styles.suggestionText}>{b}</Text>
                       </TouchableOpacity>
                     ))}
-                  </View>
+                  </ScrollView>
                 )}
-
-                {/* Popular Quick-Select Chips */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.chipsScroll, { marginTop: 8 }]}>
-                  {POPULAR_BRANCHES.map((b) => (
-                    <TouchableOpacity
-                      key={b}
-                      style={[styles.smallChip, branch === b && styles.smallChipActive]}
-                      onPress={() => handleSelectBranch(b)}
-                    >
-                      <Text style={[styles.smallChipText, branch === b && styles.smallChipTextActive]}>{b}</Text>
-                    </TouchableOpacity>
-                  ))}
-                  {branch && !POPULAR_BRANCHES.includes(branch) && (
-                    <View style={[styles.smallChip, styles.smallChipActive]}>
-                      <Text style={[styles.smallChipText, styles.smallChipTextActive]}>{branch}</Text>
-                    </View>
-                  )}
-                </ScrollView>
               </View>
 
               {/* Graduation Year */}
@@ -844,7 +819,7 @@ export default function SettingsScreen() {
           setShowBranchModal(false);
         }}
         onClose={() => setShowBranchModal(false)}
-        searchPlaceholder="Search all 170+ college branches..."
+        searchPlaceholder="Search college branches (e.g. CSE, B.Pharmacy, Biotech...)"
       />
     </SafeAreaView>
   );
@@ -983,7 +958,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   inputGroup: {
-    marginBottom: 14,
+    marginBottom: 18,
   },
   labelRow: {
     flexDirection: 'row',
@@ -1079,8 +1054,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.md,
     marginTop: 6,
-    maxHeight: 180,
-    overflow: 'hidden',
+    maxHeight: 220,
     ...theme.shadows.sm,
   },
   suggestionItem: {

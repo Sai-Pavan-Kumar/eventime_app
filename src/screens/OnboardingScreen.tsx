@@ -568,7 +568,7 @@ export default function OnboardingScreen() {
     }
     const matches = INDIAN_COLLEGE_BRANCHES.filter((b) =>
       b.toLowerCase().includes(q)
-    ).slice(0, 8);
+    ).slice(0, 20);
     setBranchesList(matches);
   };
 
@@ -1072,7 +1072,11 @@ export default function OnboardingScreen() {
 
                   {/* College suggestions dropdown */}
                   {!selectedCollege && collegesList.length > 0 && (
-                    <View style={styles.suggestionsBox}>
+                    <ScrollView
+                      style={styles.suggestionsBox}
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                    >
                       {collegesList.map((col) => (
                         <TouchableOpacity
                           key={col.id}
@@ -1086,7 +1090,7 @@ export default function OnboardingScreen() {
                           <Text style={styles.suggestionText}>{col.name}</Text>
                         </TouchableOpacity>
                       ))}
-                    </View>
+                    </ScrollView>
                   )}
 
                   {/* Graduation Year */}
@@ -1109,7 +1113,7 @@ export default function OnboardingScreen() {
                     <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
                     <TextInput
                       style={styles.searchInput}
-                      placeholder="Search 170+ branches (CSE, Biotech, Civil...)"
+                      placeholder="Search branch (e.g. CSE, B.Pharmacy, Biotech...)"
                       placeholderTextColor="#94A3B8"
                       value={branchSearch || branch}
                       onChangeText={handleBranchSearchChange}
@@ -1123,7 +1127,11 @@ export default function OnboardingScreen() {
 
                   {/* Branch suggestions dropdown */}
                   {branchesList.length > 0 && (
-                    <View style={styles.suggestionsBox}>
+                    <ScrollView
+                      style={styles.suggestionsBox}
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                    >
                       {branchesList.map((b) => (
                         <TouchableOpacity
                           key={b}
@@ -1133,7 +1141,7 @@ export default function OnboardingScreen() {
                           <Text style={styles.suggestionText}>{b}</Text>
                         </TouchableOpacity>
                       ))}
-                    </View>
+                    </ScrollView>
                   )}
 
                   {/* Popular Branch Chips */}
@@ -2013,8 +2021,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     borderRadius: 14,
     marginTop: 6,
-    maxHeight: 180,
-    overflow: 'hidden',
+    maxHeight: 220,
   },
   suggestionItem: {
     paddingHorizontal: 14,
