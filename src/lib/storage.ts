@@ -22,9 +22,16 @@ export async function uploadEventPoster(
     const blob = await fileRes.blob();
     const fileSize = blob.size;
 
+    // Enforce 5MB upload limit to prevent OOM crashes on mobile
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    if (fileSize > MAX_FILE_SIZE) {
+      const sizeMb = (fileSize / (1024 * 1024)).toFixed(1);
+      throw new Error(`Poster size (${sizeMb}MB) exceeds the 5MB limit. Please choose a smaller or compressed image.`);
+    }
+
     // Get current auth session to pass to the Next.js API
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    if (!session) throw new Error('Not authenticated. Please sign in to upload images.');
 
     // Supabase sets the cookie based on the project URL host
     // The project URL is https://pgqcdygsbafladcczubn.supabase.co
@@ -51,7 +58,7 @@ export async function uploadEventPoster(
 
     if (!presignRes.ok) {
       const err = await presignRes.text();
-      throw new Error(`Failed to get presigned URL: ${err}`);
+      throw new Error(`Failed to get presigned upload URL: ${err || presignRes.statusText}`);
     }
 
     const { uploadUrl, publicUrl } = await presignRes.json();
@@ -66,13 +73,13 @@ export async function uploadEventPoster(
     });
 
     if (!uploadRes.ok) {
-      throw new Error('Failed to upload to R2');
+      throw new Error('Cloud storage upload failed. Please check your network connection and try again.');
     }
 
     return publicUrl;
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Storage] Upload error:', error);
-    // If upload fails, fallback to localUri so form submission doesn't hard-crash
-    return localUri;
+    // Never return local file:// URI to prevent corrupting remote database with unreachable phone paths
+    throw new Error(error?.message || 'Could not upload poster image.');
   }
 }

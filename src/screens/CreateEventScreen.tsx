@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -538,6 +539,52 @@ export default function CreateEventScreen() {
   const [showCelebrationModal, setShowCelebrationModal] = useState(false);
   const [publishedEventData, setPublishedEventData] = useState<CelebrationEventData | null>(null);
 
+  // Form dirty status check to prevent accidental loss of typed content
+  const isFormDirty = Boolean(
+    !editId && (
+      title.trim() ||
+      description.trim() ||
+      regLink.trim() ||
+      posterUri ||
+      location.trim()
+    )
+  );
+
+  const handleExitPress = useCallback(() => {
+    if (step === 1) {
+      setStep(0);
+      return;
+    }
+
+    if (isFormDirty) {
+      Alert.alert(
+        'Discard Event Draft?',
+        'You have unsaved changes in this event. Are you sure you want to discard this draft?',
+        [
+          { text: 'Keep Editing', style: 'cancel' },
+          {
+            text: 'Discard',
+            style: 'destructive',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    } else {
+      navigation.goBack();
+    }
+  }, [step, isFormDirty, navigation]);
+
+  // Handle hardware back press on Android
+  useEffect(() => {
+    const onBackPress = () => {
+      handleExitPress();
+      return true;
+    };
+
+    const backSubscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => backSubscription.remove();
+  }, [handleExitPress]);
+
   // Determine if selected category is a college category
   const isCollegeCategory = category === 'College Event' || category === 'College Fest';
 
@@ -780,7 +827,15 @@ export default function CreateEventScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setPosterUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+        Alert.alert(
+          'Image Too Large',
+          'Please select an image smaller than 5MB to ensure fast loading on mobile networks.'
+        );
+        return;
+      }
+      setPosterUri(asset.uri);
     }
   };
 
@@ -1157,13 +1212,7 @@ export default function CreateEventScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
-          onPress={() => {
-            if (step === 1) {
-              setStep(0);
-            } else {
-              navigation.goBack();
-            }
-          }}
+          onPress={handleExitPress}
         >
           <ArrowLeft size={20} color={theme.colors.textPrimary} />
         </TouchableOpacity>
