@@ -84,6 +84,7 @@ function SelectPickerModal({
   onSelect,
   onClose,
   searchPlaceholder = 'Search...',
+  searchable = true,
 }: {
   visible: boolean;
   title: string;
@@ -92,6 +93,7 @@ function SelectPickerModal({
   onSelect: (item: string) => void;
   onClose: () => void;
   searchPlaceholder?: string;
+  searchable?: boolean;
 }) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -102,10 +104,11 @@ function SelectPickerModal({
   }, [visible]);
 
   const filteredItems = useMemo(() => {
+    if (!searchable) return items;
     const q = searchQuery.trim().toLowerCase();
     if (!q) return items;
     return items.filter((item) => item.toLowerCase().includes(q));
-  }, [items, searchQuery]);
+  }, [items, searchQuery, searchable]);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -120,23 +123,25 @@ function SelectPickerModal({
           </View>
 
           {/* Search Bar */}
-          <View style={modalStyles.searchWrapper}>
-            <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
-            <TextInput
-              style={modalStyles.searchInput}
-              placeholder={searchPlaceholder}
-              placeholderTextColor="#94A3B8"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <X size={16} color="#94A3B8" />
-              </TouchableOpacity>
-            )}
-          </View>
+          {searchable && (
+            <View style={modalStyles.searchWrapper}>
+              <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
+              <TextInput
+                style={modalStyles.searchInput}
+                placeholder={searchPlaceholder}
+                placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <X size={16} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           {/* Items List */}
           <FlatList
@@ -1822,7 +1827,7 @@ export default function CreateEventScreen() {
         selectedItem={collegeYear || 'All Years'}
         onSelect={(yr) => setCollegeYear(yr)}
         onClose={() => setShowYearModal(false)}
-        searchPlaceholder="Search graduation year (e.g. 2026, 2027...)"
+        searchable={false}
       />
 
       {/* Event Date Picker Modal */}
