@@ -187,32 +187,82 @@ function DatePickerModal({
   visible,
   title = 'Select Date',
   initialDateString,
+  minDateString,
+  maxDateString,
   onSelect,
   onClose,
 }: {
   visible: boolean;
   title?: string;
   initialDateString?: string;
+  minDateString?: string;
+  maxDateString?: string;
   onSelect: (dateStr: string) => void;
   onClose: () => void;
 }) {
-  const today = new Date();
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const defaultMaxDate = useMemo(() => {
+    const d = new Date(today);
+    d.setFullYear(today.getFullYear() + 1);
+    return d;
+  }, [today]);
+
+  const effectiveMinDate = useMemo(() => {
+    if (minDateString) {
+      const parsed = parseEventDateString(minDateString);
+      if (parsed && parsed > today) return parsed;
+    }
+    return today;
+  }, [minDateString, today]);
+
+  const effectiveMaxDate = useMemo(() => {
+    if (maxDateString) {
+      const parsed = parseEventDateString(maxDateString);
+      if (parsed) return parsed;
+    }
+    return defaultMaxDate;
+  }, [maxDateString, defaultMaxDate]);
+
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   useEffect(() => {
     if (initialDateString) {
-      const parsed = new Date(initialDateString);
-      if (!isNaN(parsed.getTime())) {
+      const parsed = parseEventDateString(initialDateString);
+      if (parsed) {
         setViewYear(parsed.getFullYear());
         setViewMonth(parsed.getMonth());
         setSelectedDay(parsed.getDate());
+        return;
       }
     }
-  }, [initialDateString, visible]);
+    setViewYear(effectiveMinDate.getFullYear());
+    setViewMonth(effectiveMinDate.getMonth());
+    setSelectedDay(null);
+  }, [initialDateString, visible, effectiveMinDate]);
+
+  const isPrevMonthDisabled = useMemo(() => {
+    return (
+      viewYear < effectiveMinDate.getFullYear() ||
+      (viewYear === effectiveMinDate.getFullYear() && viewMonth <= effectiveMinDate.getMonth())
+    );
+  }, [viewYear, viewMonth, effectiveMinDate]);
+
+  const isNextMonthDisabled = useMemo(() => {
+    return (
+      viewYear > effectiveMaxDate.getFullYear() ||
+      (viewYear === effectiveMaxDate.getFullYear() && viewMonth >= effectiveMaxDate.getMonth())
+    );
+  }, [viewYear, viewMonth, effectiveMaxDate]);
 
   const prevMonth = () => {
+    if (isPrevMonthDisabled) return;
     if (viewMonth === 0) {
       setViewMonth(11);
       setViewYear((y) => y - 1);
@@ -222,6 +272,7 @@ function DatePickerModal({
   };
 
   const nextMonth = () => {
+    if (isNextMonthDisabled) return;
     if (viewMonth === 11) {
       setViewMonth(0);
       setViewYear((y) => y + 1);
@@ -257,14 +308,24 @@ function DatePickerModal({
 
           {/* Month Navigation */}
           <View style={modalStyles.monthNavRow}>
-            <TouchableOpacity style={modalStyles.monthNavBtn} onPress={prevMonth} activeOpacity={0.7}>
-              <ChevronLeft size={20} color="#6C47FF" />
+            <TouchableOpacity
+              style={[modalStyles.monthNavBtn, isPrevMonthDisabled && modalStyles.monthNavBtnDisabled]}
+              onPress={prevMonth}
+              disabled={isPrevMonthDisabled}
+              activeOpacity={isPrevMonthDisabled ? 1 : 0.7}
+            >
+              <ChevronLeft size={20} color={isPrevMonthDisabled ? '#CBD5E1' : '#6C47FF'} />
             </TouchableOpacity>
             <Text style={modalStyles.monthYearTitle}>
               {MONTH_NAMES[viewMonth]} {viewYear}
             </Text>
-            <TouchableOpacity style={modalStyles.monthNavBtn} onPress={nextMonth} activeOpacity={0.7}>
-              <ChevronRight size={20} color="#6C47FF" />
+            <TouchableOpacity
+              style={[modalStyles.monthNavBtn, isNextMonthDisabled && modalStyles.monthNavBtnDisabled]}
+              onPress={nextMonth}
+              disabled={isNextMonthDisabled}
+              activeOpacity={isNextMonthDisabled ? 1 : 0.7}
+            >
+              <ChevronRight size={20} color={isNextMonthDisabled ? '#CBD5E1' : '#6C47FF'} />
             </TouchableOpacity>
           </View>
 
@@ -284,6 +345,13 @@ function DatePickerModal({
             ))}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
+              const cellDate = new Date(viewYear, viewMonth, day);
+              cellDate.setHours(0, 0, 0, 0);
+
+              const isPastOrBeforeMin = cellDate < effectiveMinDate;
+              const isAfterMax = cellDate > effectiveMaxDate;
+              const isDisabled = isPastOrBeforeMin || isAfterMax;
+
               const isToday =
                 day === today.getDate() &&
                 viewMonth === today.getMonth() &&
@@ -296,15 +364,18 @@ function DatePickerModal({
                     modalStyles.dayCell,
                     isToday && modalStyles.todayCell,
                     isSelected && modalStyles.selectedDayCell,
+                    isDisabled && modalStyles.disabledDayCell,
                   ]}
-                  onPress={() => handlePickDay(day)}
-                  activeOpacity={0.7}
+                  onPress={() => !isDisabled && handlePickDay(day)}
+                  disabled={isDisabled}
+                  activeOpacity={isDisabled ? 1 : 0.7}
                 >
                   <Text
                     style={[
                       modalStyles.dayCellText,
                       isToday && modalStyles.todayCellText,
                       isSelected && modalStyles.selectedDayCellText,
+                      isDisabled && modalStyles.disabledDayCellText,
                     ]}
                   >
                     {day}
@@ -520,6 +591,7 @@ export default function CreateEventScreen() {
   const [showCityModal, setShowCityModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [showDeadlinePicker, setShowDeadlinePicker] = useState(false);
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [showBranchModal, setShowBranchModal] = useState(false);
@@ -916,13 +988,21 @@ export default function CreateEventScreen() {
       return;
     }
 
-    // Date range and past date validations
+    // Date range and past date validations (Dynamic rolling 1-year window)
     const evStartDate = parseEventDateString(dateString);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const maxAllowedDate = new Date(today);
+    maxAllowedDate.setFullYear(today.getFullYear() + 1);
+
     if (evStartDate && evStartDate < today && !editId) {
       Alert.alert('Invalid Event Date', 'Event date cannot be in the past.');
+      return;
+    }
+
+    if (evStartDate && evStartDate > maxAllowedDate) {
+      Alert.alert('Invalid Event Date', 'Event date cannot be more than 1 year in advance.');
       return;
     }
 
@@ -932,12 +1012,24 @@ export default function CreateEventScreen() {
         Alert.alert('Invalid Date Range', 'End date cannot be earlier than the event start date.');
         return;
       }
+      if (evEndDate && evEndDate > maxAllowedDate) {
+        Alert.alert('Invalid End Date', 'Event end date cannot be more than 1 year in advance.');
+        return;
+      }
     }
 
     if (registrationDeadline.trim()) {
       const deadlineDate = parseEventDateString(registrationDeadline.trim());
+      if (deadlineDate && deadlineDate < today && !editId) {
+        Alert.alert('Invalid Deadline', 'Registration deadline cannot be in the past.');
+        return;
+      }
       if (deadlineDate && evStartDate && deadlineDate > evStartDate) {
         Alert.alert('Invalid Deadline', 'Registration deadline cannot be after the event start date.');
+        return;
+      }
+      if (deadlineDate && deadlineDate > maxAllowedDate) {
+        Alert.alert('Invalid Deadline', 'Registration deadline cannot be more than 1 year in advance.');
         return;
       }
     }
@@ -980,6 +1072,29 @@ export default function CreateEventScreen() {
     if (step === 1 && isFeatured && !posterUri) {
       Alert.alert('Poster Required', 'A 1:1 square poster is required for featured events.');
       return;
+    }
+
+    // Validate registration deadline if modified in step 1
+    if (registrationDeadline.trim()) {
+      const deadlineDate = parseEventDateString(registrationDeadline.trim());
+      const evStartDate = parseEventDateString(dateString);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const maxAllowedDate = new Date(today);
+      maxAllowedDate.setFullYear(today.getFullYear() + 1);
+
+      if (deadlineDate && deadlineDate < today && !editId) {
+        Alert.alert('Invalid Deadline', 'Registration deadline cannot be in the past.');
+        return;
+      }
+      if (deadlineDate && evStartDate && deadlineDate > evStartDate) {
+        Alert.alert('Invalid Deadline', 'Registration deadline cannot be after the event start date.');
+        return;
+      }
+      if (deadlineDate && deadlineDate > maxAllowedDate) {
+        Alert.alert('Invalid Deadline', 'Registration deadline cannot be more than 1 year in advance.');
+        return;
+      }
     }
 
     // Defensive Client-Side Rate Limit: prevent spam / accidental double-tap floods
@@ -1880,14 +1995,35 @@ export default function CreateEventScreen() {
 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Registration Deadline (Optional)</Text>
-                <TextInput
-                  style={styles.inputPlain}
-                  placeholder="e.g. 2026-10-22"
-                  placeholderTextColor={theme.colors.textMuted}
-                  value={registrationDeadline}
-                  onChangeText={setRegistrationDeadline}
-                  maxLength={30}
-                />
+                <TouchableOpacity
+                  style={styles.pickerTrigger}
+                  onPress={() => setShowDeadlinePicker(true)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.pickerTriggerLeft}>
+                    <Calendar
+                      size={18}
+                      color={registrationDeadline ? theme.colors.brand : theme.colors.textSecondary}
+                      style={{ marginRight: 10 }}
+                    />
+                    <Text style={[styles.pickerTriggerText, !registrationDeadline && styles.placeholderText]}>
+                      {registrationDeadline ? formatEventDateDetailed(registrationDeadline) : 'Select registration deadline'}
+                    </Text>
+                  </View>
+                  {registrationDeadline ? (
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setRegistrationDeadline('');
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <X size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                  ) : (
+                    <ChevronDown size={18} color="#64748B" />
+                  )}
+                </TouchableOpacity>
               </View>
 
               {/* Step 1 Actions */}
@@ -1979,7 +2115,23 @@ export default function CreateEventScreen() {
         visible={showDatePicker}
         title="Select Event Date"
         initialDateString={dateString}
-        onSelect={setDateString}
+        onSelect={(newDate) => {
+          setDateString(newDate);
+          if (endDateString) {
+            const newStart = parseEventDateString(newDate);
+            const currentEnd = parseEventDateString(endDateString);
+            if (newStart && currentEnd && currentEnd < newStart) {
+              setEndDateString('');
+            }
+          }
+          if (registrationDeadline) {
+            const newStart = parseEventDateString(newDate);
+            const currentDeadline = parseEventDateString(registrationDeadline);
+            if (newStart && currentDeadline && currentDeadline > newStart) {
+              setRegistrationDeadline('');
+            }
+          }
+        }}
         onClose={() => setShowDatePicker(false)}
       />
 
@@ -1987,9 +2139,20 @@ export default function CreateEventScreen() {
       <DatePickerModal
         visible={showEndDatePicker}
         title="Select End Date"
-        initialDateString={endDateString}
+        initialDateString={endDateString || dateString}
+        minDateString={dateString}
         onSelect={setEndDateString}
         onClose={() => setShowEndDatePicker(false)}
+      />
+
+      {/* Registration Deadline Picker Modal */}
+      <DatePickerModal
+        visible={showDeadlinePicker}
+        title="Select Registration Deadline"
+        initialDateString={registrationDeadline}
+        maxDateString={dateString}
+        onSelect={setRegistrationDeadline}
+        onClose={() => setShowDeadlinePicker(false)}
       />
 
       {/* Start Time Picker Modal */}
@@ -2192,6 +2355,16 @@ const modalStyles = StyleSheet.create({
   selectedDayCellText: {
     fontFamily: 'Switzer-Bold',
     color: '#FFFFFF',
+  },
+  monthNavBtnDisabled: {
+    backgroundColor: '#F8FAFC',
+    opacity: 0.35,
+  },
+  disabledDayCell: {
+    opacity: 0.3,
+  },
+  disabledDayCellText: {
+    color: '#94A3B8',
   },
 
   // Time Modal Styles

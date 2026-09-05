@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ export interface DatePickerModalProps {
   visible: boolean;
   title?: string;
   initialDateString?: string | null;
+  minDateString?: string | null;
+  maxDateString?: string | null;
   onSelect: (formattedDate: string, isoDate: string) => void;
   onClose: () => void;
   allowClear?: boolean;
@@ -29,12 +31,41 @@ export function DatePickerModal({
   visible,
   title = 'Select Date',
   initialDateString,
+  minDateString,
+  maxDateString,
   onSelect,
   onClose,
   allowClear = false,
   onClear,
 }: DatePickerModalProps) {
-  const today = new Date();
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const defaultMaxDate = useMemo(() => {
+    const d = new Date(today);
+    d.setFullYear(today.getFullYear() + 1);
+    return d;
+  }, [today]);
+
+  const effectiveMinDate = useMemo(() => {
+    if (minDateString) {
+      const parsed = new Date(minDateString);
+      if (!isNaN(parsed.getTime()) && parsed > today) return parsed;
+    }
+    return today;
+  }, [minDateString, today]);
+
+  const effectiveMaxDate = useMemo(() => {
+    if (maxDateString) {
+      const parsed = new Date(maxDateString);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+    return defaultMaxDate;
+  }, [maxDateString, defaultMaxDate]);
+
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -46,13 +77,30 @@ export function DatePickerModal({
         setViewYear(parsed.getFullYear());
         setViewMonth(parsed.getMonth());
         setSelectedDay(parsed.getDate());
+        return;
       }
-    } else {
-      setSelectedDay(null);
     }
-  }, [initialDateString, visible]);
+    setViewYear(effectiveMinDate.getFullYear());
+    setViewMonth(effectiveMinDate.getMonth());
+    setSelectedDay(null);
+  }, [initialDateString, visible, effectiveMinDate]);
+
+  const isPrevMonthDisabled = useMemo(() => {
+    return (
+      viewYear < effectiveMinDate.getFullYear() ||
+      (viewYear === effectiveMinDate.getFullYear() && viewMonth <= effectiveMinDate.getMonth())
+    );
+  }, [viewYear, viewMonth, effectiveMinDate]);
+
+  const isNextMonthDisabled = useMemo(() => {
+    return (
+      viewYear > effectiveMaxDate.getFullYear() ||
+      (viewYear === effectiveMaxDate.getFullYear() && viewMonth >= effectiveMaxDate.getMonth())
+    );
+  }, [viewYear, viewMonth, effectiveMaxDate]);
 
   const prevMonth = () => {
+    if (isPrevMonthDisabled) return;
     if (viewMonth === 0) {
       setViewMonth(11);
       setViewYear((y) => y - 1);
@@ -62,6 +110,7 @@ export function DatePickerModal({
   };
 
   const nextMonth = () => {
+    if (isNextMonthDisabled) return;
     if (viewMonth === 11) {
       setViewMonth(0);
       setViewYear((y) => y + 1);
@@ -119,14 +168,24 @@ export function DatePickerModal({
 
           {/* Month Navigation */}
           <View style={styles.monthNavRow}>
-            <TouchableOpacity style={styles.monthNavBtn} onPress={prevMonth} activeOpacity={0.7}>
-              <ChevronLeft size={20} color="#6C47FF" />
+            <TouchableOpacity
+              style={[styles.monthNavBtn, isPrevMonthDisabled && styles.monthNavBtnDisabled]}
+              onPress={prevMonth}
+              disabled={isPrevMonthDisabled}
+              activeOpacity={isPrevMonthDisabled ? 1 : 0.7}
+            >
+              <ChevronLeft size={20} color={isPrevMonthDisabled ? '#CBD5E1' : '#6C47FF'} />
             </TouchableOpacity>
             <Text style={styles.monthYearTitle}>
               {MONTH_NAMES[viewMonth]} {viewYear}
             </Text>
-            <TouchableOpacity style={styles.monthNavBtn} onPress={nextMonth} activeOpacity={0.7}>
-              <ChevronRight size={20} color="#6C47FF" />
+            <TouchableOpacity
+              style={[styles.monthNavBtn, isNextMonthDisabled && styles.monthNavBtnDisabled]}
+              onPress={nextMonth}
+              disabled={isNextMonthDisabled}
+              activeOpacity={isNextMonthDisabled ? 1 : 0.7}
+            >
+              <ChevronRight size={20} color={isNextMonthDisabled ? '#CBD5E1' : '#6C47FF'} />
             </TouchableOpacity>
           </View>
 
@@ -147,6 +206,13 @@ export function DatePickerModal({
 
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
+              const cellDate = new Date(viewYear, viewMonth, day);
+              cellDate.setHours(0, 0, 0, 0);
+
+              const isPastOrBeforeMin = cellDate < effectiveMinDate;
+              const isAfterMax = cellDate > effectiveMaxDate;
+              const isDisabled = isPastOrBeforeMin || isAfterMax;
+
               const isToday =
                 today.getFullYear() === viewYear &&
                 today.getMonth() === viewMonth &&
@@ -160,15 +226,18 @@ export function DatePickerModal({
                     styles.dayCell,
                     isToday && styles.todayCell,
                     isSelected && styles.selectedDayCell,
+                    isDisabled && styles.disabledDayCell,
                   ]}
-                  onPress={() => handlePickDay(day)}
-                  activeOpacity={0.7}
+                  onPress={() => !isDisabled && handlePickDay(day)}
+                  disabled={isDisabled}
+                  activeOpacity={isDisabled ? 1 : 0.7}
                 >
                   <Text
                     style={[
                       styles.dayCellText,
                       isToday && styles.todayCellText,
                       isSelected && styles.selectedDayCellText,
+                      isDisabled && styles.disabledDayCellText,
                     ]}
                   >
                     {day}
@@ -306,5 +375,15 @@ const styles = StyleSheet.create({
   selectedDayCellText: {
     fontFamily: 'Switzer-Bold',
     color: '#FFFFFF',
+  },
+  monthNavBtnDisabled: {
+    backgroundColor: '#F8FAFC',
+    opacity: 0.35,
+  },
+  disabledDayCell: {
+    opacity: 0.3,
+  },
+  disabledDayCellText: {
+    color: '#94A3B8',
   },
 });

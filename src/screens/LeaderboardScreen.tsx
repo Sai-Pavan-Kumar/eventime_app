@@ -142,10 +142,10 @@ export default function LeaderboardScreen() {
         // 3. Cohort-Filtered Queries (Only active contributors > 150 ET)
         if (cohort === 'campus') {
           if (isStudent && userCollege) {
-            // Student: query campus-matched profiles with active score > 150 ET
+            // Student: query campus-matched profiles from leaderboard_view with active score > 150 ET
             const { data: collegeProfs, error: collegeErr } = await supabase
-              .from('profiles')
-              .select('id, full_name, username, avatar_url, college, et_score')
+              .from('leaderboard_view')
+              .select('*')
               .ilike('college', `%${userCollege.trim()}%`)
               .gt('et_score', 150)
               .order('et_score', { ascending: false })
@@ -153,42 +153,26 @@ export default function LeaderboardScreen() {
 
             if (!collegeErr && collegeProfs && collegeProfs.length > 0) {
               cleanRows = collegeProfs
-                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 150)
+                .filter((p) => p.user_id && !excludedIds.has(p.user_id) && (p.et_score ?? 0) > 150)
                 .map((p, idx) => ({
-                  user_id: p.id,
-                  full_name: p.full_name,
-                  username: p.username,
-                  avatar_url: p.avatar_url,
-                  college: p.college,
-                  et_score: p.et_score ?? 150,
-                  base_score: 100,
-                  events_posted: 0,
-                  impact_saves: 0,
+                  ...p,
                   rank: idx + 1,
                 }));
             }
           } else {
             // Professional or curator: query active curators/professionals > 150 ET
             const { data: proProfs, error: proErr } = await supabase
-              .from('profiles')
-              .select('id, full_name, username, avatar_url, college, et_score, user_type')
+              .from('leaderboard_view')
+              .select('*')
               .gt('et_score', 150)
               .order('et_score', { ascending: false })
               .limit(50);
 
             if (!proErr && proProfs && proProfs.length > 0) {
               cleanRows = proProfs
-                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 150)
+                .filter((p) => p.user_id && !excludedIds.has(p.user_id) && (p.et_score ?? 0) > 150)
                 .map((p, idx) => ({
-                  user_id: p.id,
-                  full_name: p.full_name,
-                  username: p.username,
-                  avatar_url: p.avatar_url,
-                  college: p.college,
-                  et_score: p.et_score ?? 150,
-                  base_score: 100,
-                  events_posted: 0,
-                  impact_saves: 0,
+                  ...p,
                   rank: idx + 1,
                 }));
             }
@@ -197,34 +181,27 @@ export default function LeaderboardScreen() {
           if (cityTarget) {
             const { data: cityProfs, error: cityErr } = await supabase
               .from('profiles')
-              .select('id, full_name, username, avatar_url, college, et_score, preferred_cities')
-              .contains('preferred_cities', [cityTarget])
-              .gt('et_score', 150)
-              .order('et_score', { ascending: false })
-              .limit(50);
+              .select('id, preferred_cities')
+              .contains('preferred_cities', [cityTarget]);
 
             if (!cityErr && cityProfs && cityProfs.length > 0) {
-              // Priority 1 Home City filter: curators whose #1 home city is cityTarget
-              // If not enough users with #1 city, include all active users with city in preferred_cities
-              const homeCityCurators = cityProfs.filter(
-                (p) => p.preferred_cities && p.preferred_cities[0] === cityTarget
-              );
-              const finalCityPool = homeCityCurators.length > 0 ? homeCityCurators : cityProfs;
+              const cityUserIds = cityProfs.map((p) => p.id);
+              const { data: viewProfs } = await supabase
+                .from('leaderboard_view')
+                .select('*')
+                .in('user_id', cityUserIds)
+                .gt('et_score', 150)
+                .order('et_score', { ascending: false })
+                .limit(50);
 
-              cleanRows = finalCityPool
-                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 150)
-                .map((p, idx) => ({
-                  user_id: p.id,
-                  full_name: p.full_name,
-                  username: p.username,
-                  avatar_url: p.avatar_url,
-                  college: p.college,
-                  et_score: p.et_score ?? 150,
-                  base_score: 100,
-                  events_posted: 0,
-                  impact_saves: 0,
-                  rank: idx + 1,
-                }));
+              if (viewProfs && viewProfs.length > 0) {
+                cleanRows = viewProfs
+                  .filter((p) => p.user_id && !excludedIds.has(p.user_id) && (p.et_score ?? 0) > 150)
+                  .map((p, idx) => ({
+                    ...p,
+                    rank: idx + 1,
+                  }));
+              }
             }
           }
         } else if (cohort === 'all_time') {
@@ -243,30 +220,6 @@ export default function LeaderboardScreen() {
                 et_score: r.et_score ?? 150,
                 rank: idx + 1,
               }));
-          } else {
-            const { data: profs, error: profError } = await supabase
-              .from('profiles')
-              .select('id, full_name, username, avatar_url, college, et_score')
-              .gt('et_score', 150)
-              .order('et_score', { ascending: false })
-              .limit(100);
-
-            if (!profError && profs) {
-              cleanRows = profs
-                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 150)
-                .map((p, idx) => ({
-                  user_id: p.id,
-                  full_name: p.full_name,
-                  username: p.username,
-                  avatar_url: p.avatar_url,
-                  college: p.college,
-                  et_score: p.et_score ?? 150,
-                  base_score: 100,
-                  events_posted: 0,
-                  impact_saves: 0,
-                  rank: idx + 1,
-                }));
-            }
           }
         }
 
@@ -944,29 +897,22 @@ export default function LeaderboardScreen() {
               </View>
               <View style={styles.scoreRow}>
                 <View style={styles.scoreRowLeft}>
-                  <Text style={styles.scoreRowLabel}>Share an Event</Text>
+                  <Text style={styles.scoreRowLabel}>Each Approved Event</Text>
                   <Text style={styles.scoreRowDesc}>When your posted event gets approved</Text>
                 </View>
-                <Text style={styles.scoreRowValue}>+100</Text>
+                <Text style={styles.scoreRowValue}>+20</Text>
               </View>
               <View style={styles.scoreRow}>
                 <View style={styles.scoreRowLeft}>
-                  <Text style={styles.scoreRowLabel}>Someone Interested</Text>
-                  <Text style={styles.scoreRowDesc}>When someone marks 'Interested' on your event</Text>
-                </View>
-                <Text style={styles.scoreRowValue}>+25</Text>
-              </View>
-              <View style={styles.scoreRow}>
-                <View style={styles.scoreRowLeft}>
-                  <Text style={styles.scoreRowLabel}>Someone Saves</Text>
-                  <Text style={styles.scoreRowDesc}>When someone bookmarks your event</Text>
+                  <Text style={styles.scoreRowLabel}>Unique Save / Interest</Text>
+                  <Text style={styles.scoreRowDesc}>Each unique save or interest on your event</Text>
                 </View>
                 <Text style={styles.scoreRowValue}>+10</Text>
               </View>
               <View style={[styles.scoreRow, { borderBottomWidth: 0 }]}>
                 <View style={styles.scoreRowLeft}>
                   <Text style={styles.scoreRowLabel}>Spam or Fake Event</Text>
-                  <Text style={styles.scoreRowDesc}>Penalty if a posted event is fake or misleading</Text>
+                  <Text style={styles.scoreRowDesc}>Penalty if a posted event is confirmed spam</Text>
                 </View>
                 <Text style={[styles.scoreRowValue, { color: '#EF4444' }]}>−25</Text>
               </View>

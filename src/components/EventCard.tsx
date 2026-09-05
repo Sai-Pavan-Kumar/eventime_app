@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { Bookmark, Share2, MapPin, Clock, Users, IndianRupee, Check, Sparkles } from 'lucide-react-native';
@@ -66,6 +66,19 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
   const [isSaved, setIsSaved] = useState(props.isSaved ?? false);
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const creatorId = props.event?.creator_id || (props as any).creator_id;
+  const isOwner = Boolean(user && creatorId && user.id === creatorId);
+  const [ownerNotice, setOwnerNotice] = useState(false);
+  const ownerNoticeTimer = React.useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (ownerNoticeTimer.current) {
+        clearTimeout(ownerNoticeTimer.current);
+      }
+    };
+  }, []);
 
   const categoryConfig = getCategoryConfig(category);
   const isCustomPoster = Boolean(isFeatured && posterUrl && posterUrl.startsWith('http'));
@@ -150,6 +163,15 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
   };
 
   const handleBookmarkPress = async () => {
+    if (isOwner) {
+      haptic.selection();
+      setOwnerNotice(true);
+      if (ownerNoticeTimer.current) clearTimeout(ownerNoticeTimer.current);
+      ownerNoticeTimer.current = setTimeout(() => {
+        setOwnerNotice(false);
+      }, 2400);
+      return;
+    }
     if (!user) {
       Alert.alert('Sign In Required', 'Please sign in to save events to your profile.');
       return;
@@ -342,17 +364,27 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
 
           {/* Action Buttons: Save & Share */}
           <View style={styles.actionButtons}>
-            {(!isPast || isSaved) && (
+            {ownerNotice && (
+              <View style={styles.cardOwnerTooltip}>
+                <Text style={styles.cardOwnerTooltipText}>Your Event</Text>
+              </View>
+            )}
+
+            {(!isPast || isSaved || isOwner) && (
               <TouchableOpacity
                 onPress={handleBookmarkPress}
                 disabled={isSaving}
-                style={[styles.actionBtn, isSaved && styles.actionBtnSaved]}
+                style={[
+                  styles.actionBtn,
+                  isSaved && styles.actionBtnSaved,
+                  isOwner && styles.actionBtnOwner,
+                ]}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Bookmark
                   size={16}
-                  color={isSaved ? '#6C47FF' : '#94A3B8'}
-                  fill={isSaved ? '#6C47FF' : 'none'}
+                  color={isOwner ? '#CBD5E1' : isSaved ? '#6C47FF' : '#94A3B8'}
+                  fill={isOwner ? 'none' : isSaved ? '#6C47FF' : 'none'}
                 />
               </TouchableOpacity>
             )}
@@ -566,6 +598,30 @@ const styles = StyleSheet.create({
   },
   actionBtnSaved: {
     backgroundColor: '#EEF2FF',
+  },
+  actionBtnOwner: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cardOwnerTooltip: {
+    position: 'absolute',
+    right: 38,
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    zIndex: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  cardOwnerTooltipText: {
+    color: '#F8FAFC',
+    fontSize: 10,
+    fontFamily: 'Switzer-Bold',
   },
   matchBadgeOverlay: {
     backgroundColor: '#F59E0B',

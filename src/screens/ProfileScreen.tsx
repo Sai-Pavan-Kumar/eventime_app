@@ -41,6 +41,7 @@ export default function ProfileScreen() {
   const [createdEventsCount, setCreatedEventsCount] = useState(0);
   const [totalSavesCount, setTotalSavesCount] = useState(0);
   const [savedCount, setSavedCount] = useState(0);
+  const [liveEtScore, setLiveEtScore] = useState<number | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
@@ -72,6 +73,17 @@ export default function ProfileScreen() {
         .eq('user_id', user.id);
 
       setSavedCount(bookmarkCount || 0);
+
+      // 3. Live ET Score from leaderboard_view (matches website parity)
+      const { data: scoreRow } = await supabase
+        .from('leaderboard_view')
+        .select('et_score')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (scoreRow?.et_score != null) {
+        setLiveEtScore(scoreRow.et_score);
+      }
     } catch (err) {
       console.error('Fetch profile stats error:', err);
     } finally {
@@ -180,7 +192,7 @@ export default function ProfileScreen() {
               {/* Tier Pill */}
               <View style={[styles.tierPill, { backgroundColor: tier.bg }]}>
                 <Text style={[styles.tierText, { color: tier.color }]}>{tier.label}</Text>
-                <Text style={[styles.scoreText, { color: tier.color }]}>• {profile?.et_score || 100} ET</Text>
+                <Text style={[styles.scoreText, { color: tier.color }]}>• {liveEtScore ?? profile?.et_score ?? 100} ET</Text>
               </View>
             </View>
           </View>

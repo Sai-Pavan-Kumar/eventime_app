@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -38,6 +39,7 @@ import {
   Sparkles,
   Hourglass,
   Tag,
+  Info,
 } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
@@ -46,6 +48,7 @@ import { APP_ASSETS, getCategoryPoster } from '../lib/asset-registry';
 import { scheduleEventReminder, cancelEventReminder, sendRemotePushNotification } from '../lib/notifications';
 import { withTimeout } from '../lib/api-resilience';
 import { useAuth } from '../context/AuthContext';
+import { haptic } from '../lib/haptics';
 import { EventCard } from '../components/EventCard';
 import { EmptyState } from '../components/EmptyState';
 import { EventReportModal } from '../components/EventReportModal';
@@ -206,6 +209,46 @@ export default function EventDetailScreen() {
     (user.id === event.creator_id || profile?.role === 'admin' || profile?.user_type === 'admin')
   );
 
+  const isOwner = Boolean(user && event?.creator_id && user.id === event.creator_id);
+
+  // Auto-closing notification toast for host interactions on their own events
+  const [ownerNotice, setOwnerNotice] = useState<string | null>(null);
+  const noticeAnim = useMemo(() => new Animated.Value(0), []);
+  const noticeTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const triggerOwnerNotice = useCallback((message: string) => {
+    haptic.selection();
+    if (noticeTimerRef.current) {
+      clearTimeout(noticeTimerRef.current);
+    }
+    setOwnerNotice(message);
+    noticeAnim.setValue(0);
+    Animated.spring(noticeAnim, {
+      toValue: 1,
+      friction: 7,
+      tension: 60,
+      useNativeDriver: true,
+    }).start();
+
+    noticeTimerRef.current = setTimeout(() => {
+      Animated.timing(noticeAnim, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }).start(() => {
+        setOwnerNotice(null);
+      });
+    }, 2800);
+  }, [noticeAnim]);
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current) {
+        clearTimeout(noticeTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleEditEvent = () => {
     if (!event) return;
     navigation.navigate('CreateEvent', {
@@ -263,6 +306,10 @@ export default function EventDetailScreen() {
   };
 
   const handleBookmarkToggle = async () => {
+    if (isOwner) {
+      triggerOwnerNotice("You're the host · This event is already in your My Events tab");
+      return;
+    }
     if (!user) {
       Alert.alert('Sign In Required', 'Please sign in to save this event to your profile.');
       return;
@@ -299,6 +346,10 @@ export default function EventDetailScreen() {
   };
 
   const handleInterestedToggle = async () => {
+    if (isOwner) {
+      triggerOwnerNotice('Hosts cannot mark interest in their own event · Self-points are restricted');
+      return;
+    }
     if (isPast) return;
     if (!user) {
       Alert.alert('Sign In Required', 'Please sign in to mark your interest in this event.');
@@ -402,6 +453,10 @@ export default function EventDetailScreen() {
     }
   };
 
+  const hasRegistrationLink = Boolean(
+    (event?.registration_link || event?.website || event?.external_link || '').trim()
+  );
+
   const handleRegister = async () => {
     const rawLink = (event?.registration_link || event?.website || event?.external_link || '').trim();
     if (!rawLink) {
@@ -471,21 +526,59 @@ export default function EventDetailScreen() {
             <Share2 size={18} color={theme.colors.textPrimary} />
           </TouchableOpacity>
 
-          {(!isPast || isSaved) && (
+          {(!isPast || isSaved || isOwner) && (
             <TouchableOpacity
-              style={[styles.iconBtn, isSaved && styles.iconBtnSaved]}
+              style={[
+                styles.iconBtn,
+                isSaved && styles.iconBtnSaved,
+                isOwner && styles.iconBtnOwner,
+              ]}
               onPress={handleBookmarkToggle}
               disabled={isSaving}
+              activeOpacity={0.7}
             >
               <Bookmark
                 size={18}
-                color={isSaved ? '#FFF' : theme.colors.textPrimary}
-                fill={isSaved ? '#FFF' : 'transparent'}
+                color={isOwner ? '#94A3B8' : isSaved ? '#FFF' : theme.colors.textPrimary}
+                fill={isOwner ? 'transparent' : isSaved ? '#FFF' : 'transparent'}
               />
             </TouchableOpacity>
           )}
         </View>
       </View>
+
+      {/* Floating Auto-Closing Notice for Host Actions */}
+      {ownerNotice && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.ownerNoticeToast,
+            {
+              top: insets.top + 52,
+              opacity: noticeAnim,
+              transform: [
+                {
+                  translateY: noticeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-10, 0],
+                  }),
+                },
+                {
+                  scale: noticeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.96, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.ownerNoticeIconBox}>
+            <Info size={14} color="#6C47FF" />
+          </View>
+          <Text style={styles.ownerNoticeText}>{ownerNotice}</Text>
+        </Animated.View>
+      )}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -531,12 +624,24 @@ export default function EventDetailScreen() {
           {/* Role-Gated Real-Action Attendance Bar (Only for upcoming events) */}
           {!isPast && (
             <TouchableOpacity
-              style={[styles.socialProofBar, isInterested && styles.socialProofBarActive]}
+              style={[
+                styles.socialProofBar,
+                isInterested && styles.socialProofBarActive,
+                isOwner && styles.socialProofBarOwner,
+              ]}
               onPress={handleInterestedToggle}
               activeOpacity={0.85}
             >
-              <View style={[styles.socialProofIconBox, isInterested && styles.socialProofIconBoxActive]}>
-                {isStudent ? (
+              <View
+                style={[
+                  styles.socialProofIconBox,
+                  isInterested && styles.socialProofIconBoxActive,
+                  isOwner && styles.socialProofIconBoxOwner,
+                ]}
+              >
+                {isOwner ? (
+                  <Users size={16} color="#94A3B8" />
+                ) : isStudent ? (
                   <GraduationCap size={16} color={isInterested ? '#EF4444' : '#6C47FF'} />
                 ) : (
                   <Users size={16} color={isInterested ? '#EF4444' : '#6C47FF'} />
@@ -544,8 +649,19 @@ export default function EventDetailScreen() {
               </View>
 
               <View style={styles.socialProofTextBox}>
-                <Text style={[styles.socialProofTitle, isInterested && styles.socialProofTitleActive]} numberOfLines={2}>
-                  {isStudent
+                <Text
+                  style={[
+                    styles.socialProofTitle,
+                    isInterested && styles.socialProofTitleActive,
+                    isOwner && styles.socialProofTitleOwner,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {isOwner
+                    ? interestCount > 0
+                      ? `${interestCount} ${interestCount === 1 ? 'person is' : 'people are'} interested`
+                      : 'No attendees yet'
+                    : isStudent
                     ? interestCount > 0
                       ? isInterested
                         ? interestCount === 1
@@ -561,19 +677,41 @@ export default function EventDetailScreen() {
                       : `${interestCount} ${interestCount === 1 ? 'person is' : 'people are'} interested`
                     : 'Be the first to show interest'}
                 </Text>
-                <Text style={styles.socialProofSub}>
-                  {isInterested ? 'You are marked as interested · Tap to remove' : 'Tap to show you are interested'}
+                <Text style={[styles.socialProofSub, isOwner && styles.socialProofSubOwner]}>
+                  {isOwner
+                    ? 'You are the host of this event · Tap for info'
+                    : isInterested
+                    ? 'You are marked as interested · Tap to remove'
+                    : 'Tap to show you are interested'}
                 </Text>
               </View>
 
-              <View style={[styles.socialProofPill, isInterested && styles.socialProofPillActive]}>
-                <Heart
-                  size={12}
-                  color={isInterested ? '#FFFFFF' : '#6C47FF'}
-                  fill={isInterested ? '#FFFFFF' : 'none'}
-                />
-                <Text style={[styles.socialProofPillText, isInterested && styles.socialProofPillTextActive]}>
-                  {isInterested ? 'Interested' : "I'm Interested"}
+              <View
+                style={[
+                  styles.socialProofPill,
+                  isOwner
+                    ? styles.socialProofPillOwner
+                    : isInterested && styles.socialProofPillActive,
+                ]}
+              >
+                {isOwner ? (
+                  <Sparkles size={11} color="#64748B" />
+                ) : (
+                  <Heart
+                    size={12}
+                    color={isInterested ? '#FFFFFF' : '#6C47FF'}
+                    fill={isInterested ? '#FFFFFF' : 'none'}
+                  />
+                )}
+                <Text
+                  style={[
+                    styles.socialProofPillText,
+                    isOwner
+                      ? styles.socialProofPillTextOwner
+                      : isInterested && styles.socialProofPillTextActive,
+                  ]}
+                >
+                  {isOwner ? 'Host' : isInterested ? 'Interested' : "I'm Interested"}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -817,15 +955,29 @@ export default function EventDetailScreen() {
       {/* Fixed Bottom Register Bar */}
       <View style={[styles.bottomBar, { paddingBottom: bottomPadding + 6 }]}>
         <TouchableOpacity
-          style={[styles.registerBtn, isPast && styles.registerBtnDisabled]}
-          onPress={isPast ? undefined : handleRegister}
-          activeOpacity={isPast ? 1 : 0.85}
-          disabled={isPast || !event?.registration_link}
+          style={[
+            styles.registerBtn,
+            isPast && styles.registerBtnDisabled,
+            !isPast && !hasRegistrationLink && styles.registerBtnWalkIn,
+          ]}
+          onPress={isPast || !hasRegistrationLink ? undefined : handleRegister}
+          activeOpacity={isPast || !hasRegistrationLink ? 1 : 0.85}
+          disabled={isPast || !hasRegistrationLink}
         >
-          <Text style={[styles.registerBtnText, isPast && styles.registerBtnTextDisabled]}>
-            {isPast ? 'Event Concluded' : 'Register for Event'}
+          <Text
+            style={[
+              styles.registerBtnText,
+              isPast && styles.registerBtnTextDisabled,
+              !isPast && !hasRegistrationLink && styles.registerBtnTextWalkIn,
+            ]}
+          >
+            {isPast
+              ? 'Event Concluded'
+              : hasRegistrationLink
+              ? 'Register for Event'
+              : 'Walk-in Event'}
           </Text>
-          {!isPast && <ExternalLink size={18} color="#FFF" />}
+          {!isPast && hasRegistrationLink && <ExternalLink size={18} color="#FFF" />}
         </TouchableOpacity>
       </View>
 
@@ -912,6 +1064,12 @@ const styles = StyleSheet.create({
   },
   iconBtnSaved: {
     backgroundColor: theme.colors.brand,
+  },
+  iconBtnOwner: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    opacity: 0.65,
   },
   interestedHeaderBtn: {
     flexDirection: 'row',
@@ -1050,6 +1208,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F3FF',
     borderColor: '#DDD6FE',
   },
+  socialProofBarOwner: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
   socialProofIconBox: {
     width: 36,
     height: 36,
@@ -1060,6 +1222,9 @@ const styles = StyleSheet.create({
   },
   socialProofIconBoxActive: {
     backgroundColor: '#FEE2E2',
+  },
+  socialProofIconBoxOwner: {
+    backgroundColor: '#F1F5F9',
   },
   socialProofTextBox: {
     flex: 1,
@@ -1073,11 +1238,17 @@ const styles = StyleSheet.create({
   socialProofTitleActive: {
     color: '#6C47FF',
   },
+  socialProofTitleOwner: {
+    color: '#475569',
+  },
   socialProofSub: {
     fontFamily: 'Switzer-Regular',
     fontSize: 11,
     color: '#64748B',
     marginTop: 2,
+  },
+  socialProofSubOwner: {
+    color: '#94A3B8',
   },
   socialProofPill: {
     flexDirection: 'row',
@@ -1091,6 +1262,11 @@ const styles = StyleSheet.create({
   socialProofPillActive: {
     backgroundColor: '#EF4444',
   },
+  socialProofPillOwner: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
   socialProofPillText: {
     fontFamily: 'Switzer-Bold',
     fontSize: 11,
@@ -1098,6 +1274,44 @@ const styles = StyleSheet.create({
   },
   socialProofPillTextActive: {
     color: '#FFFFFF',
+  },
+  socialProofPillTextOwner: {
+    color: '#64748B',
+  },
+  ownerNoticeToast: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 9999,
+    backgroundColor: '#0F172A',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  ownerNoticeIconBox: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: 'rgba(108, 71, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  ownerNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: 'Switzer-Medium',
+    color: '#F8FAFC',
+    lineHeight: 17,
   },
   actionStrip: {
     flexDirection: 'row',
@@ -1311,6 +1525,16 @@ const styles = StyleSheet.create({
   },
   registerBtnTextDisabled: {
     color: '#94A3B8',
+  },
+  registerBtnWalkIn: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  registerBtnTextWalkIn: {
+    color: '#334155',
   },
   modalOverlay: {
     flex: 1,
