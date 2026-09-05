@@ -10,22 +10,19 @@ import {
   Easing,
   Linking,
   Share,
-  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import {
-  ShieldCheck,
-  Sparkles,
+  CheckCircle2,
   Calendar,
   MapPin,
   Share2,
   ExternalLink,
   X,
-  Trophy,
-  CheckCircle2,
 } from 'lucide-react-native';
+import { theme } from '../config/theme';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 export interface CelebrationEventData {
   id?: string;
@@ -43,21 +40,21 @@ export interface CelebrationEventData {
 interface CuratorCelebrationModalProps {
   visible: boolean;
   event: CelebrationEventData | null;
-  curatorUsername: string;
+  curatorUsername?: string;
   onClose: () => void;
   onViewEvent?: (eventId?: string, slug?: string) => void;
 }
 
-// 18 micro-confetti particles for celebratory burst
-const CONFETTI_PARTICLES = Array.from({ length: 18 }).map((_, i) => {
-  const angle = (i / 18) * 2 * Math.PI + (Math.random() * 0.2 - 0.1);
-  const distance = 80 + Math.random() * 70;
-  const colors = ['#F59E0B', '#10B981', '#6366F1', '#38BDF8', '#EC4899', '#FFFFFF'];
+// 16 refined micro-confetti particles for subtle celebratory burst
+const CONFETTI_PARTICLES = Array.from({ length: 16 }).map((_, i) => {
+  const angle = (i / 16) * 2 * Math.PI + (Math.random() * 0.2 - 0.1);
+  const distance = 70 + Math.random() * 60;
+  const colors = ['#6C47FF', '#10B981', '#38BDF8', '#F59E0B', '#A855F7', '#EC4899'];
   return {
     id: i,
     dx: Math.cos(angle) * distance,
-    dy: Math.sin(angle) * distance * 0.85 - 40,
-    size: 5 + Math.random() * 5,
+    dy: Math.sin(angle) * distance * 0.85 - 30,
+    size: 4 + Math.random() * 4,
     color: colors[i % colors.length],
     rotation: Math.random() * 360,
   };
@@ -66,27 +63,16 @@ const CONFETTI_PARTICLES = Array.from({ length: 18 }).map((_, i) => {
 export function CuratorCelebrationModal({
   visible,
   event,
-  curatorUsername,
   onClose,
   onViewEvent,
 }: CuratorCelebrationModalProps) {
-  // Animation values
-  const scaleAnim = useRef(new Animated.Value(0.85)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const confettiAnim = useRef(new Animated.Value(0)).current;
 
-  // Sanitize curator username: strictly no email addresses
-  const cleanUsername = React.useMemo(() => {
-    if (!curatorUsername) return 'curator';
-    return curatorUsername
-      .replace(/^@/, '')
-      .split('@')[0]
-      .trim();
-  }, [curatorUsername]);
-
   useEffect(() => {
     if (visible) {
-      scaleAnim.setValue(0.85);
+      scaleAnim.setValue(0.9);
       opacityAnim.setValue(0);
       confettiAnim.setValue(0);
 
@@ -99,13 +85,13 @@ export function CuratorCelebrationModal({
         }),
         Animated.timing(opacityAnim, {
           toValue: 1,
-          duration: 250,
+          duration: 220,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(confettiAnim, {
           toValue: 1,
-          duration: 1200,
+          duration: 1000,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
@@ -119,7 +105,7 @@ export function CuratorCelebrationModal({
   const eventUrl = `https://eventime.thesurfboard.in/events/${event.slug || event.id || ''}`;
 
   const handleWhatsAppShare = async () => {
-    const message = `🚀 Just published "${event.title}" on EvenTime!\n\n📅 ${event.dateString}\n📍 ${event.city || 'Online'}\n\nCheck out the schedule & register here:\n${eventUrl}`;
+    const message = `Check out "${event.title}" on EvenTime!\n\n📅 ${event.dateString}\n📍 ${event.city || 'Online'}\n\nView details & register here:\n${eventUrl}`;
     const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(message)}`;
 
     try {
@@ -170,7 +156,7 @@ export function CuratorCelebrationModal({
       statusBarTranslucent
     >
       <View style={styles.overlay}>
-        {/* Confetti Particles Layer */}
+        {/* Confetti Particles */}
         <View pointerEvents="none" style={styles.confettiContainer}>
           {CONFETTI_PARTICLES.map((p) => {
             const pX = confettiAnim.interpolate({
@@ -179,11 +165,11 @@ export function CuratorCelebrationModal({
             });
             const pY = confettiAnim.interpolate({
               inputRange: [0, 0.4, 1],
-              outputRange: [0, p.dy, p.dy + 80],
+              outputRange: [0, p.dy, p.dy + 70],
             });
             const pOpacity = confettiAnim.interpolate({
               inputRange: [0, 0.7, 1],
-              outputRange: [1, 0.9, 0],
+              outputRange: [1, 0.8, 0],
             });
             const pScale = confettiAnim.interpolate({
               inputRange: [0, 0.2, 1],
@@ -197,7 +183,7 @@ export function CuratorCelebrationModal({
                   styles.confettiPiece,
                   {
                     width: p.size,
-                    height: p.size * (p.id % 2 === 0 ? 1 : 1.6),
+                    height: p.size * (p.id % 2 === 0 ? 1 : 1.5),
                     backgroundColor: p.color,
                     borderRadius: p.id % 3 === 0 ? 100 : 2,
                     transform: [
@@ -214,7 +200,7 @@ export function CuratorCelebrationModal({
           })}
         </View>
 
-        {/* Main Apple-Grade Card */}
+        {/* Modal Card */}
         <Animated.View
           style={[
             styles.cardContainer,
@@ -224,48 +210,34 @@ export function CuratorCelebrationModal({
             },
           ]}
         >
-          {/* Subtle Top Close Button */}
+          {/* Top Close Button */}
           <TouchableOpacity
             style={styles.closeIconButton}
             onPress={onClose}
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <X size={18} color="#94A3B8" />
+            <X size={18} color="#64748B" />
           </TouchableOpacity>
 
-          {/* 1. Verified Host Pill (With Clean Username Only) */}
-          <View style={styles.verifiedHostRow}>
-            <View style={styles.verifiedHostPill}>
-              <ShieldCheck size={14} color="#10B981" strokeWidth={2.5} />
-              <Text style={styles.verifiedHostLabel}>VERIFIED HOST</Text>
-              <View style={styles.pillDot} />
-              <Text style={styles.curatorUsernameText}>@{cleanUsername}</Text>
-            </View>
+          {/* Clean Success Badge */}
+          <View style={styles.successIconWrapper}>
+            <CheckCircle2 size={26} color="#10B981" strokeWidth={2.4} />
           </View>
 
-          {/* 2. Headline & Subtitle */}
+          {/* Headline & Subtitle */}
           <View style={styles.headlineBlock}>
             <Text style={styles.headlineTitle}>
               {isLive ? 'Your Event is Live!' : 'Event Submitted!'}
             </Text>
             <Text style={styles.headlineSubtitle}>
               {isLive
-                ? 'Broadcasted instantly to curious students across EvenTime.'
-                : 'In priority review queue — going live on EvenTime shortly.'}
+                ? 'Your event has been published and is now live on EvenTime.'
+                : 'Your event was submitted and will be reviewed shortly.'}
             </Text>
           </View>
 
-          {/* 3. Gamification Reward Chip */}
-          {isLive && (
-            <View style={styles.rewardChip}>
-              <Sparkles size={13} color="#F59E0B" />
-              <Text style={styles.rewardChipText}>+100 ET Curator Score</Text>
-              <Trophy size={13} color="#F59E0B" />
-            </View>
-          )}
-
-          {/* 4. Event Preview Ticket */}
+          {/* Event Preview Card */}
           <View style={styles.ticketPreview}>
             <View style={styles.ticketLeft}>
               {event.posterUrl ? (
@@ -276,7 +248,7 @@ export function CuratorCelebrationModal({
                 />
               ) : (
                 <View style={styles.ticketFallbackArt}>
-                  <Calendar size={22} color="#6C47FF" />
+                  <Calendar size={22} color={theme.colors.brand} />
                 </View>
               )}
             </View>
@@ -294,14 +266,14 @@ export function CuratorCelebrationModal({
 
               <View style={styles.ticketMetaRow}>
                 <View style={styles.ticketMetaItem}>
-                  <Calendar size={12} color="#94A3B8" />
+                  <Calendar size={12} color="#64748B" />
                   <Text style={styles.ticketMetaText} numberOfLines={1}>
                     {event.dateString}
                   </Text>
                 </View>
 
                 <View style={styles.ticketMetaItem}>
-                  <MapPin size={12} color="#94A3B8" />
+                  <MapPin size={12} color="#64748B" />
                   <Text style={styles.ticketMetaText} numberOfLines={1}>
                     {event.city || 'Online'}
                   </Text>
@@ -310,7 +282,7 @@ export function CuratorCelebrationModal({
             </View>
           </View>
 
-          {/* 5. Viral Sharing Actions */}
+          {/* Actions */}
           <View style={styles.actionBlock}>
             {/* Primary Action: WhatsApp */}
             <TouchableOpacity
@@ -318,9 +290,6 @@ export function CuratorCelebrationModal({
               onPress={handleWhatsAppShare}
               activeOpacity={0.85}
             >
-              <View style={styles.whatsAppIconCircle}>
-                <CheckCircle2 size={16} color="#FFFFFF" strokeWidth={2.5} />
-              </View>
               <Text style={styles.whatsAppBtnText}>Share to WhatsApp</Text>
             </TouchableOpacity>
 
@@ -331,7 +300,7 @@ export function CuratorCelebrationModal({
                 onPress={handleSystemShare}
                 activeOpacity={0.8}
               >
-                <Share2 size={15} color="#CBD5E1" />
+                <Share2 size={15} color="#475569" />
                 <Text style={styles.secondaryBtnText}>Share Link</Text>
               </TouchableOpacity>
 
@@ -340,7 +309,7 @@ export function CuratorCelebrationModal({
                 onPress={handleView}
                 activeOpacity={0.8}
               >
-                <ExternalLink size={15} color="#60A5FA" />
+                <ExternalLink size={15} color={theme.colors.brand} />
                 <Text style={[styles.secondaryBtnText, styles.viewEventText]}>
                   View Event
                 </Text>
@@ -348,7 +317,7 @@ export function CuratorCelebrationModal({
             </View>
           </View>
 
-          {/* 6. Dismiss Footnote */}
+          {/* Dismiss Action */}
           <TouchableOpacity
             style={styles.dismissBtn}
             onPress={onClose}
@@ -365,7 +334,7 @@ export function CuratorCelebrationModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -374,7 +343,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 2,
     height: 2,
-    top: '45%',
+    top: '40%',
     left: '50%',
     alignItems: 'center',
     justifyContent: 'center',
@@ -384,121 +353,80 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   cardContainer: {
-    width: Math.min(width - 32, 400),
-    backgroundColor: '#0F172A',
+    width: Math.min(width - 32, 380),
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: '#E2E8F0',
     paddingTop: 24,
-    paddingBottom: 20,
+    paddingBottom: 16,
     paddingHorizontal: 20,
     alignItems: 'center',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.45,
-    shadowRadius: 28,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
   },
   closeIconButton: {
     position: 'absolute',
     top: 16,
     right: 16,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,
   },
-  verifiedHostRow: {
-    marginBottom: 14,
-  },
-  verifiedHostPill: {
-    flexDirection: 'row',
+  successIconWrapper: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#ECFDF5',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    borderRadius: 100,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-  },
-  verifiedHostLabel: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 10,
-    color: '#10B981',
-    letterSpacing: 0.6,
-  },
-  pillDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: 'rgba(16, 185, 129, 0.5)',
-  },
-  curatorUsernameText: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 12,
-    color: '#F8FAFC',
-    letterSpacing: -0.2,
+    justifyContent: 'center',
+    marginBottom: 14,
   },
   headlineBlock: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 18,
   },
   headlineTitle: {
     fontFamily: 'Outfit-Bold',
-    fontSize: 24,
-    color: '#FFFFFF',
-    letterSpacing: -0.6,
+    fontSize: 22,
+    color: '#0F172A',
+    letterSpacing: -0.4,
     textAlign: 'center',
     marginBottom: 6,
   },
   headlineSubtitle: {
     fontFamily: 'Switzer-Regular',
     fontSize: 13,
-    color: '#94A3B8',
+    color: '#64748B',
     textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 12,
-  },
-  rewardChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
-    borderRadius: 100,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    marginBottom: 18,
-  },
-  rewardChipText: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 11,
-    color: '#F59E0B',
-    letterSpacing: 0.2,
+    lineHeight: 19,
+    paddingHorizontal: 8,
   },
   ticketPreview: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#E2E8F0',
     borderRadius: 16,
     padding: 12,
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 18,
   },
   ticketLeft: {
-    width: 60,
-    height: 60,
+    width: 56,
+    height: 56,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: '#F1F5F9',
   },
   ticketPoster: {
     width: '100%',
@@ -507,7 +435,7 @@ const styles = StyleSheet.create({
   ticketFallbackArt: {
     width: '100%',
     height: '100%',
-    backgroundColor: 'rgba(108, 71, 255, 0.12)',
+    backgroundColor: '#EEF0FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -517,24 +445,24 @@ const styles = StyleSheet.create({
   },
   ticketCategoryBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 7,
+    backgroundColor: '#EEF0FF',
+    paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 6,
     marginBottom: 4,
   },
   ticketCategoryText: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 9,
-    color: '#CBD5E1',
+    fontFamily: 'Outfit-Bold',
+    fontSize: 10,
+    color: theme.colors.brand,
     letterSpacing: 0.5,
   },
   ticketTitle: {
     fontFamily: 'Outfit-Bold',
-    fontSize: 14,
-    color: '#F8FAFC',
-    lineHeight: 18,
-    marginBottom: 6,
+    fontSize: 15,
+    color: '#0F172A',
+    lineHeight: 19,
+    marginBottom: 5,
   },
   ticketMetaRow: {
     flexDirection: 'row',
@@ -548,36 +476,28 @@ const styles = StyleSheet.create({
   },
   ticketMetaText: {
     fontFamily: 'Switzer-Medium',
-    fontSize: 11,
-    color: '#94A3B8',
+    fontSize: 12,
+    color: '#64748B',
   },
   actionBlock: {
     width: '100%',
     gap: 10,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   whatsAppBtn: {
     width: '100%',
     height: 48,
-    backgroundColor: '#16A34A',
+    backgroundColor: '#22C55E',
     borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  whatsAppIconCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
   whatsAppBtnText: {
     fontFamily: 'Switzer-Bold',
@@ -592,9 +512,9 @@ const styles = StyleSheet.create({
   secondaryBtn: {
     flex: 1,
     height: 44,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: '#E2E8F0',
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -603,15 +523,15 @@ const styles = StyleSheet.create({
   },
   secondaryBtnText: {
     fontFamily: 'Switzer-Bold',
-    fontSize: 12,
-    color: '#E2E8F0',
+    fontSize: 13,
+    color: '#0F172A',
   },
   viewEventBtn: {
-    backgroundColor: 'rgba(59, 130, 246, 0.12)',
-    borderColor: 'rgba(59, 130, 246, 0.25)',
+    backgroundColor: '#EEF0FF',
+    borderColor: '#C7D2FE',
   },
   viewEventText: {
-    color: '#60A5FA',
+    color: theme.colors.brand,
   },
   dismissBtn: {
     paddingVertical: 8,
