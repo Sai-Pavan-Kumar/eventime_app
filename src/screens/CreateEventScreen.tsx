@@ -71,10 +71,8 @@ const COLLEGE_YEAR_OPTIONS = [
   '2028',
   '2029',
   '2030',
-  '1st Year',
-  '2nd Year',
-  '3rd Year',
-  '4th Year',
+  '2031',
+  '2032',
 ];
 
 // Reusable Select Modal for Category and City Selection
@@ -1819,12 +1817,12 @@ export default function CreateEventScreen() {
       {/* Graduation Year Selection Modal */}
       <SelectPickerModal
         visible={showYearModal}
-        title="Select Target Year"
+        title="Select Graduation Year"
         items={COLLEGE_YEAR_OPTIONS}
         selectedItem={collegeYear || 'All Years'}
         onSelect={(yr) => setCollegeYear(yr)}
         onClose={() => setShowYearModal(false)}
-        searchPlaceholder="Search year (e.g. 2026, 1st Year...)"
+        searchPlaceholder="Search graduation year (e.g. 2026, 2027...)"
       />
 
       {/* Event Date Picker Modal */}
