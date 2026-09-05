@@ -34,6 +34,9 @@
       <intent-filter android:autoVerify="true" data-generated="true">
         <action android:name="android.intent.action.VIEW"/>
         <data android:scheme="https" android:host="eventime.thesurfboard.in" android:pathPrefix="/events"/>
+        <data android:scheme="https" android:host="eventime.thesurfboard.in" android:pathPrefix="/cities"/>
+        <data android:scheme="https" android:host="eventime.thesurfboard.in" android:pathPrefix="/city"/>
+        <data android:scheme="https" android:host="eventime.thesurfboard.in" android:pathPrefix="/curator"/>
         <data android:scheme="eventime"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <category android:name="android.intent.category.DEFAULT"/>

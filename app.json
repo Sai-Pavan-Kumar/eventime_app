@@ -52,6 +52,11 @@
             },
             {
               "scheme": "https",
+              "host": "eventime.thesurfboard.in",
+              "pathPrefix": "/curator"
+            },
+            {
+              "scheme": "https",
               "host": "eventime.in",
               "pathPrefix": "/events"
             },

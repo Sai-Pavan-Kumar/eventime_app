@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,14 @@ import {
   ActivityIndicator,
   Dimensions,
   Share,
+  PanResponder,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { Image } from 'expo-image';
+import * as Haptics from 'expo-haptics';
 import {
   ArrowLeft,
   CalendarDays,
@@ -41,6 +44,57 @@ export default function CuratorProfileScreen() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
+
+  // Animation values for smooth swipeable tab transitions
+  const tabSlideAnim = useRef(new Animated.Value(0)).current;
+  const tabFadeAnim = useRef(new Animated.Value(1)).current;
+
+  const switchTab = useCallback(
+    (newTab: 'upcoming' | 'past') => {
+      if (newTab === activeTab) return;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const direction = newTab === 'past' ? 1 : -1;
+      tabSlideAnim.setValue(direction * 24);
+      tabFadeAnim.setValue(0.6);
+      setActiveTab(newTab);
+      Animated.parallel([
+        Animated.spring(tabSlideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          damping: 20,
+          stiffness: 220,
+        }),
+        Animated.timing(tabFadeAnim, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    },
+    [activeTab, tabSlideAnim, tabFadeAnim]
+  );
+
+  // PanResponder to handle smooth swipeable transitions between Upcoming and Past Archive
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          return (
+            Math.abs(gestureState.dx) > 20 &&
+            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5
+          );
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dx < -40 && activeTab === 'upcoming') {
+            switchTab('past');
+          } else if (gestureState.dx > 40 && activeTab === 'past') {
+            switchTab('upcoming');
+          }
+        },
+      }),
+    [activeTab, switchTab]
+  );
 
   const fetchCuratorData = useCallback(async () => {
     try {
@@ -103,7 +157,7 @@ export default function CuratorProfileScreen() {
           .eq('creator_id', curatorData.id)
           .eq('status', 'approved')
           .gte('date_string', sixMonthsAgoStr)
-          .order('date_string', { ascending: false }),
+          .order('date_string', { ascending: true }),
       ]);
 
       setTotalEventCount(countRes.count || 0);
@@ -127,20 +181,41 @@ export default function CuratorProfileScreen() {
   }, [fetchCuratorData]);
 
   // Separate upcoming vs past events
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
 
-  const upcomingEvents = events.filter((e) => {
-    const evDate = parseEventDateString(e.date_string || '');
-    if (!evDate) return true;
-    return evDate >= today;
-  });
+  // Upcoming events sorted in ASCENDING order (earliest / closest date first)
+  const upcomingEvents = useMemo(() => {
+    return events
+      .filter((e) => {
+        const evDate = parseEventDateString(e.date_string || '');
+        if (!evDate) return true;
+        return evDate >= today;
+      })
+      .sort((a, b) => {
+        const da = parseEventDateString(a.date_string || '')?.getTime() || 0;
+        const db = parseEventDateString(b.date_string || '')?.getTime() || 0;
+        return da - db;
+      });
+  }, [events, today]);
 
-  const pastEvents = events.filter((e) => {
-    const evDate = parseEventDateString(e.date_string || '');
-    if (!evDate) return false;
-    return evDate < today;
-  });
+  // Past events sorted in DESCENDING order (newest past event first in archive)
+  const pastEvents = useMemo(() => {
+    return events
+      .filter((e) => {
+        const evDate = parseEventDateString(e.date_string || '');
+        if (!evDate) return false;
+        return evDate < today;
+      })
+      .sort((a, b) => {
+        const da = parseEventDateString(a.date_string || '')?.getTime() || 0;
+        const db = parseEventDateString(b.date_string || '')?.getTime() || 0;
+        return db - da;
+      });
+  }, [events, today]);
 
   const displayedEvents = activeTab === 'upcoming' ? upcomingEvents : pastEvents;
 
@@ -162,7 +237,8 @@ export default function CuratorProfileScreen() {
 
   const handleShareCurator = async () => {
     if (!curator) return;
-    const profileUrl = `https://eventime.in/${curator.username || curator.id}`;
+    const identifier = curator.username || curator.id;
+    const profileUrl = `https://eventime.thesurfboard.in/curator/${identifier}`;
     try {
       await Share.share({
         title: `${curator.full_name || 'Curator'} on EvenTime`,
@@ -255,7 +331,7 @@ export default function CuratorProfileScreen() {
           <View style={styles.tabContainer}>
             <TouchableOpacity
               style={[styles.tabButton, activeTab === 'upcoming' && styles.tabButtonActive]}
-              onPress={() => setActiveTab('upcoming')}
+              onPress={() => switchTab('upcoming')}
               activeOpacity={0.8}
             >
               <Text
@@ -270,7 +346,7 @@ export default function CuratorProfileScreen() {
 
             <TouchableOpacity
               style={[styles.tabButton, activeTab === 'past' && styles.tabButtonActive]}
-              onPress={() => setActiveTab('past')}
+              onPress={() => switchTab('past')}
               activeOpacity={0.8}
             >
               <Text
@@ -284,8 +360,17 @@ export default function CuratorProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Events List */}
-          <View style={styles.eventsSection}>
+          {/* Swipeable Events List with Spring Transition */}
+          <Animated.View
+            {...panResponder.panHandlers}
+            style={[
+              styles.eventsSection,
+              {
+                opacity: tabFadeAnim,
+                transform: [{ translateX: tabSlideAnim }],
+              },
+            ]}
+          >
             {displayedEvents.length === 0 ? (
               <View style={styles.noEventsBox}>
                 <Layers size={36} color="#CBD5E1" />
@@ -325,7 +410,7 @@ export default function CuratorProfileScreen() {
                 ))}
               </View>
             )}
-          </View>
+          </Animated.View>
         </ScrollView>
       )}
     </SafeAreaView>
