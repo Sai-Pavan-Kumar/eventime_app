@@ -173,6 +173,10 @@ export const CalendarPickerModal = React.memo<CalendarPickerModalProps>(({
               now.getMonth() === calendarMonth &&
               now.getDate() === day;
 
+            const isPast =
+              !isToday &&
+              new Date(calendarYear, calendarMonth, day, 23, 59, 59).getTime() < now.getTime();
+
             return (
               <View key={`day-${idx}`} style={styles.dayCellWrapper}>
                 <TouchableOpacity
@@ -193,7 +197,14 @@ export const CalendarPickerModal = React.memo<CalendarPickerModalProps>(({
                   >
                     {day}
                   </Text>
-                  {hasEvents && !isSelected && <View style={styles.eventDot} />}
+                  {hasEvents && !isSelected && (
+                    <View
+                      style={[
+                        styles.eventDot,
+                        isPast ? styles.eventDotPast : styles.eventDotUpcoming,
+                      ]}
+                    />
+                  )}
                 </TouchableOpacity>
               </View>
             );
@@ -339,7 +350,12 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
+  },
+  eventDotUpcoming: {
     backgroundColor: '#6C47FF',
+  },
+  eventDotPast: {
+    backgroundColor: '#0F172A',
   },
   calendarModalFooter: {
     flexDirection: 'row',
