@@ -58,6 +58,10 @@ export const CalendarPickerModal = React.memo<CalendarPickerModalProps>(({
     for (let d = 1; d <= daysInMonth; d++) {
       days.push(d);
     }
+    const totalCells = Math.ceil(days.length / 7) * 7;
+    while (days.length < totalCells) {
+      days.push(null);
+    }
     return days;
   }, [calendarYear, calendarMonth]);
 
@@ -141,9 +145,9 @@ export const CalendarPickerModal = React.memo<CalendarPickerModalProps>(({
         {/* Weekday Names */}
         <View style={styles.weekdayRow}>
           {WEEKDAY_NAMES.map((day, idx) => (
-            <Text key={idx} style={styles.weekdayText}>
-              {day}
-            </Text>
+            <View key={idx} style={styles.weekdayCellWrapper}>
+              <Text style={styles.weekdayText}>{day}</Text>
+            </View>
           ))}
         </View>
 
@@ -151,7 +155,11 @@ export const CalendarPickerModal = React.memo<CalendarPickerModalProps>(({
         <View style={styles.daysGrid}>
           {calendarDays.map((day, idx) => {
             if (day === null) {
-              return <View key={idx} style={styles.emptyDayCell} />;
+              return (
+                <View key={`empty-${idx}`} style={styles.dayCellWrapper}>
+                  <View style={styles.emptyDayCell} />
+                </View>
+              );
             }
 
             const m = String(calendarMonth + 1).padStart(2, '0');
@@ -166,26 +174,28 @@ export const CalendarPickerModal = React.memo<CalendarPickerModalProps>(({
               now.getDate() === day;
 
             return (
-              <TouchableOpacity
-                key={idx}
-                style={[
-                  styles.dayCell,
-                  isSelected && styles.dayCellSelected,
-                  isToday && !isSelected && styles.dayCellToday,
-                ]}
-                onPress={() => handleSelectDay(day)}
-              >
-                <Text
+              <View key={`day-${idx}`} style={styles.dayCellWrapper}>
+                <TouchableOpacity
                   style={[
-                    styles.dayText,
-                    isSelected && styles.dayTextSelected,
-                    isToday && !isSelected && styles.dayTextToday,
+                    styles.dayCell,
+                    isSelected && styles.dayCellSelected,
+                    isToday && !isSelected && styles.dayCellToday,
                   ]}
+                  onPress={() => handleSelectDay(day)}
+                  activeOpacity={0.7}
                 >
-                  {day}
-                </Text>
-                {hasEvents && !isSelected && <View style={styles.eventDot} />}
-              </TouchableOpacity>
+                  <Text
+                    style={[
+                      styles.dayText,
+                      isSelected && styles.dayTextSelected,
+                      isToday && !isSelected && styles.dayTextToday,
+                    ]}
+                  >
+                    {day}
+                  </Text>
+                  {hasEvents && !isSelected && <View style={styles.eventDot} />}
+                </TouchableOpacity>
+              </View>
             );
           })}
         </View>
@@ -268,11 +278,14 @@ const styles = StyleSheet.create({
   },
   weekdayRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: 8,
   },
+  weekdayCellWrapper: {
+    width: '14.2857%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   weekdayText: {
-    width: 36,
     textAlign: 'center',
     fontFamily: 'Switzer-Bold',
     fontSize: 12,
@@ -281,17 +294,20 @@ const styles = StyleSheet.create({
   daysGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  },
+  dayCellWrapper: {
+    width: '14.2857%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 3,
   },
   emptyDayCell: {
     width: 36,
     height: 36,
-    marginVertical: 3,
   },
   dayCell: {
     width: 36,
     height: 36,
-    marginVertical: 3,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 18,

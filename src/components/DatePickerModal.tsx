@@ -72,6 +72,7 @@ export function DatePickerModal({
 
   const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const trailingDays = (7 - ((firstDayOfWeek + daysInMonth) % 7)) % 7;
 
   const handlePickDay = (day: number) => {
     setSelectedDay(day);
@@ -175,6 +176,10 @@ export function DatePickerModal({
                 </TouchableOpacity>
               );
             })}
+
+            {Array.from({ length: trailingDays }).map((_, i) => (
+              <View key={`empty-end-${i}`} style={styles.dayCell} />
+            ))}
           </View>
         </TouchableOpacity>
       </TouchableOpacity>
