@@ -500,17 +500,17 @@ export default function EventDetailScreen() {
                   ? interestCount > 0
                     ? isInterested
                       ? interestCount === 1
-                        ? `You're going · ${userCollege || 'Your College'}`
-                        : `You & ${interestCount - 1} ${interestCount - 1 === 1 ? 'other student' : 'other students'} are going · ${userCollege || 'Campus'}`
-                      : `${interestCount} ${interestCount === 1 ? 'student is' : 'students are'} going · ${event.colleges?.name || userCollege || 'Campus'}`
-                    : `Be the first from ${userCollege || 'your college'} to show interest`
+                        ? "You're going"
+                        : `You & ${interestCount - 1} ${interestCount - 1 === 1 ? 'other' : 'others'} are going`
+                      : `${interestCount} ${interestCount === 1 ? 'student is' : 'students are'} going`
+                    : 'Be the first to show interest'
                   : interestCount > 0
                   ? isInterested
                     ? interestCount === 1
-                      ? `You're going · ${event.city || 'Local'}`
-                      : `You & ${interestCount - 1} ${interestCount - 1 === 1 ? 'other person' : 'others'} are going · ${event.city || 'Local'}`
-                    : `${interestCount} ${interestCount === 1 ? 'person is' : 'people are'} interested · ${event.city || 'Local'}`
-                  : `Be the first in ${event.city || 'your city'} to show interest`}
+                      ? "You're going"
+                      : `You & ${interestCount - 1} ${interestCount - 1 === 1 ? 'other' : 'others'} are going`
+                    : `${interestCount} ${interestCount === 1 ? 'person is' : 'people are'} interested`
+                  : 'Be the first to show interest'}
               </Text>
               <Text style={styles.socialProofSub}>
                 {isInterested ? 'You are marked as interested · Tap to remove' : 'Tap to show you are interested'}
