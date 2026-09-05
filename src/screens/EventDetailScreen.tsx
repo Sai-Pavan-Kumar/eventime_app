@@ -27,6 +27,7 @@ import {
   Share2,
   ExternalLink,
   Flag,
+  CheckCircle2,
   Users,
   Award,
   CalendarPlus,
@@ -73,6 +74,8 @@ export default function EventDetailScreen() {
 
   // Report Modal state
   const [showReportModal, setShowReportModal] = useState(false);
+  const [isReportedByMe, setIsReportedByMe] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   const isStudent = profile?.user_type === 'student';
   const userCollege = profile?.college || event?.colleges?.name || '';
@@ -159,7 +162,7 @@ export default function EventDetailScreen() {
         fetchSimilarEvents(data as EventRow);
 
         if (user) {
-          const [{ data: savedRow }, { data: interestRow }] = await Promise.all([
+          const [{ data: savedRow }, { data: interestRow }, { data: reportRow }] = await Promise.all([
             supabase
               .from('saved_events')
               .select('id')
@@ -172,10 +175,18 @@ export default function EventDetailScreen() {
               .eq('event_id', data.id)
               .eq('user_id', user.id)
               .maybeSingle(),
+            supabase
+              .from('event_reports')
+              .select('id')
+              .eq('event_id', data.id)
+              .eq('reporter_id', user.id)
+              .eq('status', 'pending')
+              .maybeSingle(),
           ]);
 
           setIsSaved(!!savedRow);
           setIsInterested(!!interestRow);
+          setIsReportedByMe(!!reportRow);
         }
       }
     } catch (err) {
@@ -215,6 +226,40 @@ export default function EventDetailScreen() {
     } catch (err) {
       console.error('Share error:', err);
     }
+  };
+
+  const handleWithdrawReport = () => {
+    Alert.alert(
+      'Withdraw Report',
+      'Are you sure you want to withdraw your report for this event? This will restore your active report quota.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Withdraw',
+          style: 'destructive',
+          onPress: async () => {
+            if (!user || !event?.id) return;
+            setIsWithdrawing(true);
+            try {
+              const { error } = await supabase
+                .from('event_reports')
+                .delete()
+                .eq('event_id', event.id)
+                .eq('reporter_id', user.id)
+                .eq('status', 'pending');
+
+              if (error) throw error;
+              setIsReportedByMe(false);
+              Alert.alert('Report Withdrawn', 'Your report has been withdrawn successfully.');
+            } catch (e: any) {
+              Alert.alert('Error', e?.message || 'Could not withdraw report.');
+            } finally {
+              setIsWithdrawing(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleBookmarkToggle = async () => {
@@ -729,15 +774,36 @@ export default function EventDetailScreen() {
             </View>
           )}
 
-          {/* Report Event Link */}
-          <TouchableOpacity
-            style={styles.reportRow}
-            onPress={() => setShowReportModal(true)}
-            activeOpacity={0.7}
-          >
-            <Flag size={14} color={theme.colors.textMuted} />
-            <Text style={styles.reportText}>Report inaccurate info or spam</Text>
-          </TouchableOpacity>
+          {/* Report Event or Withdraw Active Report */}
+          {isReportedByMe ? (
+            <View style={styles.reportedBox}>
+              <View style={styles.reportedInfoRow}>
+                <CheckCircle2 size={15} color="#D97706" />
+                <Text style={styles.reportedStatusText}>Report Submitted (Pending Review)</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.withdrawBtn}
+                onPress={handleWithdrawReport}
+                disabled={isWithdrawing}
+                activeOpacity={0.7}
+              >
+                {isWithdrawing ? (
+                  <ActivityIndicator size="small" color="#B91C1C" />
+                ) : (
+                  <Text style={styles.withdrawBtnText}>Withdraw</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.reportRow}
+              onPress={() => setShowReportModal(true)}
+              activeOpacity={0.7}
+            >
+              <Flag size={14} color={theme.colors.textMuted} />
+              <Text style={styles.reportText}>Report inaccurate info or spam</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
@@ -764,6 +830,7 @@ export default function EventDetailScreen() {
           curatorId={event.creator_id}
           eventTitle={event.title}
           onClose={() => setShowReportModal(false)}
+          onReportSubmitted={() => setIsReportedByMe(true)}
         />
       )}
     </SafeAreaView>
@@ -1163,6 +1230,42 @@ const styles = StyleSheet.create({
     fontFamily: 'Switzer-Medium',
     fontSize: 12,
     color: '#94A3B8',
+  },
+  reportedBox: {
+    marginVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  reportedInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  reportedStatusText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 12,
+    color: '#92400E',
+  },
+  withdrawBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  withdrawBtnText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 12,
+    color: '#B91C1C',
   },
   bottomBar: {
     position: 'absolute',

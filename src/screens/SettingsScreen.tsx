@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,12 @@ import {
   ActivityIndicator,
   Alert,
   Switch,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, CheckCircle2, Save, MapPin, User, Building, GraduationCap, Lock, Bell, Sparkles, Search, X } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Save, MapPin, User, Building, GraduationCap, Lock, Bell, Sparkles, Search, X, Flag } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
@@ -56,6 +58,69 @@ export default function SettingsScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [cityCounts, setCityCounts] = useState<Record<string, number>>({});
+
+  // My Reports state
+  const [pendingReportsCount, setPendingReportsCount] = useState(0);
+  const [showMyReportsModal, setShowMyReportsModal] = useState(false);
+  const [myReports, setMyReports] = useState<any[]>([]);
+  const [isLoadingReports, setIsLoadingReports] = useState(false);
+
+  const fetchMyReports = useCallback(async () => {
+    if (!user) return;
+    setIsLoadingReports(true);
+    try {
+      const { data, error } = await supabase
+        .from('event_reports')
+        .select('id, event_id, reason, status, created_at, events(id, title, date_string, city)')
+        .eq('reporter_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setMyReports(data);
+        const pending = data.filter((r: any) => r.status === 'pending').length;
+        setPendingReportsCount(pending);
+      }
+    } catch (err) {
+      console.warn('[Settings] Failed to fetch reports', err);
+    } finally {
+      setIsLoadingReports(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchMyReports();
+  }, [fetchMyReports]);
+
+  const handleWithdrawFromSettings = (reportId: string) => {
+    Alert.alert(
+      'Withdraw Report',
+      'Are you sure you want to withdraw this report? This will restore your active report quota.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Withdraw',
+          style: 'destructive',
+          onPress: async () => {
+            if (!user) return;
+            try {
+              const { error } = await supabase
+                .from('event_reports')
+                .delete()
+                .eq('id', reportId)
+                .eq('reporter_id', user.id)
+                .eq('status', 'pending');
+
+              if (error) throw error;
+              Alert.alert('Report Withdrawn', 'Your report has been successfully withdrawn.');
+              fetchMyReports();
+            } catch (e: any) {
+              Alert.alert('Error', e?.message || 'Could not withdraw report.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   useEffect(() => {
     (async () => {
@@ -752,6 +817,36 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Community Trust & Reports */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderTop}>
+            <Text style={styles.sectionTitle}>My Reported Events</Text>
+            <View style={styles.limitBadge}>
+              <Text style={styles.limitBadgeText}>
+                {pendingReportsCount} / 5 Active
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.sectionSubtitle}>
+            Review event reports you submitted and track their moderation status or withdraw active reports.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.legalRow}
+            onPress={() => {
+              fetchMyReports();
+              setShowMyReportsModal(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.legalLeft}>
+              <Flag size={16} color="#EF4444" />
+              <Text style={styles.legalText}>View Submitted Reports ({myReports.length})</Text>
+            </View>
+            <Text style={styles.legalArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Legal & Privacy Section (DPDP Act) */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Privacy & Legal</Text>
@@ -829,6 +924,93 @@ export default function SettingsScreen() {
         onClose={() => setShowBranchModal(false)}
         searchPlaceholder="Search college branches (e.g. CSE, B.Pharmacy, Biotech...)"
       />
+
+      {/* My Reports Modal */}
+      <Modal visible={showMyReportsModal} transparent animationType="slide" onRequestClose={() => setShowMyReportsModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>My Reported Events</Text>
+                <Text style={styles.modalSubtitle}>
+                  {pendingReportsCount} of 5 active report slots used
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowMyReportsModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <X size={20} color={theme.colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {isLoadingReports ? (
+              <View style={styles.reportsLoadingContainer}>
+                <ActivityIndicator size="small" color={theme.colors.brand} />
+                <Text style={styles.reportsLoadingText}>Loading your reports...</Text>
+              </View>
+            ) : myReports.length === 0 ? (
+              <View style={styles.reportsEmptyContainer}>
+                <CheckCircle2 size={32} color="#10B981" />
+                <Text style={styles.reportsEmptyTitle}>No Reports Submitted</Text>
+                <Text style={styles.reportsEmptySubtitle}>
+                  You haven't reported any events. You have all 5 report slots available.
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={myReports}
+                keyExtractor={(item) => item.id}
+                style={{ maxHeight: 380 }}
+                showsVerticalScrollIndicator={false}
+                renderItem={({ item }) => {
+                  const isPending = item.status === 'pending';
+                  const isResolved = item.status === 'resolved';
+                  const eventTitle = item.events?.title || 'Unknown / Concluded Event';
+
+                  return (
+                    <View style={styles.reportItemCard}>
+                      <View style={styles.reportItemTop}>
+                        <Text style={styles.reportItemTitle} numberOfLines={1}>
+                          {eventTitle}
+                        </Text>
+                        <View
+                          style={[
+                            styles.statusPill,
+                            isPending && styles.statusPillPending,
+                            isResolved && styles.statusPillResolved,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.statusPillText,
+                              isPending && styles.statusPillTextPending,
+                              isResolved && styles.statusPillTextResolved,
+                            ]}
+                          >
+                            {isPending ? 'Pending' : isResolved ? 'Resolved' : 'Dismissed'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text style={styles.reportItemReason}>
+                        {item.reason}
+                      </Text>
+
+                      {isPending && (
+                        <TouchableOpacity
+                          style={styles.withdrawReportBtn}
+                          onPress={() => handleWithdrawFromSettings(item.id)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.withdrawReportBtnText}>Withdraw Report</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1267,5 +1449,131 @@ const styles = StyleSheet.create({
     fontFamily: 'Switzer-Bold',
     fontSize: 13,
     color: theme.colors.danger,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalTitle: {
+    fontFamily: 'Outfit-Bold',
+    fontSize: 18,
+    color: '#0F172A',
+  },
+  modalSubtitle: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  reportsLoadingContainer: {
+    paddingVertical: 36,
+    alignItems: 'center',
+    gap: 8,
+  },
+  reportsLoadingText: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 13,
+    color: '#64748B',
+  },
+  reportsEmptyContainer: {
+    paddingVertical: 36,
+    alignItems: 'center',
+    gap: 6,
+  },
+  reportsEmptyTitle: {
+    fontFamily: 'Outfit-Bold',
+    fontSize: 16,
+    color: '#0F172A',
+    marginTop: 6,
+  },
+  reportsEmptySubtitle: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  reportItemCard: {
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 10,
+  },
+  reportItemTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+    gap: 8,
+  },
+  reportItemTitle: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 14,
+    color: '#0F172A',
+    flex: 1,
+  },
+  reportItemReason: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+  },
+  statusPillPending: {
+    backgroundColor: '#FEF3C7',
+  },
+  statusPillResolved: {
+    backgroundColor: '#D1FAE5',
+  },
+  statusPillText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 10,
+    color: '#475569',
+    textTransform: 'uppercase',
+  },
+  statusPillTextPending: {
+    color: '#92400E',
+  },
+  statusPillTextResolved: {
+    color: '#065F46',
+  },
+  withdrawReportBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  withdrawReportBtnText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 11,
+    color: '#B91C1C',
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { AlertTriangle, CheckCircle2, X } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
+import { checkRateLimit, recordAction } from '../lib/rate-limiter';
 
 export interface EventReportModalProps {
   visible: boolean;
@@ -23,6 +24,7 @@ export interface EventReportModalProps {
   curatorId?: string | null;
   eventTitle?: string;
   onClose: () => void;
+  onReportSubmitted?: () => void;
 }
 
 const REPORT_REASONS = [
@@ -38,12 +40,30 @@ export const EventReportModal: React.FC<EventReportModalProps> = ({
   curatorId,
   eventTitle,
   onClose,
+  onReportSubmitted,
 }) => {
   const { user } = useAuth();
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [additionalDetails, setAdditionalDetails] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReported, setIsReported] = useState(false);
+  const [pendingCount, setPendingCount] = useState<number | null>(null);
+
+  // Fetch pending reports count when modal opens
+  useEffect(() => {
+    if (visible && user) {
+      supabase
+        .from('event_reports')
+        .select('id', { count: 'exact', head: true })
+        .eq('reporter_id', user.id)
+        .eq('status', 'pending')
+        .then(({ count, error }) => {
+          if (!error && typeof count === 'number') {
+            setPendingCount(count);
+          }
+        });
+    }
+  }, [visible, user]);
 
   const resetState = () => {
     setSelectedReason('');
@@ -68,27 +88,35 @@ export const EventReportModal: React.FC<EventReportModalProps> = ({
       return;
     }
 
-    // Security Check 1: Prevent Self-Reporting (Matching Website Security Fix 1)
+    // Security Check 1: Prevent Self-Reporting
     if (curatorId && user.id === curatorId) {
       Alert.alert('Action Not Allowed', 'You cannot report your own event.');
       return;
     }
 
+    // Security Check 2: Client-side sliding-window rate limit
+    const rateCheck = checkRateLimit('REPORT_EVENT');
+    if (!rateCheck.allowed) {
+      Alert.alert(
+        'Please Slow Down',
+        `You are submitting reports too quickly. Please wait ${rateCheck.retryAfterSeconds}s before trying again.`
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // Security Check 2: Rate Limiting (Max 5 active/pending reports per user, matching Website Security Fix 2)
-      const { count: pendingCount, error: countError } = await supabase
+      // Security Check 3: Rate Limiting (Max 5 active/pending reports per user)
+      const { count: currentPending, error: countError } = await supabase
         .from('event_reports')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('reporter_id', user.id)
         .eq('status', 'pending');
 
-      if (countError) {
-        console.error('[EventReportModal] Rate limit check error:', countError);
-      } else if (pendingCount && pendingCount >= 5) {
+      if (!countError && typeof currentPending === 'number' && currentPending >= 5) {
         Alert.alert(
           'Report Limit Reached',
-          'You have reached the maximum limit of 5 pending reports. Please wait for our moderation team to review them.'
+          'You have reached the maximum limit of 5 pending reports. Please wait for our moderation team to review them or withdraw an existing report.'
         );
         setIsSubmitting(false);
         return;
@@ -125,7 +153,25 @@ export const EventReportModal: React.FC<EventReportModalProps> = ({
         status: 'pending',
       });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        if (insertError.message?.includes('Report quota exceeded')) {
+          Alert.alert(
+            'Report Limit Reached',
+            'You have reached the maximum limit of 5 active reports. Please wait for moderation or withdraw an existing report.'
+          );
+          return;
+        }
+        throw insertError;
+      }
+
+      // Record successful report in client rate-limiter
+      recordAction('REPORT_EVENT');
+
+      // Update local quota count & notify parent
+      setPendingCount((prev) => (prev !== null ? prev + 1 : 1));
+      if (onReportSubmitted) {
+        onReportSubmitted();
+      }
 
       // Show success screen matching website
       setIsReported(true);
@@ -168,6 +214,14 @@ export const EventReportModal: React.FC<EventReportModalProps> = ({
                 ? 'Our admin team will review this listing shortly.'
                 : 'Help us keep the EvenTime community accurate and safe.'}
             </Text>
+
+            {!isReported && pendingCount !== null && (
+              <View style={styles.quotaBadge}>
+                <Text style={styles.quotaBadgeText}>
+                  Active Reports: {pendingCount} / 5 Used
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Body */}
@@ -426,5 +480,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#0F172A',
+  },
+  quotaBadge: {
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  quotaBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400E',
   },
 });
