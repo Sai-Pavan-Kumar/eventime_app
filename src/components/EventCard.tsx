@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { Bookmark, Share2, MapPin, Clock, Users, IndianRupee, Check, Sparkles } from 'lucide-react-native';
@@ -39,6 +39,8 @@ export interface EventCardProps {
   onCityPress?: (city: string) => void;
 }
 
+const MONTHS_SHORT = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
 export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
   const navigation = useNavigation<any>();
   const { user, profile } = useAuth();
@@ -69,11 +71,21 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
   const isCustomPoster = Boolean(isFeatured && posterUrl && posterUrl.startsWith('http'));
   const posterSource = isCustomPoster ? { uri: posterUrl! } : getCategoryPoster(category);
 
-  // Short Date Overlay e.g. "22 MAY" or "SOON"
+  // Short Date Overlay e.g. "MAY 22", "SEP 6", or actual user date
   const parsedDate = parseEventDateString(dateString);
-  const shortDateOverlay = parsedDate
-    ? parsedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }).toUpperCase()
-    : 'SOON';
+  const shortDateOverlay = useMemo(() => {
+    if (!dateString || !dateString.trim()) {
+      return 'SOON';
+    }
+    if (parsedDate) {
+      const month = MONTHS_SHORT[parsedDate.getMonth()];
+      const day = parsedDate.getDate();
+      return `${month} ${day}`;
+    }
+    // If date was provided but could not be parsed into a Date object, display the user's date text
+    const clean = dateString.split(/[·•]/)[0].trim();
+    return clean.toUpperCase();
+  }, [dateString, parsedDate]);
 
   // Status calculation
   const statusInfo = (() => {
