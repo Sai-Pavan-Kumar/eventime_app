@@ -139,28 +139,28 @@ export default function LeaderboardScreen() {
         let cleanRows: LeaderboardViewRow[] = [];
 
         // 3. Cohort-Filtered Queries
-        // 3. Cohort-Filtered Queries (Only active contributors > 100 ET)
+        // 3. Cohort-Filtered Queries (Only active contributors > 150 ET)
         if (cohort === 'campus') {
           if (isStudent && userCollege) {
-            // Student: query campus-matched profiles with active score > 100 ET
+            // Student: query campus-matched profiles with active score > 150 ET
             const { data: collegeProfs, error: collegeErr } = await supabase
               .from('profiles')
               .select('id, full_name, username, avatar_url, college, et_score')
               .ilike('college', `%${userCollege.trim()}%`)
-              .gt('et_score', 100)
+              .gt('et_score', 150)
               .order('et_score', { ascending: false })
               .limit(50);
 
             if (!collegeErr && collegeProfs && collegeProfs.length > 0) {
               cleanRows = collegeProfs
-                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 100)
+                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 150)
                 .map((p, idx) => ({
                   user_id: p.id,
                   full_name: p.full_name,
                   username: p.username,
                   avatar_url: p.avatar_url,
                   college: p.college,
-                  et_score: p.et_score ?? 100,
+                  et_score: p.et_score ?? 150,
                   base_score: 100,
                   events_posted: 0,
                   impact_saves: 0,
@@ -168,24 +168,24 @@ export default function LeaderboardScreen() {
                 }));
             }
           } else {
-            // Professional or curator: query active curators/professionals > 100 ET
+            // Professional or curator: query active curators/professionals > 150 ET
             const { data: proProfs, error: proErr } = await supabase
               .from('profiles')
               .select('id, full_name, username, avatar_url, college, et_score, user_type')
-              .gt('et_score', 100)
+              .gt('et_score', 150)
               .order('et_score', { ascending: false })
               .limit(50);
 
             if (!proErr && proProfs && proProfs.length > 0) {
               cleanRows = proProfs
-                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 100)
+                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 150)
                 .map((p, idx) => ({
                   user_id: p.id,
                   full_name: p.full_name,
                   username: p.username,
                   avatar_url: p.avatar_url,
                   college: p.college,
-                  et_score: p.et_score ?? 100,
+                  et_score: p.et_score ?? 150,
                   base_score: 100,
                   events_posted: 0,
                   impact_saves: 0,
@@ -199,7 +199,7 @@ export default function LeaderboardScreen() {
               .from('profiles')
               .select('id, full_name, username, avatar_url, college, et_score, preferred_cities')
               .contains('preferred_cities', [cityTarget])
-              .gt('et_score', 100)
+              .gt('et_score', 150)
               .order('et_score', { ascending: false })
               .limit(50);
 
@@ -212,14 +212,14 @@ export default function LeaderboardScreen() {
               const finalCityPool = homeCityCurators.length > 0 ? homeCityCurators : cityProfs;
 
               cleanRows = finalCityPool
-                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 100)
+                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 150)
                 .map((p, idx) => ({
                   user_id: p.id,
                   full_name: p.full_name,
                   username: p.username,
                   avatar_url: p.avatar_url,
                   college: p.college,
-                  et_score: p.et_score ?? 100,
+                  et_score: p.et_score ?? 150,
                   base_score: 100,
                   events_posted: 0,
                   impact_saves: 0,
@@ -231,36 +231,36 @@ export default function LeaderboardScreen() {
           const { data, error } = await supabase
             .from('leaderboard_view')
             .select('*')
-            .gt('et_score', 100)
+            .gt('et_score', 150)
             .order('et_score', { ascending: false })
             .limit(100);
 
           if (!error && data && data.length > 0) {
             cleanRows = data
-              .filter((r) => r.user_id && !excludedIds.has(r.user_id) && (r.et_score ?? 0) > 100)
+              .filter((r) => r.user_id && !excludedIds.has(r.user_id) && (r.et_score ?? 0) > 150)
               .map((r, idx) => ({
                 ...r,
-                et_score: r.et_score ?? 100,
+                et_score: r.et_score ?? 150,
                 rank: idx + 1,
               }));
           } else {
             const { data: profs, error: profError } = await supabase
               .from('profiles')
               .select('id, full_name, username, avatar_url, college, et_score')
-              .gt('et_score', 100)
+              .gt('et_score', 150)
               .order('et_score', { ascending: false })
               .limit(100);
 
             if (!profError && profs) {
               cleanRows = profs
-                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 100)
+                .filter((p) => !excludedIds.has(p.id) && (p.et_score ?? 0) > 150)
                 .map((p, idx) => ({
                   user_id: p.id,
                   full_name: p.full_name,
                   username: p.username,
                   avatar_url: p.avatar_url,
                   college: p.college,
-                  et_score: p.et_score ?? 100,
+                  et_score: p.et_score ?? 150,
                   base_score: 100,
                   events_posted: 0,
                   impact_saves: 0,
@@ -360,7 +360,7 @@ export default function LeaderboardScreen() {
   const userScore = profile?.et_score ?? currentUserEntry?.et_score ?? 100;
 
   const myRank = useMemo(() => {
-    if (!user || userScore <= 100) return null;
+    if (!user || userScore <= 150) return null;
     const foundIndex = currentCohortList.findIndex((r) => r.user_id === user.id);
     return foundIndex !== -1 ? foundIndex + 1 : null;
   }, [currentCohortList, user, userScore]);
@@ -890,13 +890,13 @@ export default function LeaderboardScreen() {
                 <Text style={styles.rivalSubtitle}>
                   Viewing {selectedLeaderboardCity}. Your Home Turf is {preferredCities[0]}.
                 </Text>
-              ) : userScore <= 100 ? (
+              ) : userScore <= 150 ? (
                 <Text style={styles.rivalSubtitle}>
-                  Save or share an event (+10 ET) to earn points and claim your spot on the leaderboard.
+                  Share an event (+100 ET) to earn points and claim your spot on the leaderboard.
                 </Text>
               ) : (
                 <Text style={styles.rivalSubtitle}>
-                  Save or share events to climb up the leaderboard ranks.
+                  Share or save events to climb up the leaderboard ranks.
                 </Text>
               )}
             </View>
