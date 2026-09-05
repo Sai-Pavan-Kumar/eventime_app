@@ -645,18 +645,23 @@ export default function CreateEventScreen() {
     setRegLink(url);
     setDuplicateError('');
     setExtractionConfidence(0);
-    if (!url || !url.startsWith('http')) {
+
+    const trimmed = url.trim();
+    if (!trimmed) {
       setIsTrusted(false);
       return;
     }
 
+    // Auto-normalize protocol if user types/pastes "lu.ma/xxx" without http/https
+    const normalizedUrl = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
     setIsCheckingDomain(true);
     try {
       // 1. Duplicate check (matching website pattern matching & normalization)
-      let normalized = url.trim();
+      let normalized = normalizedUrl;
       let eventIdSegment: string | null = null;
       try {
-        const parsedUrl = new URL(url.trim());
+        const parsedUrl = new URL(normalizedUrl);
         const host = parsedUrl.hostname.replace(/^www\./, '');
         normalized = `${host}${parsedUrl.pathname}`.replace(/\/$/, '');
         const segments = parsedUrl.pathname.split('/').filter(Boolean);
@@ -676,18 +681,37 @@ export default function CreateEventScreen() {
         return;
       }
 
-      // 2. Verified partner domain lookup
+      // 2. Verified partner domain lookup (including fast-path fallback for core platforms)
       const { data: trustedDomains } = await supabase.from('verified_domains').select('domain_name');
 
       let hostname = '';
       try {
-        hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+        hostname = new URL(normalizedUrl).hostname.toLowerCase().replace(/^www\./, '');
       } catch {
         hostname = '';
       }
 
-      const trusted = !!trustedDomains?.some((d) => {
-        const dName = d.domain_name.toLowerCase().replace(/^www\./, '');
+      const KNOWN_TRUSTED_DOMAINS = [
+        'lu.ma',
+        'luma.com',
+        'eventbrite.com',
+        'meetup.com',
+        'unstop.com',
+        'townscript.com',
+        'devfolio.co',
+        'skillenza.com',
+        'allevents.in',
+        'bookmyshow.com',
+        'insider.in',
+        'airmeet.com',
+      ];
+
+      const domainList = [
+        ...KNOWN_TRUSTED_DOMAINS,
+        ...(trustedDomains || []).map((d) => d.domain_name.toLowerCase().replace(/^www\./, '')),
+      ];
+
+      const trusted = domainList.some((dName) => {
         return hostname === dName || hostname.endsWith(`.${dName}`);
       });
 
@@ -703,7 +727,7 @@ export default function CreateEventScreen() {
           const res = await fetch('https://eventime.thesurfboard.in/api/extract', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: url.trim() }),
+            body: JSON.stringify({ url: normalizedUrl }),
             signal: controller.signal,
           });
           clearTimeout(timeoutId);
@@ -722,7 +746,8 @@ export default function CreateEventScreen() {
                 setDateString(`${yyyy}-${mm}-${dd}`);
               }
             }
-            if (extracted.isTrusted !== undefined) setIsTrusted(Boolean(extracted.isTrusted));
+            // Only upgrade isTrusted if server explicitly confirms, NEVER downgrade if already trusted
+            if (extracted.isTrusted === true) setIsTrusted(true);
             setExtractionConfidence(extracted.title ? 0.9 : 0.5);
           }
         } catch {
@@ -889,6 +914,13 @@ export default function CreateEventScreen() {
       const uniqueSlug = editId ? undefined : generateSlug(title, effectiveCity, dateString);
       const status = isAdmin || isTrusted ? 'approved' : 'pending';
 
+      const cleanRegLink = regLink.trim();
+      const finalRegLink = cleanRegLink
+        ? /^https?:\/\//i.test(cleanRegLink)
+          ? cleanRegLink
+          : `https://${cleanRegLink}`
+        : null;
+
       const payload: any = {
         title: title.trim(),
         category,
@@ -903,7 +935,7 @@ export default function CreateEventScreen() {
         is_free: isFree,
         price: !isFree && price ? parseFloat(price) : 0,
         organizer_name: effectiveOrganizer,
-        registration_link: regLink.trim() || null,
+        registration_link: finalRegLink,
         website: website.trim() || null,
         description: description.trim(),
         prizes: prizes.trim() || null,

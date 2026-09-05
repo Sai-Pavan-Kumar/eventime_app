@@ -56,7 +56,7 @@ export default function CityEventsScreen() {
           .eq('status', 'approved')
           .or('college_only.is.null,college_only.eq.false')
           .ilike('city', city)
-          .order('created_at', { ascending: false })
+          .order('date_string', { ascending: true })
           .range(from, to);
 
         const { data, error } = await withTimeout(query, 8000);
@@ -66,14 +66,20 @@ export default function CityEventsScreen() {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Filter out past events so only upcoming events in this city are shown
-        const upcomingBatch = (data || []).filter((ev: any) => {
-          const parsed = parseEventDateString(ev.date_string || '');
-          if (!parsed) return true;
-          const evDate = new Date(parsed);
-          evDate.setHours(0, 0, 0, 0);
-          return evDate.getTime() >= today.getTime();
-        });
+        // Filter out past events and sort chronologically ascending (today / closest date first)
+        const upcomingBatch = (data || [])
+          .filter((ev: any) => {
+            const parsed = parseEventDateString(ev.date_string || '');
+            if (!parsed) return true;
+            const evDate = new Date(parsed);
+            evDate.setHours(0, 0, 0, 0);
+            return evDate.getTime() >= today.getTime();
+          })
+          .sort((a: any, b: any) => {
+            const da = parseEventDateString(a.date_string || '')?.getTime() || Infinity;
+            const db = parseEventDateString(b.date_string || '')?.getTime() || Infinity;
+            return da - db;
+          });
 
         if (!data || data.length < PAGE_SIZE) {
           setHasMore(false);
