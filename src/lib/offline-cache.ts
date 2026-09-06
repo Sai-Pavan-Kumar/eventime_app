@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { EventRow } from '../types';
+import type { EventRow, LeaderboardViewRow } from '../types';
 import { parseEventDateString } from './utils/date';
 
 /**
@@ -13,6 +13,10 @@ const CACHE_KEYS = {
   CAMPUS_EVENTS: '@eventime_cache_campus_events_v2',
   PLATFORM_STATS: '@eventime_cache_stats_v2',
   SAVED_EVENT_IDS: '@eventime_cache_saved_ids_v2',
+  LEADERBOARD_CAMPUS: '@eventime_cache_leaderboard_campus_v1',
+  LEADERBOARD_CITY: '@eventime_cache_leaderboard_city_v1',
+  LEADERBOARD_ALL_TIME: '@eventime_cache_leaderboard_all_time_v1',
+  EVENT_DETAIL_PREFIX: '@eventime_cache_event_detail_',
 } as const;
 
 export interface CachedStatsData {
@@ -34,6 +38,12 @@ const memoryCache = {
   campusEvents: null as CacheEnvelope<EventRow[]> | null,
   stats: null as CacheEnvelope<CachedStatsData> | null,
   savedIds: null as CacheEnvelope<string[]> | null,
+  leaderboard: {
+    campus: null as CacheEnvelope<LeaderboardViewRow[]> | null,
+    city: null as CacheEnvelope<LeaderboardViewRow[]> | null,
+    all_time: null as CacheEnvelope<LeaderboardViewRow[]> | null,
+  },
+  eventDetails: new Map<string, CacheEnvelope<EventRow>>(),
 };
 
 function filterUpcomingOnly(events: EventRow[]): EventRow[] {
@@ -220,3 +230,113 @@ export async function saveCachedSavedEventIds(ids: Set<string> | string[]): Prom
     console.warn('[OfflineCache] Failed to persist saved event IDs:', err);
   }
 }
+
+// ==========================================
+// 5. LEADERBOARD CACHE
+// ==========================================
+
+export function getMemoryLeaderboard(cohort: 'campus' | 'city' | 'all_time'): LeaderboardViewRow[] | null {
+  return memoryCache.leaderboard[cohort]?.data || null;
+}
+
+export async function loadCachedLeaderboard(
+  cohort: 'campus' | 'city' | 'all_time'
+): Promise<LeaderboardViewRow[] | null> {
+  if (memoryCache.leaderboard[cohort]?.data) {
+    return memoryCache.leaderboard[cohort]!.data;
+  }
+  const key =
+    cohort === 'campus'
+      ? CACHE_KEYS.LEADERBOARD_CAMPUS
+      : cohort === 'city'
+      ? CACHE_KEYS.LEADERBOARD_CITY
+      : CACHE_KEYS.LEADERBOARD_ALL_TIME;
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) return null;
+    const parsed: CacheEnvelope<LeaderboardViewRow[]> = JSON.parse(raw);
+    if (Array.isArray(parsed?.data)) {
+      memoryCache.leaderboard[cohort] = parsed;
+      return parsed.data;
+    }
+  } catch (err) {
+    console.warn(`[OfflineCache] Failed to load cached leaderboard (${cohort}):`, err);
+  }
+  return null;
+}
+
+export async function saveCachedLeaderboard(
+  cohort: 'campus' | 'city' | 'all_time',
+  rows: LeaderboardViewRow[]
+): Promise<void> {
+  if (!rows || !Array.isArray(rows)) return;
+  const key =
+    cohort === 'campus'
+      ? CACHE_KEYS.LEADERBOARD_CAMPUS
+      : cohort === 'city'
+      ? CACHE_KEYS.LEADERBOARD_CITY
+      : CACHE_KEYS.LEADERBOARD_ALL_TIME;
+  const envelope: CacheEnvelope<LeaderboardViewRow[]> = {
+    data: rows,
+    timestamp: Date.now(),
+    version: 1,
+  };
+  memoryCache.leaderboard[cohort] = envelope;
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(envelope));
+  } catch (err) {
+    console.warn(`[OfflineCache] Failed to persist leaderboard (${cohort}):`, err);
+  }
+}
+
+// ==========================================
+// 6. EVENT DETAIL CACHE (0ms Instant Hydration)
+// ==========================================
+
+export function getMemoryEventDetail(target: string): EventRow | null {
+  if (!target) return null;
+  return memoryCache.eventDetails.get(target)?.data || null;
+}
+
+export async function loadCachedEventDetail(target: string): Promise<EventRow | null> {
+  if (!target) return null;
+  const inMemory = memoryCache.eventDetails.get(target);
+  if (inMemory?.data) return inMemory.data;
+
+  try {
+    const raw = await AsyncStorage.getItem(`${CACHE_KEYS.EVENT_DETAIL_PREFIX}${target}`);
+    if (!raw) return null;
+    const parsed: CacheEnvelope<EventRow> = JSON.parse(raw);
+    if (parsed?.data) {
+      memoryCache.eventDetails.set(target, parsed);
+      if (parsed.data.id) memoryCache.eventDetails.set(parsed.data.id, parsed);
+      if (parsed.data.slug) memoryCache.eventDetails.set(parsed.data.slug, parsed);
+      return parsed.data;
+    }
+  } catch (err) {
+    console.warn(`[OfflineCache] Failed to load cached event detail (${target}):`, err);
+  }
+  return null;
+}
+
+export async function saveCachedEventDetail(event: EventRow): Promise<void> {
+  if (!event || (!event.id && !event.slug)) return;
+  const envelope: CacheEnvelope<EventRow> = {
+    data: event,
+    timestamp: Date.now(),
+    version: 1,
+  };
+  if (event.id) memoryCache.eventDetails.set(event.id, envelope);
+  if (event.slug) memoryCache.eventDetails.set(event.slug, envelope);
+
+  try {
+    const serialized = JSON.stringify(envelope);
+    const writes: [string, string][] = [];
+    if (event.id) writes.push([`${CACHE_KEYS.EVENT_DETAIL_PREFIX}${event.id}`, serialized]);
+    if (event.slug) writes.push([`${CACHE_KEYS.EVENT_DETAIL_PREFIX}${event.slug}`, serialized]);
+    await AsyncStorage.multiSet(writes);
+  } catch (err) {
+    console.warn('[OfflineCache] Failed to persist event detail:', err);
+  }
+}
+

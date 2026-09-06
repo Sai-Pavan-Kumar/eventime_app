@@ -30,12 +30,15 @@ import {
   Compass,
   GraduationCap,
   MapPin,
+  WifiOff,
 } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { haptic } from '../lib/haptics';
 import { useAuth } from '../context/AuthContext';
+import { withTimeout } from '../lib/api-resilience';
+import { loadCachedLeaderboard, saveCachedLeaderboard, getMemoryLeaderboard } from '../lib/offline-cache';
 import type { LeaderboardViewRow } from '../types';
 
 const DEFAULT_EXCLUDED_EMAILS = ['p.pavansiri@gmail.com', 'eventime.admin@gmail.com'];
@@ -77,6 +80,25 @@ export default function LeaderboardScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showScoreInfo, setShowScoreInfo] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+
+  // 1. Instant 0ms Cold-Start Hydration from local cache (Stale-While-Revalidate)
+  useEffect(() => {
+    Promise.all([
+      loadCachedLeaderboard('campus'),
+      loadCachedLeaderboard('city'),
+      loadCachedLeaderboard('all_time'),
+    ]).then(([campusCached, cityCached, allTimeCached]) => {
+      if (campusCached?.length || cityCached?.length || allTimeCached?.length) {
+        setCohortData({
+          campus: campusCached || [],
+          city: cityCached || [],
+          all_time: allTimeCached || [],
+        });
+        setIsLoading(false);
+      }
+    });
+  }, []);
 
   // Dynamic Cohort Tabs based on user role (strictly role-gated)
   const cohortTabs = useMemo(() => {
@@ -100,12 +122,15 @@ export default function LeaderboardScreen() {
       try {
         const cityTarget = cityOverride || selectedLeaderboardCity;
 
-        // 1. Check if leaderboard is enabled in app_settings
-        const { data: settings } = await supabase
-          .from('app_settings')
-          .select('leaderboard_enabled')
-          .eq('id', 1)
-          .maybeSingle();
+        // 1. Check if leaderboard is enabled in app_settings (protected with 8s timeout)
+        const { data: settings } = await withTimeout(
+          supabase
+            .from('app_settings')
+            .select('leaderboard_enabled')
+            .eq('id', 1)
+            .maybeSingle(),
+          8000
+        );
 
         if (settings && settings.leaderboard_enabled === false) {
           setIsLeaderboardEnabled(false);
@@ -122,34 +147,42 @@ export default function LeaderboardScreen() {
 
         const allExcludedEmails = Array.from(new Set([...DEFAULT_EXCLUDED_EMAILS, ...envEmailList]));
 
-        const { data: excludedProfiles } = await supabase
-          .from('profiles')
-          .select('id, username, email')
-          .in('email', allExcludedEmails);
+        const { data: excludedProfiles } = await withTimeout(
+          supabase
+            .from('profiles')
+            .select('id, username, email')
+            .in('email', allExcludedEmails),
+          8000
+        );
 
         const excludedIds = new Set<string>((excludedProfiles || []).map((p) => p.id));
 
-        const { data: excludedByUsername } = await supabase
-          .from('profiles')
-          .select('id, username')
-          .in('username', DEFAULT_EXCLUDED_USERNAMES);
+        const { data: excludedByUsername } = await withTimeout(
+          supabase
+            .from('profiles')
+            .select('id, username')
+            .in('username', DEFAULT_EXCLUDED_USERNAMES),
+          8000
+        );
 
         (excludedByUsername || []).forEach((p) => excludedIds.add(p.id));
 
         let cleanRows: LeaderboardViewRow[] = [];
 
-        // 3. Cohort-Filtered Queries
         // 3. Cohort-Filtered Queries (Only active contributors > 150 ET)
         if (cohort === 'campus') {
           if (isStudent && userCollege) {
             // Student: query campus-matched profiles from leaderboard_view with active score > 150 ET
-            const { data: collegeProfs, error: collegeErr } = await supabase
-              .from('leaderboard_view')
-              .select('*')
-              .ilike('college', `%${userCollege.trim()}%`)
-              .gt('et_score', 150)
-              .order('et_score', { ascending: false })
-              .limit(50);
+            const { data: collegeProfs, error: collegeErr } = await withTimeout(
+              supabase
+                .from('leaderboard_view')
+                .select('*')
+                .ilike('college', `%${userCollege.trim()}%`)
+                .gt('et_score', 150)
+                .order('et_score', { ascending: false })
+                .limit(50),
+              8000
+            );
 
             if (!collegeErr && collegeProfs && collegeProfs.length > 0) {
               cleanRows = collegeProfs
@@ -161,12 +194,15 @@ export default function LeaderboardScreen() {
             }
           } else {
             // Professional or curator: query active curators/professionals > 150 ET
-            const { data: proProfs, error: proErr } = await supabase
-              .from('leaderboard_view')
-              .select('*')
-              .gt('et_score', 150)
-              .order('et_score', { ascending: false })
-              .limit(50);
+            const { data: proProfs, error: proErr } = await withTimeout(
+              supabase
+                .from('leaderboard_view')
+                .select('*')
+                .gt('et_score', 150)
+                .order('et_score', { ascending: false })
+                .limit(50),
+              8000
+            );
 
             if (!proErr && proProfs && proProfs.length > 0) {
               cleanRows = proProfs
@@ -179,20 +215,26 @@ export default function LeaderboardScreen() {
           }
         } else if (cohort === 'city') {
           if (cityTarget) {
-            const { data: cityProfs, error: cityErr } = await supabase
-              .from('profiles')
-              .select('id, preferred_cities')
-              .contains('preferred_cities', [cityTarget]);
+            const { data: cityProfs, error: cityErr } = await withTimeout(
+              supabase
+                .from('profiles')
+                .select('id, preferred_cities')
+                .contains('preferred_cities', [cityTarget]),
+              8000
+            );
 
             if (!cityErr && cityProfs && cityProfs.length > 0) {
               const cityUserIds = cityProfs.map((p) => p.id);
-              const { data: viewProfs } = await supabase
-                .from('leaderboard_view')
-                .select('*')
-                .in('user_id', cityUserIds)
-                .gt('et_score', 150)
-                .order('et_score', { ascending: false })
-                .limit(50);
+              const { data: viewProfs } = await withTimeout(
+                supabase
+                  .from('leaderboard_view')
+                  .select('*')
+                  .in('user_id', cityUserIds)
+                  .gt('et_score', 150)
+                  .order('et_score', { ascending: false })
+                  .limit(50),
+                8000
+              );
 
               if (viewProfs && viewProfs.length > 0) {
                 cleanRows = viewProfs
@@ -205,12 +247,15 @@ export default function LeaderboardScreen() {
             }
           }
         } else if (cohort === 'all_time') {
-          const { data, error } = await supabase
-            .from('leaderboard_view')
-            .select('*')
-            .gt('et_score', 150)
-            .order('et_score', { ascending: false })
-            .limit(100);
+          const { data, error } = await withTimeout(
+            supabase
+              .from('leaderboard_view')
+              .select('*')
+              .gt('et_score', 150)
+              .order('et_score', { ascending: false })
+              .limit(100),
+            8000
+          );
 
           if (!error && data && data.length > 0) {
             cleanRows = data
@@ -223,10 +268,16 @@ export default function LeaderboardScreen() {
           }
         }
 
+        if (cleanRows.length > 0) {
+          saveCachedLeaderboard(cohort, cleanRows);
+        }
+        setIsOffline(false);
         return cleanRows;
       } catch (err) {
-        console.error('Fetch leaderboard error:', err);
-        return [];
+        console.warn(`[Leaderboard] Fetch error for ${cohort}, falling back to local cache:`, err);
+        setIsOffline(true);
+        const cached = await loadCachedLeaderboard(cohort);
+        return cached || [];
       }
     },
     [isStudent, userCollege, selectedLeaderboardCity]
@@ -262,7 +313,14 @@ export default function LeaderboardScreen() {
   );
 
   useEffect(() => {
-    setIsLoading(true);
+    // Only show full loading spinner if we don't already have cached rows
+    if (
+      cohortData.campus.length === 0 &&
+      cohortData.city.length === 0 &&
+      cohortData.all_time.length === 0
+    ) {
+      setIsLoading(true);
+    }
     fetchAllCohorts();
   }, [fetchAllCohorts]);
 
@@ -385,6 +443,14 @@ export default function LeaderboardScreen() {
           );
         })}
       </View>
+
+      {/* Offline Mode Banner */}
+      {isOffline && (
+        <View style={styles.offlineBanner}>
+          <WifiOff size={13} color="#64748B" />
+          <Text style={styles.offlineBannerText}>Offline Mode • Showing cached rankings</Text>
+        </View>
+      )}
 
       {/* Horizontally Swipeable Cohort Pager */}
       {isLoading ? (
@@ -1446,5 +1512,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit-Bold',
     fontSize: 14,
     color: '#10B981',
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  offlineBannerText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 12,
+    color: '#64748B',
   },
 });

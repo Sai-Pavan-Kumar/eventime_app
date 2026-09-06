@@ -40,6 +40,7 @@ import {
   Hourglass,
   Tag,
   Info,
+  WifiOff,
 } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
@@ -47,6 +48,7 @@ import { getCategoryConfig } from '../lib/category-config';
 import { APP_ASSETS, getCategoryPoster } from '../lib/asset-registry';
 import { scheduleEventReminder, cancelEventReminder, sendRemotePushNotification } from '../lib/notifications';
 import { withTimeout } from '../lib/api-resilience';
+import { loadCachedEventDetail, saveCachedEventDetail, loadCachedSavedEventIds } from '../lib/offline-cache';
 import { useAuth } from '../context/AuthContext';
 import { haptic } from '../lib/haptics';
 import { EventCard } from '../components/EventCard';
@@ -64,21 +66,51 @@ export default function EventDetailScreen() {
   const navigation = useNavigation<any>();
   const { user, profile } = useAuth();
 
-  const { slug, id, eventId } = (route.params || {}) as any;
+  const { slug, id, eventId, initialEvent } = (route.params || {}) as any;
 
-  const [event, setEvent] = useState<(EventRow & { colleges?: { name: string }; profiles?: { username?: string; full_name?: string } }) | null>(null);
+  const [event, setEvent] = useState<(EventRow & { colleges?: { name: string }; profiles?: { username?: string; full_name?: string } }) | null>(initialEvent || null);
   const [similarEvents, setSimilarEvents] = useState<EventRow[]>([]);
   const [isSaved, setIsSaved] = useState(false);
   const [isInterested, setIsInterested] = useState(false);
-  const [interestCount, setInterestCount] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [interestCount, setInterestCount] = useState<number>(
+    (initialEvent as any)?.interested_events?.[0]?.count ?? (initialEvent as any)?.interested_count ?? 0
+  );
+  const [isLoading, setIsLoading] = useState(!initialEvent);
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingInterest, setIsUpdatingInterest] = useState(false);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
 
   // Report Modal state
   const [showReportModal, setShowReportModal] = useState(false);
   const [isReportedByMe, setIsReportedByMe] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  // 1. Instant 0ms Cold-Start Hydration from local cache if initialEvent wasn't passed
+  useEffect(() => {
+    const target = eventId || id || slug;
+    if (!event && target) {
+      loadCachedEventDetail(target).then((cached) => {
+        if (cached) {
+          setEvent(cached as any);
+          setIsLoading(false);
+        }
+      });
+    } else if (initialEvent) {
+      setIsLoading(false);
+    }
+  }, [eventId, id, slug, initialEvent]);
+
+  // Check saved state from local cache (works offline)
+  useEffect(() => {
+    const targetId = event?.id || id || eventId;
+    if (targetId && user) {
+      loadCachedSavedEventIds().then((savedIds) => {
+        if (savedIds && savedIds.has(targetId)) {
+          setIsSaved(true);
+        }
+      });
+    }
+  }, [event?.id, id, eventId, user]);
 
   const isStudent = profile?.user_type === 'student';
   const userCollege = profile?.college || event?.colleges?.name || '';
@@ -155,9 +187,12 @@ export default function EventDetailScreen() {
 
       const { data, error } = await withTimeout(query.maybeSingle(), 8000);
       if (error) throw error;
-      setEvent(data as any);
 
       if (data) {
+        setEvent(data as any);
+        saveCachedEventDetail(data as any);
+        setIsOfflineMode(false);
+
         const initialCount = (data as any).interested_events?.[0]?.count ?? (data as any).interested_count ?? 0;
         setInterestCount(initialCount);
 
@@ -193,11 +228,19 @@ export default function EventDetailScreen() {
         }
       }
     } catch (err) {
-      console.error('[EventDetail] Fetch error:', err);
+      console.warn('[EventDetail] Fetch error, keeping cached event data:', err);
+      setIsOfflineMode(true);
+      const target = eventId || id || slug;
+      if (!event && target) {
+        const cached = await loadCachedEventDetail(target);
+        if (cached) {
+          setEvent(cached as any);
+        }
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [id, slug, eventId, user, fetchSimilarEvents]);
+  }, [id, slug, eventId, user, fetchSimilarEvents, event]);
 
   useEffect(() => {
     fetchEvent();
@@ -546,6 +589,14 @@ export default function EventDetailScreen() {
           )}
         </View>
       </View>
+
+      {/* Offline Mode Banner */}
+      {isOfflineMode && (
+        <View style={styles.offlineBanner}>
+          <WifiOff size={13} color="#64748B" />
+          <Text style={styles.offlineBannerText}>Offline Mode • Showing cached details</Text>
+        </View>
+      )}
 
       {/* Floating Auto-Closing Notice for Host Actions */}
       {ownerNotice && (
@@ -1586,5 +1637,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 14,
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  offlineBannerText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 12,
+    color: '#64748B',
   },
 });

@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase';
 import { parseEventDateString, formatEventTime } from '../lib/utils/date';
 import { scheduleEventReminder, cancelEventReminder } from '../lib/notifications';
 import { haptic } from '../lib/haptics';
+import { saveCachedEventDetail, loadCachedSavedEventIds, saveCachedSavedEventIds } from '../lib/offline-cache';
 import type { EventRow } from '../types';
 
 export interface EventCardProps {
@@ -51,6 +52,7 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
   const category = props.event?.category || props.category || 'General';
   const dateString = props.event?.date_string || props.dateString || '';
   const startTime = props.event?.start_time || props.startTime || undefined;
+  const endTime = props.event?.end_time || props.endTime || undefined;
   const location = props.event?.location || props.location || '';
   const city = props.event?.city || props.city || '';
   const collegeName = props.event?.college_name || (props.event as any)?.colleges?.name || undefined;
@@ -136,7 +138,32 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
     if (props.onPress) {
       props.onPress();
     } else if (id || slug) {
-      navigation.navigate('EventDetail', { id, slug, eventId: id });
+      const eventData = (props.event || {
+        id,
+        slug,
+        title,
+        category,
+        date_string: dateString,
+        start_time: startTime,
+        end_time: endTime,
+        location,
+        city,
+        poster_url: posterUrl,
+        organizer_name: organizerName,
+        is_free: isFree,
+        is_featured: isFeatured,
+      }) as EventRow;
+
+      if (eventData) {
+        saveCachedEventDetail(eventData);
+      }
+
+      navigation.navigate('EventDetail', {
+        id,
+        slug,
+        eventId: id,
+        initialEvent: eventData,
+      });
     }
   };
 
@@ -187,6 +214,19 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
     setIsSaved(nextState);
     setIsSaving(true);
 
+    // Optimistically update local cached saved IDs immediately
+    if (id) {
+      loadCachedSavedEventIds().then((cachedSet) => {
+        const idSet = cachedSet ? new Set(cachedSet) : new Set<string>();
+        if (nextState) {
+          idSet.add(id);
+        } else {
+          idSet.delete(id);
+        }
+        saveCachedSavedEventIds(idSet);
+      });
+    }
+
     try {
       if (nextState) {
         await supabase.from('saved_events').insert({
@@ -208,11 +248,23 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
           .eq('event_id', id);
         cancelEventReminder(id);
       }
-      if (props.onSaveToggle) {
+      if (props.onSaveToggle && id) {
         props.onSaveToggle(id, nextState);
       }
     } catch (err) {
       setIsSaved(!nextState);
+      // Rollback local cache if network definitively failed
+      if (id) {
+        loadCachedSavedEventIds().then((cachedSet) => {
+          const idSet = cachedSet ? new Set(cachedSet) : new Set<string>();
+          if (!nextState) {
+            idSet.add(id);
+          } else {
+            idSet.delete(id);
+          }
+          saveCachedSavedEventIds(idSet);
+        });
+      }
       console.error('[EventCard] Save error:', err);
     } finally {
       setIsSaving(false);

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { withTimeout } from './api-resilience';
 
 /**
  * Uploads an image from React Native local file URI to Cloudflare R2 via Web API presigned URL.
@@ -18,15 +19,19 @@ export async function uploadEventPoster(
     const contentType = fileExt === 'png' ? 'image/png' : fileExt === 'webp' ? 'image/webp' : 'image/jpeg';
     
     // Get file info (size)
-    const fileRes = await fetch(localUri);
+    const fileRes = await withTimeout(
+      fetch(localUri),
+      10000,
+      'Could not read local poster file. Please try selecting the image again.'
+    );
     const blob = await fileRes.blob();
     const fileSize = blob.size;
 
-    // Enforce 5MB upload limit to prevent OOM crashes on mobile
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    // Enforce 2MB upload limit to conserve mobile data and guarantee fast uploads on 2G/3G
+    const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
     if (fileSize > MAX_FILE_SIZE) {
       const sizeMb = (fileSize / (1024 * 1024)).toFixed(1);
-      throw new Error(`Poster size (${sizeMb}MB) exceeds the 5MB limit. Please choose a smaller or compressed image.`);
+      throw new Error(`Poster size (${sizeMb}MB) exceeds the 2MB limit. Please choose a smaller or compressed image.`);
     }
 
     // Get current auth session to pass to the Next.js API
@@ -42,19 +47,23 @@ export async function uploadEventPoster(
       JSON.stringify(['access_token', 'refresh_token', session.access_token, session.refresh_token])
     );
 
-    // 1. Get Presigned URL from Web API
-    const presignRes = await fetch('https://eventime.thesurfboard.in/api/upload/presign', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cookie': `${cookieName}=${cookieValue}`,
-      },
-      body: JSON.stringify({
-        fileName,
-        contentType,
-        fileSize,
+    // 1. Get Presigned URL from Web API (with 20s timeout guard)
+    const presignRes = await withTimeout(
+      fetch('https://eventime.thesurfboard.in/api/upload/presign', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cookie': `${cookieName}=${cookieValue}`,
+        },
+        body: JSON.stringify({
+          fileName,
+          contentType,
+          fileSize,
+        }),
       }),
-    });
+      20000,
+      'Upload server timed out. Please check your internet connection and try again.'
+    );
 
     if (!presignRes.ok) {
       const err = await presignRes.text();
@@ -63,14 +72,18 @@ export async function uploadEventPoster(
 
     const { uploadUrl, publicUrl } = await presignRes.json();
 
-    // 2. Upload to Cloudflare R2
-    const uploadRes = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': contentType,
-      },
-      body: blob,
-    });
+    // 2. Upload to Cloudflare R2 (with 25s timeout guard)
+    const uploadRes = await withTimeout(
+      fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': contentType,
+        },
+        body: blob,
+      }),
+      25000,
+      'Poster upload timed out. Your connection may be too slow. Please retry.'
+    );
 
     if (!uploadRes.ok) {
       throw new Error('Cloud storage upload failed. Please check your network connection and try again.');
@@ -80,6 +93,6 @@ export async function uploadEventPoster(
   } catch (error: any) {
     console.error('[Storage] Upload error:', error);
     // Never return local file:// URI to prevent corrupting remote database with unreachable phone paths
-    throw new Error(error?.message || 'Could not upload poster image.');
+    throw new Error(error?.message || 'Could not upload poster image. Please check your internet connection.');
   }
 }

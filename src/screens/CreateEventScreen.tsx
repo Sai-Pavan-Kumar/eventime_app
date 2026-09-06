@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -62,6 +63,7 @@ import { CuratorCelebrationModal, CelebrationEventData } from '../components/Cur
 import { formatEventDateDetailed, parseEventDateString } from '../lib/utils/date';
 import type { RootStackParamList } from '../types';
 
+const DRAFT_STORAGE_KEY = '@eventime_create_event_draft_v1';
 const BRANCH_OPTIONS = ['All Branches', ...INDIAN_COLLEGE_BRANCHES];
 const COLLEGE_YEAR_OPTIONS = [
   'All Years',
@@ -622,6 +624,126 @@ export default function CreateEventScreen() {
     )
   );
 
+  // 1. Auto-restore draft on mount if not editing an existing event
+  useEffect(() => {
+    if (!editId && !initialEvent) {
+      AsyncStorage.getItem(DRAFT_STORAGE_KEY).then((raw) => {
+        if (raw) {
+          try {
+            const draft = JSON.parse(raw);
+            if (draft && (draft.title || draft.description || draft.dateString || draft.posterUri)) {
+              if (draft.title) setTitle(draft.title);
+              if (draft.regLink) setRegLink(draft.regLink);
+              if (draft.category) setCategory(draft.category);
+              if (draft.description) setDescription(draft.description);
+              if (draft.dateString) setDateString(draft.dateString);
+              if (draft.hasEndDate !== undefined) setHasEndDate(draft.hasEndDate);
+              if (draft.endDateString) setEndDateString(draft.endDateString);
+              if (draft.startTime) setStartTime(draft.startTime);
+              if (draft.hasEndTime !== undefined) setHasEndTime(draft.hasEndTime);
+              if (draft.endTime) setEndTime(draft.endTime);
+              if (draft.isVirtual !== undefined) setIsVirtual(draft.isVirtual);
+              if (draft.city) setCity(draft.city);
+              if (draft.location) setLocation(draft.location);
+              if (draft.isFree !== undefined) setIsFree(draft.isFree);
+              if (draft.price) setPrice(draft.price);
+              if (draft.posterUri) setPosterUri(draft.posterUri);
+              if (draft.organizerName) setOrganizerName(draft.organizerName);
+              if (draft.website) setWebsite(draft.website);
+              if (draft.prizes) setPrizes(draft.prizes);
+              if (draft.teamSize) setTeamSize(draft.teamSize);
+              if (draft.registrationDeadline) setRegistrationDeadline(draft.registrationDeadline);
+              if (draft.collegeOnly !== undefined) setCollegeOnly(draft.collegeOnly);
+              if (draft.collegeName) setCollegeName(draft.collegeName);
+              if (draft.collegeId) setCollegeId(draft.collegeId);
+              if (draft.collegeBranch) setCollegeBranch(draft.collegeBranch);
+              if (draft.collegeYear) setCollegeYear(draft.collegeYear);
+            }
+          } catch (e) {
+            console.warn('[CreateEvent] Failed to parse draft:', e);
+          }
+        }
+      });
+    }
+  }, [editId, initialEvent]);
+
+  // 2. Debounced auto-save draft to AsyncStorage on user input
+  const draftTimerRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    if (editId || isSubmitting) return;
+
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      if (title.trim() || description.trim() || dateString.trim() || posterUri || regLink.trim()) {
+        const draftPayload = {
+          title,
+          regLink,
+          category,
+          description,
+          dateString,
+          hasEndDate,
+          endDateString,
+          startTime,
+          hasEndTime,
+          endTime,
+          isVirtual,
+          city,
+          location,
+          isFree,
+          price,
+          posterUri,
+          organizerName,
+          website,
+          prizes,
+          teamSize,
+          registrationDeadline,
+          collegeOnly,
+          collegeName,
+          collegeId,
+          collegeBranch,
+          collegeYear,
+          updatedAt: Date.now(),
+        };
+        AsyncStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftPayload)).catch((e) => {
+          console.warn('[CreateEvent] Failed to save draft:', e);
+        });
+      }
+    }, 800);
+
+    return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    };
+  }, [
+    editId,
+    isSubmitting,
+    title,
+    regLink,
+    category,
+    description,
+    dateString,
+    hasEndDate,
+    endDateString,
+    startTime,
+    hasEndTime,
+    endTime,
+    isVirtual,
+    city,
+    location,
+    isFree,
+    price,
+    posterUri,
+    organizerName,
+    website,
+    prizes,
+    teamSize,
+    registrationDeadline,
+    collegeOnly,
+    collegeName,
+    collegeId,
+    collegeBranch,
+    collegeYear,
+  ]);
+
   const handleExitPress = useCallback(() => {
     if (step === 1) {
       setStep(0);
@@ -895,15 +1017,15 @@ export default function CreateEventScreen() {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1], // Exactly matching 1:1 square ratio from website
-      quality: 0.8,
+      quality: 0.65, // Pre-compressed to ~200-300KB for lightning-fast uploads on 2G/3G networks
     });
 
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+      if (asset.fileSize && asset.fileSize > 2 * 1024 * 1024) {
         Alert.alert(
           'Image Too Large',
-          'Please select an image smaller than 5MB to ensure fast loading on mobile networks.'
+          'Please select an image smaller than 2MB to ensure fast loading on mobile networks.'
         );
         return;
       }
@@ -1268,14 +1390,24 @@ export default function CreateEventScreen() {
           isTrusted: isTrusted || isAdmin,
         });
         setShowCelebrationModal(true);
+        // Clear saved draft from local storage upon successful publish
+        AsyncStorage.removeItem(DRAFT_STORAGE_KEY).catch(() => {});
       }
     } catch (err: any) {
       console.error('[CreateEvent] Error:', err);
       const isDuplicateLink = err?.code === '23505' && err?.message?.includes('unique_registration_link');
+      const isNetworkError =
+        err?.message?.includes('network') ||
+        err?.message?.includes('timed out') ||
+        err?.message?.includes('connection') ||
+        err?.message?.includes('offline');
+
       Alert.alert(
-        'Submission Error',
+        isNetworkError ? 'Network Disconnected' : 'Submission Error',
         isDuplicateLink
           ? 'This event link has already been posted by someone else.'
+          : isNetworkError
+          ? 'Could not connect to the server. All your event details and poster are safely saved as a draft on your device. Reconnect to the internet and tap Publish again.'
           : err?.message || 'Could not submit event. Please try again.'
       );
     } finally {

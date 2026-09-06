@@ -30,7 +30,7 @@ export type RootStackParamList = {
   MainTabs: undefined;
   Login: undefined;
   Onboarding: undefined;
-  EventDetail: { slug?: string; id?: string; eventId?: string };
+  EventDetail: { slug?: string; id?: string; eventId?: string; initialEvent?: Partial<EventRow> };
   CreateEvent: { editId?: string; event?: any };
   SavedEvents: undefined;
   MyPostedEvents: undefined;
