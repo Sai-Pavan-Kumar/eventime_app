@@ -75,6 +75,9 @@ const getTimeOfDayGreeting = (name?: string) => {
   return `Up early, ${userName}?`;
 };
 
+const FEED_EVENT_FIELDS =
+  'id, slug, title, category, date_string, start_time, end_time, location, city, poster_url, organizer_name, is_free, is_featured, is_virtual, college_only, college_id, college_branch, college_year, goal_tags, branch_tags, target_audience, creator_id, created_at, colleges(name), profiles(username, full_name), interested_events(count)';
+
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user, profile } = useAuth();
@@ -259,7 +262,7 @@ export default function HomeScreen() {
       // 1. Fetch public approved events (strictly exclude college-only events)
       let query = supabase
         .from('events')
-        .select('*, colleges(name), profiles(username, full_name), interested_events(count)')
+        .select(FEED_EVENT_FIELDS)
         .eq('status', 'approved')
         .or('college_only.is.null,college_only.eq.false');
 
@@ -324,7 +327,7 @@ export default function HomeScreen() {
 
       let query = supabase
         .from('events')
-        .select('*, colleges(name), profiles(username, full_name), interested_events(count)')
+        .select(FEED_EVENT_FIELDS)
         .eq('status', 'approved')
         .eq('college_id', profile.college_id);
 

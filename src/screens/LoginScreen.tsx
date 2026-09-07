@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -42,6 +42,15 @@ export default function LoginScreen() {
   const [attempts, setAttempts] = useState(0);
   const [isLockedOut, setIsLockedOut] = useState(false);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
+  const lockoutTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (lockoutTimerRef.current) {
+        clearInterval(lockoutTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleGoogleLogin = async () => {
     if (!hasConsented) {
@@ -133,10 +142,17 @@ export default function LoginScreen() {
           setIsLockedOut(true);
           setLockoutSeconds(cooldownSeconds);
 
-          const interval = setInterval(() => {
+          if (lockoutTimerRef.current) {
+            clearInterval(lockoutTimerRef.current);
+          }
+
+          lockoutTimerRef.current = setInterval(() => {
             setLockoutSeconds((prev) => {
               if (prev <= 1) {
-                clearInterval(interval);
+                if (lockoutTimerRef.current) {
+                  clearInterval(lockoutTimerRef.current);
+                  lockoutTimerRef.current = null;
+                }
                 setIsLockedOut(false);
                 return 0;
               }

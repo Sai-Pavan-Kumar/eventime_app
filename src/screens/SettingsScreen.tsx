@@ -454,7 +454,12 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>Basic Info</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Full Name</Text>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Full Name</Text>
+              <Text style={[styles.charCountText, (fullName || "").length >= 50 && styles.charCountLimit]}>
+                {(fullName || "").length}/50
+              </Text>
+            </View>
             <TextInput
               style={styles.input}
               value={fullName}
@@ -468,11 +473,15 @@ export default function SettingsScreen() {
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <Text style={styles.label}>Username</Text>
-              {isUsernameLocked && (
+              {isUsernameLocked ? (
                 <View style={styles.lockedPill}>
                   <Lock size={10} color="#64748B" />
                   <Text style={styles.lockedPillText}>Permanent</Text>
                 </View>
+              ) : (
+                <Text style={[styles.charCountText, (username || "").length >= 12 && styles.charCountLimit]}>
+                  {(username || "").length}/12
+                </Text>
               )}
             </View>
 
@@ -1575,5 +1584,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Switzer-Bold',
     fontSize: 11,
     color: '#B91C1C',
+  },
+  charCountText: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  charCountLimit: {
+    color: '#EF4444',
+    fontFamily: 'Switzer-Bold',
   },
 });

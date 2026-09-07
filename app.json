@@ -3,7 +3,7 @@
     "name": "EvenTime",
     "slug": "eventime",
     "scheme": "eventime",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -23,7 +23,7 @@
         "backgroundColor": "#6C47FF"
       },
       "package": "com.eventime.app",
-      "versionCode": 5,
+      "versionCode": 6,
       "softwareKeyboardLayoutMode": "pan",
       "googleServicesFile": "./google-services.json",
       "permissions": [
@@ -54,22 +54,16 @@
               "scheme": "https",
               "host": "eventime.thesurfboard.in",
               "pathPrefix": "/curator"
-            },
-            {
-              "scheme": "https",
-              "host": "eventime.in",
-              "pathPrefix": "/events"
-            },
-            {
-              "scheme": "https",
-              "host": "eventime.in",
-              "pathPrefix": "/cities"
-            },
-            {
-              "scheme": "https",
-              "host": "eventime.in",
-              "pathPrefix": "/curator"
-            },
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "data": [
             {
               "scheme": "eventime"
             }

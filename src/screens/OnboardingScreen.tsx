@@ -969,7 +969,12 @@ export default function OnboardingScreen() {
           {profileSubStep === 1 && (
             <View style={styles.setupCard}>
               <View style={styles.inputLabelRow}>
-                <Text style={styles.inputLabel}>Curator Username</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={styles.inputLabel}>Curator Username</Text>
+                  <Text style={[styles.charCountText, username.length >= 12 && styles.charCountLimit]}>
+                    {username.length}/12
+                  </Text>
+                </View>
                 <View style={styles.permanentPill}>
                   <Lock size={10} color="#6C47FF" />
                   <Text style={styles.permanentPillText}>One-Time Setup</Text>
@@ -2421,5 +2426,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Switzer-Bold',
     fontSize: 15,
     color: '#FFFFFF',
+  },
+  charCountText: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  charCountLimit: {
+    color: '#EF4444',
+    fontFamily: 'Switzer-Bold',
   },
 });

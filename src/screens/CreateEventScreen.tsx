@@ -606,6 +606,14 @@ export default function CreateEventScreen() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [duplicateError, setDuplicateError] = useState('');
   const [extractionConfidence, setExtractionConfidence] = useState<number>(0);
+  const [autoFilledFields, setAutoFilledFields] = useState<{
+    title?: boolean;
+    description?: boolean;
+    date?: boolean;
+    location?: boolean;
+    poster?: boolean;
+  }>({});
+  const linkDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState(Boolean(editId && !initialEvent));
@@ -634,6 +642,9 @@ export default function CreateEventScreen() {
     return () => {
       showSub.remove();
       hideSub.remove();
+      if (linkDebounceTimerRef.current) {
+        clearTimeout(linkDebounceTimerRef.current);
+      }
     };
   }, []);
 
@@ -918,12 +929,34 @@ export default function CreateEventScreen() {
     })();
   }, [editId, initialEvent]);
 
-  // Check link validity, partner domain, duplicate, and auto-extraction
-  const checkLink = async (url: string) => {
+  const handleLinkChange = (url: string) => {
     setRegLink(url);
     setDuplicateError('');
     setExtractionConfidence(0);
 
+    if (linkDebounceTimerRef.current) {
+      clearTimeout(linkDebounceTimerRef.current);
+    }
+
+    const trimmed = url.trim();
+    if (!trimmed) {
+      setIsTrusted(false);
+      setAutoFilledFields({});
+      return;
+    }
+
+    // Only process if it has URL characteristics (contains '.' or starts with http)
+    if (!trimmed.includes('.') && !trimmed.startsWith('http')) {
+      return;
+    }
+
+    linkDebounceTimerRef.current = setTimeout(() => {
+      processLink(trimmed);
+    }, 450);
+  };
+
+  // Check link validity, partner domain, duplicate, and auto-extraction
+  const processLink = async (url: string) => {
     const trimmed = url.trim();
     if (!trimmed) {
       setIsTrusted(false);
@@ -1000,11 +1033,20 @@ export default function CreateEventScreen() {
         try {
           setIsExtracting(true);
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000);
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+          // Get active Supabase JWT session token so /api/extract is authorized
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token;
+
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
 
           const res = await fetch('https://eventime.thesurfboard.in/api/extract', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ url: normalizedUrl }),
             signal: controller.signal,
           });
@@ -1012,21 +1054,43 @@ export default function CreateEventScreen() {
 
           if (res.ok) {
             const extracted = await res.json();
-            if (extracted.title && !title) setTitle(extracted.title);
-            if (extracted.description && !description) setDescription(extracted.description);
-            if (extracted.location && !location) setLocation(extracted.location);
-            if (extracted.date && !dateString) {
+            const newAutoFilled: { title?: boolean; description?: boolean; date?: boolean; location?: boolean; poster?: boolean } = {};
+
+            if (extracted.title) {
+              setTitle(extracted.title);
+              newAutoFilled.title = true;
+            }
+            if (extracted.description) {
+              setDescription(extracted.description);
+              newAutoFilled.description = true;
+            }
+            if (extracted.location) {
+              setLocation(extracted.location);
+              newAutoFilled.location = true;
+            }
+            if (extracted.date) {
               const parsed = new Date(extracted.date);
               if (!isNaN(parsed.getTime())) {
                 const yyyy = parsed.getFullYear();
                 const mm = String(parsed.getMonth() + 1).padStart(2, '0');
                 const dd = String(parsed.getDate()).padStart(2, '0');
                 setDateString(`${yyyy}-${mm}-${dd}`);
+                newAutoFilled.date = true;
               }
             }
+            if (extracted.image && !posterUri) {
+              setPosterUri(extracted.image);
+              newAutoFilled.poster = true;
+            }
+            if (extracted.finalUrl && extracted.finalUrl !== normalizedUrl) {
+              setRegLink(extracted.finalUrl);
+            }
+
             // Only upgrade isTrusted if server explicitly confirms, NEVER downgrade if already trusted
             if (extracted.isTrusted === true) setIsTrusted(true);
-            setExtractionConfidence(extracted.title ? 0.9 : 0.5);
+            const conf = extracted.confidence ?? (extracted.title ? 0.9 : 0.5);
+            setExtractionConfidence(conf);
+            setAutoFilledFields(newAutoFilled);
           }
         } catch {
           // Extraction fallback to manual input
@@ -1553,7 +1617,7 @@ export default function CreateEventScreen() {
                     placeholder="Paste event link (lu.ma, eventbrite, unstop, etc.)"
                     placeholderTextColor={theme.colors.textMuted}
                     value={regLink}
-                    onChangeText={checkLink}
+                    onChangeText={handleLinkChange}
                     autoCapitalize="none"
                     keyboardType="url"
                     maxLength={500}
@@ -1608,9 +1672,22 @@ export default function CreateEventScreen() {
 
               {/* 2. Event Title * */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>
-                  Event Title <Text style={{ color: '#EF4444' }}>*</Text>
-                </Text>
+                <View style={styles.labelRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.label, { marginBottom: 0 }]}>
+                      Event Title <Text style={{ color: '#EF4444' }}>*</Text>
+                    </Text>
+                    {autoFilledFields.title ? (
+                      <View style={styles.autoFilledBadge}>
+                        <Sparkles size={10} color="#047857" />
+                        <Text style={styles.autoFilledText}>Auto-filled</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={[styles.charCountText, title.length >= 100 && styles.charCountLimit]}>
+                    {title.length}/100
+                  </Text>
+                </View>
                 <TextInput
                   style={styles.inputPlain}
                   placeholder="e.g. AI Hackathon 2026"
@@ -1781,9 +1858,22 @@ export default function CreateEventScreen() {
 
               {/* 5. Description * */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>
-                  Description <Text style={{ color: '#EF4444' }}>*</Text>
-                </Text>
+                <View style={styles.labelRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.label, { marginBottom: 0 }]}>
+                      Description <Text style={{ color: '#EF4444' }}>*</Text>
+                    </Text>
+                    {autoFilledFields.description ? (
+                      <View style={styles.autoFilledBadge}>
+                        <Sparkles size={10} color="#047857" />
+                        <Text style={styles.autoFilledText}>Auto-filled</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={[styles.charCountText, description.length >= 3000 && styles.charCountLimit]}>
+                    {description.length}/3000
+                  </Text>
+                </View>
                 <TextInput
                   style={[styles.inputPlain, styles.descriptionInput]}
                   placeholder="What is this event about?"
@@ -1801,9 +1891,17 @@ export default function CreateEventScreen() {
                 {/* Event Date */}
                 <View style={styles.inputGroup}>
                   <View style={styles.sectionHeaderRow}>
-                    <Text style={styles.label}>
-                      Event Date <Text style={{ color: '#EF4444' }}>*</Text>
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={styles.label}>
+                        Event Date <Text style={{ color: '#EF4444' }}>*</Text>
+                      </Text>
+                      {autoFilledFields.date ? (
+                        <View style={styles.autoFilledBadge}>
+                          <Sparkles size={10} color="#047857" />
+                          <Text style={styles.autoFilledText}>Auto-filled</Text>
+                        </View>
+                      ) : null}
+                    </View>
                     <TouchableOpacity
                       style={styles.toggleTextBtn}
                       onPress={() => setHasEndDate(!hasEndDate)}
@@ -1963,7 +2061,13 @@ export default function CreateEventScreen() {
                     </TouchableOpacity>
 
                     {/* Venue Address (Optional) */}
-                    <View style={{ marginTop: 10 }}>
+                    <View style={{ marginTop: 12 }}>
+                      <View style={styles.labelRow}>
+                        <Text style={[styles.label, { marginBottom: 0 }]}>Venue Address (Optional)</Text>
+                        <Text style={[styles.charCountText, location.length >= 150 && styles.charCountLimit]}>
+                          {location.length}/150
+                        </Text>
+                      </View>
                       <TextInput
                         style={styles.inputPlain}
                         placeholder="Venue Address / Campus Landmark (Optional)"
@@ -2098,9 +2202,17 @@ export default function CreateEventScreen() {
 
               {/* Featured Poster Upload (1:1 Ratio Required for Featured) */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>
-                  1:1 Square Featured Poster <Text style={{ color: '#EF4444' }}>*</Text>
-                </Text>
+                <View style={styles.labelRow}>
+                  <Text style={[styles.label, { marginBottom: 0 }]}>
+                    1:1 Square Featured Poster <Text style={{ color: '#EF4444' }}>*</Text>
+                  </Text>
+                  {autoFilledFields.poster ? (
+                    <View style={styles.autoFilledBadge}>
+                      <Sparkles size={10} color="#047857" />
+                      <Text style={styles.autoFilledText}>Auto-filled from link</Text>
+                    </View>
+                  ) : null}
+                </View>
 
                 {posterUri ? (
                   <View style={styles.posterSquareContainer}>
@@ -2120,7 +2232,12 @@ export default function CreateEventScreen() {
 
               {/* Advanced Fields */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Organizer / Club Name</Text>
+                <View style={styles.labelRow}>
+                  <Text style={[styles.label, { marginBottom: 0 }]}>Organizer / Club Name</Text>
+                  <Text style={[styles.charCountText, organizerName.length >= 80 && styles.charCountLimit]}>
+                    {organizerName.length}/80
+                  </Text>
+                </View>
                 <TextInput
                   style={styles.inputPlain}
                   placeholder="e.g. Google Developer Group"
@@ -2146,7 +2263,12 @@ export default function CreateEventScreen() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Prizes / Rewards (Optional)</Text>
+                <View style={styles.labelRow}>
+                  <Text style={[styles.label, { marginBottom: 0 }]}>Prizes / Rewards (Optional)</Text>
+                  <Text style={[styles.charCountText, prizes.length >= 120 && styles.charCountLimit]}>
+                    {prizes.length}/120
+                  </Text>
+                </View>
                 <TextInput
                   style={styles.inputPlain}
                   placeholder="e.g. ₹1,00,000 Prize Pool"
@@ -2719,6 +2841,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#94A3B8',
   },
+  charCountText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  charCountLimit: {
+    color: '#EF4444',
+    fontFamily: 'Switzer-Bold',
+  },
   subLabel: {
     fontFamily: 'Switzer-Bold',
     fontSize: 12,
@@ -3227,6 +3358,23 @@ const styles = StyleSheet.create({
     fontFamily: 'Switzer-Medium',
     flex: 1,
     fontSize: 12,
+    color: '#047857',
+  },
+  autoFilledBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: '#A7F3D0',
+    marginLeft: 8,
+  },
+  autoFilledText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 10.5,
     color: '#047857',
   },
   trustWarningBox: {

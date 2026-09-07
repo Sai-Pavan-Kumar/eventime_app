@@ -83,9 +83,12 @@ export default function SearchScreen() {
   // Fetch all approved events with relations
   const fetchAllEvents = useCallback(async () => {
     try {
+      const SEARCH_EVENT_FIELDS =
+        'id, slug, title, category, date_string, start_time, end_time, location, city, poster_url, organizer_name, is_free, is_featured, is_virtual, college_only, college_id, goal_tags, branch_tags, target_audience, description, creator_id, created_at, colleges(name), profiles(username, full_name), interested_events(count)';
+
       const query = supabase
         .from('events')
-        .select('*, colleges(name), profiles(username, full_name), interested_events(count)')
+        .select(SEARCH_EVENT_FIELDS)
         .eq('status', 'approved')
         .or('college_only.is.null,college_only.eq.false')
         .order('created_at', { ascending: false });

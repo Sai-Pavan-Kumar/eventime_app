@@ -36,7 +36,6 @@ import {
   Edit3,
   Building,
   GraduationCap,
-  Sparkles,
   Hourglass,
   Tag,
   Info,
@@ -136,9 +135,12 @@ export default function EventDetailScreen() {
 
   const fetchSimilarEvents = useCallback(async (currentEvent: EventRow) => {
     try {
+      const SIMILAR_EVENT_FIELDS =
+        'id, slug, title, category, date_string, start_time, end_time, location, city, poster_url, organizer_name, is_free, is_featured, is_virtual, colleges(name)';
+
       let query = supabase
         .from('events')
-        .select('*, colleges(name)')
+        .select(SIMILAR_EVENT_FIELDS)
         .eq('status', 'approved')
         .neq('id', currentEvent.id)
         .limit(6);
@@ -151,18 +153,18 @@ export default function EventDetailScreen() {
 
       const { data } = await query;
       if (data && data.length > 0) {
-        setSimilarEvents(data as EventRow[]);
+        setSimilarEvents(data as unknown as EventRow[]);
       } else {
         // Fallback to latest approved events so the stream never reaches a dead end
         const { data: fallback } = await supabase
           .from('events')
-          .select('*, colleges(name)')
+          .select(SIMILAR_EVENT_FIELDS)
           .eq('status', 'approved')
           .neq('id', currentEvent.id)
           .order('created_at', { ascending: false })
           .limit(6);
         if (fallback) {
-          setSimilarEvents(fallback as EventRow[]);
+          setSimilarEvents(fallback as unknown as EventRow[]);
         }
       }
     } catch (e) {
@@ -736,9 +738,7 @@ export default function EventDetailScreen() {
                     : isInterested && styles.socialProofPillActive,
                 ]}
               >
-                {isOwner ? (
-                  <Sparkles size={11} color="#64748B" />
-                ) : (
+                {!isOwner && (
                   <Heart
                     size={12}
                     color={isInterested ? '#FFFFFF' : '#6C47FF'}

@@ -293,6 +293,16 @@ export async function saveCachedLeaderboard(
 // 6. EVENT DETAIL CACHE (0ms Instant Hydration)
 // ==========================================
 
+const MAX_IN_MEMORY_EVENT_DETAILS = 40;
+
+function setBoundedEventDetail(key: string, envelope: CacheEnvelope<EventRow>) {
+  if (memoryCache.eventDetails.size >= MAX_IN_MEMORY_EVENT_DETAILS) {
+    const oldestKey = memoryCache.eventDetails.keys().next().value;
+    if (oldestKey) memoryCache.eventDetails.delete(oldestKey);
+  }
+  memoryCache.eventDetails.set(key, envelope);
+}
+
 export function getMemoryEventDetail(target: string): EventRow | null {
   if (!target) return null;
   return memoryCache.eventDetails.get(target)?.data || null;
@@ -308,9 +318,9 @@ export async function loadCachedEventDetail(target: string): Promise<EventRow | 
     if (!raw) return null;
     const parsed: CacheEnvelope<EventRow> = JSON.parse(raw);
     if (parsed?.data) {
-      memoryCache.eventDetails.set(target, parsed);
-      if (parsed.data.id) memoryCache.eventDetails.set(parsed.data.id, parsed);
-      if (parsed.data.slug) memoryCache.eventDetails.set(parsed.data.slug, parsed);
+      setBoundedEventDetail(target, parsed);
+      if (parsed.data.id) setBoundedEventDetail(parsed.data.id, parsed);
+      if (parsed.data.slug) setBoundedEventDetail(parsed.data.slug, parsed);
       return parsed.data;
     }
   } catch (err) {
@@ -326,8 +336,8 @@ export async function saveCachedEventDetail(event: EventRow): Promise<void> {
     timestamp: Date.now(),
     version: 1,
   };
-  if (event.id) memoryCache.eventDetails.set(event.id, envelope);
-  if (event.slug) memoryCache.eventDetails.set(event.slug, envelope);
+  if (event.id) setBoundedEventDetail(event.id, envelope);
+  if (event.slug) setBoundedEventDetail(event.slug, envelope);
 
   try {
     const serialized = JSON.stringify(envelope);

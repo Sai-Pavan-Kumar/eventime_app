@@ -153,7 +153,9 @@ export default function CuratorProfileScreen() {
           .eq('status', 'approved'),
         supabase
           .from('events')
-          .select('*, interested_events(count), saved_events(count)')
+          .select(
+            'id, slug, title, category, date_string, start_time, end_time, location, city, poster_url, organizer_name, is_free, is_featured, is_virtual, college_only, college_id, goal_tags, branch_tags, target_audience, creator_id, created_at, interested_events(count), saved_events(count)'
+          )
           .eq('creator_id', curatorData.id)
           .eq('status', 'approved')
           .gte('date_string', sixMonthsAgoStr)

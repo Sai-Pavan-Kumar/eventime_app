@@ -44,8 +44,6 @@ const linking = {
     'eventime://',
     'https://eventime.thesurfboard.in',
     'https://www.eventime.thesurfboard.in',
-    'https://eventime.in',
-    'https://www.eventime.in',
   ],
   config: {
     screens: {

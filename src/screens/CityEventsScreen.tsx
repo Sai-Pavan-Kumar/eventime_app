@@ -50,9 +50,12 @@ export default function CityEventsScreen() {
         const from = pageIndex * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
+        const CITY_EVENT_FIELDS =
+          'id, slug, title, category, date_string, start_time, end_time, location, city, poster_url, organizer_name, is_free, is_featured, is_virtual, college_only, college_id, goal_tags, branch_tags, target_audience, creator_id, created_at, colleges(name), profiles(username, full_name), interested_events(count)';
+
         const query = supabase
           .from('events')
-          .select('*, colleges(name), profiles(username, full_name), interested_events(count)')
+          .select(CITY_EVENT_FIELDS)
           .eq('status', 'approved')
           .or('college_only.is.null,college_only.eq.false')
           .ilike('city', city)
@@ -87,7 +90,8 @@ export default function CityEventsScreen() {
           setHasMore(true);
         }
 
-        setEvents((prev) => (pageIndex === 0 ? upcomingBatch : [...prev, ...upcomingBatch]));
+        const batch = upcomingBatch as unknown as EventRow[];
+        setEvents((prev) => (pageIndex === 0 ? batch : [...prev, ...batch]));
       } catch (err) {
         console.error('[CityEventsScreen] Fetch error:', err);
       } finally {
