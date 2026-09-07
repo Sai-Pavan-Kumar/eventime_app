@@ -19,8 +19,6 @@ import { haptic } from '../lib/haptics';
 
 interface PlatformStatsData {
   eventCount: number;
-  liveCityCount: number;
-  liveCities: string[];
   totalCitiesCount: number;
   totalCategoryCount: number;
   userCount: number;
@@ -37,7 +35,6 @@ export default function PlatformStatsScreen() {
       const [
         { count: eventCount },
         { count: userCount },
-        { data: cityData },
       ] = await Promise.all([
         supabase
           .from('events')
@@ -46,28 +43,10 @@ export default function PlatformStatsScreen() {
         supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true }),
-        supabase
-          .from('events')
-          .select('city')
-          .eq('status', 'approved'),
       ]);
-
-      const distinctCitiesSet = new Set<string>();
-      if (cityData) {
-        cityData.forEach((row) => {
-          if (row.city && row.city.trim()) {
-            const c = row.city.trim();
-            distinctCitiesSet.add(c.toLowerCase() === 'online' ? 'Online' : c);
-          }
-        });
-      }
-
-      const liveCitiesList = Array.from(distinctCitiesSet).sort();
 
       setStats({
         eventCount: eventCount || 0,
-        liveCityCount: distinctCitiesSet.size,
-        liveCities: liveCitiesList,
         totalCitiesCount: CITIES.length,
         totalCategoryCount: CATEGORIES_LIST.length,
         userCount: userCount || 0,
@@ -123,7 +102,7 @@ export default function PlatformStatsScreen() {
         <View style={styles.heroBlock}>
           <Text style={styles.heroTitle}>EvenTime at a Glance</Text>
           <Text style={styles.heroSubtitle}>
-            Live platform metrics calculated from verified approved events across India.
+            Real-time platform metrics across events, supported cities, and our community.
           </Text>
         </View>
 
@@ -133,57 +112,43 @@ export default function PlatformStatsScreen() {
           </View>
         ) : (
           <View style={styles.statsGrid}>
-            {/* Stat Card 1: Events Listed */}
+            {/* Stat Card 1: Active Events */}
             <View style={styles.statCard}>
               <View style={[styles.statIconBg, { backgroundColor: '#EEF0FF' }]}>
                 <Calendar size={20} color="#6C47FF" />
               </View>
               <Text style={styles.statValue}>{stats?.eventCount ?? 0}</Text>
-              <Text style={styles.statTitle}>Events Listed</Text>
+              <Text style={styles.statTitle}>Active Events</Text>
               <Text style={styles.statDesc}>
-                Approved public and campus events published by the community.
+                Curated public and campus events live on the platform right now.
               </Text>
             </View>
 
-            {/* Stat Card 2: Cities */}
+            {/* Stat Card 2: Cities Supported */}
             <View style={styles.statCard}>
               <View style={[styles.statIconBg, { backgroundColor: '#ECFDF5' }]}>
                 <MapPin size={20} color="#059669" />
               </View>
-              <Text style={styles.statValue}>30+</Text>
+              <Text style={styles.statValue}>{stats?.totalCitiesCount ?? CITIES.length}</Text>
               <Text style={styles.statTitle}>Cities Supported</Text>
               <Text style={styles.statDesc}>
-                Covering {stats?.totalCitiesCount ?? 32} major student and tech hubs across India.
+                Major university hubs, metros, and tech centers active across India.
               </Text>
-              {stats?.liveCities && stats.liveCities.length > 0 && (
-                <View style={styles.cityTagsWrap}>
-                  <Text style={styles.liveInLabel}>
-                    Live events currently in {stats.liveCityCount} {stats.liveCityCount === 1 ? 'city' : 'cities'}:
-                  </Text>
-                  <View style={styles.cityTagsRow}>
-                    {stats.liveCities.map((city) => (
-                      <View key={city} style={styles.cityTag}>
-                        <Text style={styles.cityTagText}>{city}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )}
             </View>
 
-            {/* Stat Card 3: Categories */}
+            {/* Stat Card 3: Curated Categories */}
             <View style={styles.statCard}>
               <View style={[styles.statIconBg, { backgroundColor: '#FEF3C7' }]}>
                 <Grid size={20} color="#D97706" />
               </View>
-              <Text style={styles.statValue}>30+</Text>
-              <Text style={styles.statTitle}>Event Categories</Text>
+              <Text style={styles.statValue}>{stats?.totalCategoryCount ?? CATEGORIES_LIST.length}</Text>
+              <Text style={styles.statTitle}>Curated Categories</Text>
               <Text style={styles.statDesc}>
-                {stats?.totalCategoryCount ?? 37} curated genres covering hackathons, tech summits, music fests, standup comedy, and campus events.
+                From developer hackathons and summits to cultural fests and networking meetups.
               </Text>
             </View>
 
-            {/* Stat Card 4: Community */}
+            {/* Stat Card 4: Community Members */}
             <View style={styles.statCard}>
               <View style={[styles.statIconBg, { backgroundColor: '#EDE9FE' }]}>
                 <Users size={20} color="#7C3AED" />
@@ -191,7 +156,7 @@ export default function PlatformStatsScreen() {
               <Text style={styles.statValue}>{stats?.userCount ?? 0}</Text>
               <Text style={styles.statTitle}>Community Members</Text>
               <Text style={styles.statDesc}>
-                Active explorers, curators, and organizers discovering together.
+                Students, builders, and event curators discovering and connecting on EvenTime.
               </Text>
             </View>
           </View>
@@ -265,24 +230,29 @@ const styles = StyleSheet.create({
   },
   statCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 18,
+    borderRadius: 16,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   statIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   statValue: {
     fontFamily: 'Outfit-Bold',
-    fontSize: 28,
+    fontSize: 32,
     color: '#0F172A',
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
     marginBottom: 2,
   },
   statTitle: {
@@ -295,36 +265,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: '#64748B',
-    lineHeight: 18,
-  },
-  cityTagsWrap: {
-    marginTop: 12,
-  },
-  liveInLabel: {
-    fontFamily: 'Switzer-Medium',
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 6,
-  },
-  cityTagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  cityTag: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  cityTagText: {
-    fontFamily: 'Switzer-Medium',
-    fontSize: 12,
-    color: '#475569',
+    lineHeight: 19,
   },
   footerNote: {
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 28,
   },
   footerNoteText: {
     fontFamily: 'Switzer-Regular',
