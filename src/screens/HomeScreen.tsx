@@ -538,6 +538,60 @@ export default function HomeScreen() {
     });
   }, [campusEvents, selectedDate]);
 
+  // Campus Sub-Filter State: 'all' vs 'eligible'
+  const [campusFilterMode, setCampusFilterMode] = useState<'all' | 'eligible'>('all');
+
+  const studentBranch = (profile?.branch || guestPrefs?.branch || '').trim();
+  const studentGradYear = (profile?.graduation_year || guestPrefs?.graduationYear || '').trim();
+
+  const isEligibleForCampusStudent = useCallback(
+    (ev: EventRow) => {
+      // If student hasn't specified branch or grad year, treat all campus events as eligible
+      if (!studentBranch && !studentGradYear) return true;
+
+      // 1. Branch match: no restriction, 'All Branches', 'All', or exact match / matching abbreviation
+      const evBranch = (ev.college_branch || '').trim().toLowerCase();
+      const sBranch = studentBranch.toLowerCase();
+      let branchMatch = !evBranch || evBranch === 'all branches' || evBranch === 'all';
+      if (!branchMatch && sBranch) {
+        if (evBranch === sBranch) {
+          branchMatch = true;
+        } else {
+          // Check bracketed abbreviation if exists, e.g. "CSE"
+          const evCode = evBranch.match(/\(([^)]+)\)/)?.[1]?.trim() || '';
+          const sCode = sBranch.match(/\(([^)]+)\)/)?.[1]?.trim() || '';
+          if (evCode && sCode && evCode === sCode) {
+            branchMatch = true;
+          }
+        }
+      }
+
+      // 2. Year match: no restriction, 'All Years', 'All', or exact match
+      const evYear = (ev.college_year || '').trim().toLowerCase();
+      const sYear = studentGradYear.toLowerCase();
+      let yearMatch = !evYear || evYear === 'all years' || evYear === 'all';
+      if (!yearMatch && sYear) {
+        if (evYear === sYear) {
+          yearMatch = true;
+        }
+      }
+
+      return branchMatch && yearMatch;
+    },
+    [studentBranch, studentGradYear]
+  );
+
+  const eligibleCampusEvents = useMemo(() => {
+    return campusFeedEvents.filter(isEligibleForCampusStudent);
+  }, [campusFeedEvents, isEligibleForCampusStudent]);
+
+  const displayedCampusEvents = useMemo(() => {
+    if (campusFilterMode === 'eligible') {
+      return eligibleCampusEvents;
+    }
+    return campusFeedEvents;
+  }, [campusFilterMode, eligibleCampusEvents, campusFeedEvents]);
+
   const renderEventItem = useCallback(
     ({ item }: { item: EventRow }) => (
       <View style={styles.cardContainer}>
@@ -786,37 +840,97 @@ export default function HomeScreen() {
           {isStudent && (
             <View style={styles.pageContainer}>
               <FlatList
-                data={campusFeedEvents}
+                data={displayedCampusEvents}
                 keyExtractor={(item) => item.id}
                 renderItem={renderEventItem}
                 ListHeaderComponent={
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>
-                      {selectedDate
-                        ? `Events on ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
-                        : 'Your Campus'}
-                    </Text>
-                    <Text style={styles.eventCountText}>{campusFeedEvents.length} events</Text>
+                  <View style={styles.campusHeaderWrapper}>
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionTitle}>
+                        {selectedDate
+                          ? `Events on ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
+                          : 'Your Campus'}
+                      </Text>
+                      <Text style={styles.eventCountText}>{displayedCampusEvents.length} events</Text>
+                    </View>
+
+                    {/* Apple-grade Segmented Filter Pills (All Events vs Eligible for Me) */}
+                    <View style={styles.campusSegmentedTrack}>
+                      <TouchableOpacity
+                        style={[
+                          styles.campusSegmentedPill,
+                          campusFilterMode === 'all' && styles.campusSegmentedPillActive,
+                        ]}
+                        onPress={() => {
+                          haptic.selection();
+                          setCampusFilterMode('all');
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text
+                          style={[
+                            styles.campusSegmentedText,
+                            campusFilterMode === 'all' && styles.campusSegmentedTextActive,
+                          ]}
+                        >
+                          All Events ({campusFeedEvents.length})
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.campusSegmentedPill,
+                          campusFilterMode === 'eligible' && styles.campusSegmentedPillActive,
+                        ]}
+                        onPress={() => {
+                          haptic.selection();
+                          setCampusFilterMode('eligible');
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text
+                          style={[
+                            styles.campusSegmentedText,
+                            campusFilterMode === 'eligible' && styles.campusSegmentedTextActive,
+                          ]}
+                        >
+                          Eligible for Me ({eligibleCampusEvents.length})
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 }
                 ListEmptyComponent={
-                  <EmptyState
-                    illustration={APP_ASSETS.illustrations.empty}
-                    title={selectedDate ? 'No Events Scheduled' : 'No Campus Events'}
-                    message={
-                      selectedDate
-                        ? `There are no events scheduled for ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}. Be the first to host one!`
-                        : 'There are no private events currently listed for your campus. Host one for your college!'
-                    }
-                    buttonText={selectedDate ? 'Clear Date' : 'Host an Event'}
-                    onButtonPress={() => {
-                      if (selectedDate) {
-                        setSelectedDate(null);
-                      } else {
-                        navigation.navigate('CreateEvent', {});
+                  campusFilterMode === 'eligible' && campusFeedEvents.length > 0 ? (
+                    <EmptyState
+                      illustration={APP_ASSETS.illustrations.empty}
+                      title="No Specific Batch Events"
+                      message="No events are currently restricted to your branch or graduation year. Switch to All Events to explore everything happening on campus!"
+                      buttonText="Show All Campus Events"
+                      onButtonPress={() => {
+                        haptic.selection();
+                        setCampusFilterMode('all');
+                      }}
+                    />
+                  ) : (
+                    <EmptyState
+                      illustration={APP_ASSETS.illustrations.empty}
+                      title={selectedDate ? 'No Events Scheduled' : 'No Campus Events'}
+                      message={
+                        selectedDate
+                          ? `There are no events scheduled for ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}. Be the first to host one!`
+                          : 'There are no private events currently listed for your campus. Host one for your college!'
                       }
-                    }}
-                  />
+                      buttonText={selectedDate ? 'Clear Date' : 'Host an Event'}
+                      onButtonPress={() => {
+                        if (selectedDate) {
+                          setSelectedDate(null);
+                        } else {
+                          navigation.navigate('CreateEvent', {});
+                        }
+                      }}
+                    />
+                  )
                 }
                 refreshControl={
                   <RefreshControl
@@ -1080,10 +1194,45 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#FEE2E2',
   },
-  clearPillText: {
+  campusHeaderWrapper: {
+    paddingBottom: 4,
+  },
+  campusSegmentedTrack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 8,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  campusSegmentedPill: {
+    flex: 1,
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9,
+  },
+  campusSegmentedPillActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  campusSegmentedText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 12.5,
+    color: '#64748B',
+    letterSpacing: -0.2,
+  },
+  campusSegmentedTextActive: {
     fontFamily: 'Switzer-Bold',
-    fontSize: 11,
-    color: '#EF4444',
+    color: '#0F172A',
   },
   sectionHeader: {
     flexDirection: 'row',

@@ -782,6 +782,18 @@ export default function CreateEventScreen() {
   // Determine if selected category is a college category
   const isCollegeCategory = category === 'College Event' || category === 'College Fest';
 
+  // Auto-prefill student's registered college if creating a college event or fest
+  useEffect(() => {
+    if (!editId && !initialEvent && isCollegeCategory && profile?.college) {
+      if (!collegeName.trim()) {
+        setCollegeName(profile.college);
+        if (profile.college_id) {
+          setCollegeId(profile.college_id);
+        }
+      }
+    }
+  }, [editId, initialEvent, isCollegeCategory, profile?.college, profile?.college_id, collegeName]);
+
   // Admin feature controls
   const isAdminFeatureEnabled = Boolean(isAdmin && isFeaturedEnabledGlobally);
 
@@ -1627,7 +1639,12 @@ export default function CreateEventScreen() {
 
                   {/* College Search / Selection */}
                   <View style={{ marginTop: 12 }}>
-                    <Text style={styles.subLabel}>College / Institute Name</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text style={styles.subLabel}>College / Institute Name</Text>
+                      {Boolean(profile?.college && collegeName && collegeName.trim().toLowerCase() === profile.college.trim().toLowerCase()) && (
+                        <Text style={styles.prefilledBadge}>Prefilled from Profile</Text>
+                      )}
+                    </View>
                     <TextInput
                       style={styles.inputPlain}
                       placeholder="Search college (e.g. CBIT, IIT, BITS...)"
@@ -2201,6 +2218,12 @@ export default function CreateEventScreen() {
           setCategory(cat);
           if (!description || Object.values(CATEGORY_TEMPLATES).includes(description)) {
             setDescription(CATEGORY_TEMPLATES[cat] || '');
+          }
+          if ((cat === 'College Event' || cat === 'College Fest') && !collegeName.trim() && profile?.college) {
+            setCollegeName(profile.college);
+            if (profile.college_id) {
+              setCollegeId(profile.college_id);
+            }
           }
         }}
         onClose={() => setShowCategoryModal(false)}
@@ -2844,6 +2867,16 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#BFDBFE',
     marginBottom: 16,
+  },
+  prefilledBadge: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 10,
+    color: '#1D4ED8',
+    backgroundColor: '#DBEAFE',
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    overflow: 'hidden',
   },
   collegeHeaderRow: {
     flexDirection: 'row',
