@@ -386,7 +386,7 @@ export default function LoginScreen() {
           {/* Trust Footer */}
           <View style={styles.trustFooter}>
             <ShieldCheck size={16} color={theme.colors.textSecondary} />
-            <Text style={styles.trustText}>Official Supabase Encrypted & RLS Protected</Text>
+            <Text style={styles.trustText}>End-to-End Encrypted & Secure Data Protected</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

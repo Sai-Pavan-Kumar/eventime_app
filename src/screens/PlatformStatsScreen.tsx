@@ -12,15 +12,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, Calendar, MapPin, Grid, Users } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
+import { CITIES } from '../lib/constants/cities';
 import { CATEGORIES_LIST } from '../lib/category-config';
 import { theme } from '../config/theme';
 import { haptic } from '../lib/haptics';
 
 interface PlatformStatsData {
   eventCount: number;
-  cityCount: number;
-  cities: string[];
-  categoryCount: number;
+  liveCityCount: number;
+  liveCities: string[];
+  totalCitiesCount: number;
+  totalCategoryCount: number;
   userCount: number;
 }
 
@@ -59,13 +61,14 @@ export default function PlatformStatsScreen() {
         });
       }
 
-      const citiesList = Array.from(distinctCitiesSet).sort();
+      const liveCitiesList = Array.from(distinctCitiesSet).sort();
 
       setStats({
         eventCount: eventCount || 0,
-        cityCount: distinctCitiesSet.size,
-        cities: citiesList,
-        categoryCount: CATEGORIES_LIST.length,
+        liveCityCount: distinctCitiesSet.size,
+        liveCities: liveCitiesList,
+        totalCitiesCount: CITIES.length,
+        totalCategoryCount: CATEGORIES_LIST.length,
         userCount: userCount || 0,
       });
     } catch (err) {
@@ -141,23 +144,28 @@ export default function PlatformStatsScreen() {
               </Text>
             </View>
 
-            {/* Stat Card 2: Active Cities */}
+            {/* Stat Card 2: Cities */}
             <View style={styles.statCard}>
               <View style={[styles.statIconBg, { backgroundColor: '#ECFDF5' }]}>
                 <MapPin size={20} color="#059669" />
               </View>
-              <Text style={styles.statValue}>{stats?.cityCount ?? 0}</Text>
-              <Text style={styles.statTitle}>Active Cities</Text>
+              <Text style={styles.statValue}>30+</Text>
+              <Text style={styles.statTitle}>Cities Supported</Text>
               <Text style={styles.statDesc}>
-                Cities with live events across India.
+                Covering {stats?.totalCitiesCount ?? 32} major student and tech hubs across India.
               </Text>
-              {stats?.cities && stats.cities.length > 0 && (
+              {stats?.liveCities && stats.liveCities.length > 0 && (
                 <View style={styles.cityTagsWrap}>
-                  {stats.cities.map((city) => (
-                    <View key={city} style={styles.cityTag}>
-                      <Text style={styles.cityTagText}>{city}</Text>
-                    </View>
-                  ))}
+                  <Text style={styles.liveInLabel}>
+                    Live events currently in {stats.liveCityCount} {stats.liveCityCount === 1 ? 'city' : 'cities'}:
+                  </Text>
+                  <View style={styles.cityTagsRow}>
+                    {stats.liveCities.map((city) => (
+                      <View key={city} style={styles.cityTag}>
+                        <Text style={styles.cityTagText}>{city}</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               )}
             </View>
@@ -167,10 +175,10 @@ export default function PlatformStatsScreen() {
               <View style={[styles.statIconBg, { backgroundColor: '#FEF3C7' }]}>
                 <Grid size={20} color="#D97706" />
               </View>
-              <Text style={styles.statValue}>{stats?.categoryCount ?? 37}</Text>
+              <Text style={styles.statValue}>30+</Text>
               <Text style={styles.statTitle}>Event Categories</Text>
               <Text style={styles.statDesc}>
-                Covering hackathons, concerts, tech summits, fests, and comedy.
+                {stats?.totalCategoryCount ?? 37} curated genres covering hackathons, tech summits, music fests, standup comedy, and campus events.
               </Text>
             </View>
 
@@ -289,10 +297,18 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   cityTagsWrap: {
+    marginTop: 12,
+  },
+  liveInLabel: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 6,
+  },
+  cityTagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: 12,
   },
   cityTag: {
     backgroundColor: '#F1F5F9',

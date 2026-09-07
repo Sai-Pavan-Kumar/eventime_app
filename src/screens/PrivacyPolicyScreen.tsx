@@ -59,7 +59,7 @@ export default function PrivacyPolicyScreen() {
               In strict accordance with the Digital Personal Data Protection (DPDP) Act, your data is processed solely for specified, lawful purposes:
             </Text>
             <Text style={styles.bulletPoint}>• Customizing your "For You" and "Around You" event feeds.</Text>
-            <Text style={styles.bulletPoint}>• Secure authentication via Supabase encrypted session tokens.</Text>
+            <Text style={styles.bulletPoint}>• Secure authentication via encrypted session tokens.</Text>
             <Text style={styles.bulletPoint}>• Calculating your ET Score and Curator Leaderboard achievements.</Text>
           </View>
 
@@ -67,7 +67,7 @@ export default function PrivacyPolicyScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionHeading}>3. Data Security & Storage</Text>
             <Text style={styles.paragraph}>
-              We never sell, rent, or monetize your personal information to third-party data brokers or advertisers. All database transactions are protected with Supabase Row Level Security (RLS) policies and industry-standard SSL encryption.
+              We never sell, rent, or monetize your personal information to third-party data brokers or advertisers. All database transactions are protected with strict Row Level Security (RLS) policies and industry-standard SSL encryption.
             </Text>
           </View>
 
