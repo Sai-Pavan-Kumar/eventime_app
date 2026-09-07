@@ -56,7 +56,8 @@ export default function PlatformStatsScreen() {
       if (cityData) {
         cityData.forEach((row) => {
           if (row.city && row.city.trim()) {
-            distinctCitiesSet.add(row.city.trim());
+            const c = row.city.trim();
+            distinctCitiesSet.add(c.toLowerCase() === 'online' ? 'Online' : c);
           }
         });
       }
