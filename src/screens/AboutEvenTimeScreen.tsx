@@ -89,10 +89,13 @@ export default function AboutEvenTimeScreen() {
               EvenTime moves that offline communication onto the timeline:
             </Text>
             <Text style={[styles.bulletItem, { marginTop: 8 }]}>
-              • <Text style={styles.boldSpan}>Exclusive College Events:</Text> Fests and events meant strictly for students of a specific institution appear in the Your Campus feed.
+              • <Text style={styles.boldSpan}>Exclusive College Events:</Text> Fests and workshops restricted to your college appear in Your Campus. Students can toggle between All Events and Eligible for Me to instantly view events matching their branch and graduation year with zero card clutter.
             </Text>
             <Text style={[styles.bulletItem, { marginTop: 6 }]}>
-              • <Text style={styles.boldSpan}>Open College Events:</Text> Fests and competitions open to outside participants appear city-wide in Around You, allowing anyone across the city to discover and attend them.
+              • <Text style={styles.boldSpan}>Open College Events:</Text> Inter-college fests, hackathons, and cultural nights open to outside attendees appear city-wide in Around You.
+            </Text>
+            <Text style={[styles.bulletItem, { marginTop: 6 }]}>
+              • <Text style={styles.boldSpan}>Seamless Publishing:</Text> When onboarded students post a college fest or event, their registered college is automatically pre-filled, making hosting effortless.
             </Text>
           </View>
 
@@ -109,7 +112,7 @@ export default function AboutEvenTimeScreen() {
               • <Text style={styles.boldSpan}>Around You:</Text> Everything else happening across your chosen cities, helping you explore beyond your usual preferences.
             </Text>
             <Text style={[styles.bulletItem, { marginTop: 6 }]}>
-              • <Text style={styles.boldSpan}>Your Campus:</Text> Events and fests exclusive to your institution (available for student profiles).
+              • <Text style={styles.boldSpan}>Your Campus:</Text> Internal events and fests exclusive to your college, with instant switching between All Events and Eligible for Me.
             </Text>
           </View>
 
