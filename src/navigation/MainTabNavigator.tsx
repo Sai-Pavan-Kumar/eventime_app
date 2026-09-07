@@ -1,14 +1,16 @@
 import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Image } from 'expo-image';
 import { Home, Search, Plus, MapPin, User } from 'lucide-react-native';
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
 import CitiesScreen from '../screens/CitiesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import { useAuth } from '../context/AuthContext';
 import { theme } from '../config/theme';
 import { haptic } from '../lib/haptics';
 import type { MainTabParamList, RootStackParamList } from '../types';
@@ -23,6 +25,7 @@ function DummyCreateScreen() {
 export function MainTabNavigator() {
   const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
+  const { user, profile } = useAuth();
 
   const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 16 : 8);
 
@@ -120,14 +123,38 @@ export function MainTabNavigator() {
         }}
       />
 
+      {/* Dynamic Profile / "You" Tab */}
       <Tab.Screen
         name="ProfileTab"
         component={ProfileScreen}
         options={{
-          tabBarLabel: 'Profile',
-          tabBarIcon: ({ color, focused }) => (
-            <User size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
-          ),
+          tabBarLabel: user ? 'You' : 'Profile',
+          tabBarIcon: ({ color, focused }) => {
+            if (!user) {
+              return <User size={22} color={color} strokeWidth={focused ? 2.5 : 2} />;
+            }
+            if (profile?.avatar_url) {
+              return (
+                <View style={[styles.avatarRing, focused && styles.avatarRingFocused]}>
+                  <Image
+                    source={{ uri: profile.avatar_url }}
+                    style={styles.tabAvatar}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    transition={0}
+                  />
+                </View>
+              );
+            }
+            const initial = (profile?.full_name || profile?.username || 'U').charAt(0).toUpperCase();
+            return (
+              <View style={[styles.tabMonogram, focused && styles.tabMonogramFocused]}>
+                <Text style={[styles.tabMonogramText, focused && styles.tabMonogramTextFocused]}>
+                  {initial}
+                </Text>
+              </View>
+            );
+          },
         }}
       />
     </Tab.Navigator>
@@ -154,5 +181,46 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 10,
     elevation: 8,
+  },
+  avatarRing: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarRingFocused: {
+    borderWidth: 2,
+    borderColor: '#6C47FF',
+  },
+  tabAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  tabMonogram: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  tabMonogramFocused: {
+    backgroundColor: '#6C47FF',
+    borderColor: '#6C47FF',
+  },
+  tabMonogramText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 11,
+    color: '#475569',
+  },
+  tabMonogramTextFocused: {
+    color: '#FFFFFF',
   },
 });
