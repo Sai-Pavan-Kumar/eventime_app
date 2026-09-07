@@ -27,6 +27,8 @@ import {
   CheckCircle,
   MessageSquare,
   Sparkles,
+  Info,
+  BarChart2,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -155,6 +157,22 @@ export default function ProfileScreen() {
           >
             <Text style={styles.signInBtnText}>Sign In / Register</Text>
           </TouchableOpacity>
+
+          <View style={styles.guestLinksRow}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('AboutEvenTime')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.guestLinkText}>About EvenTime</Text>
+            </TouchableOpacity>
+            <Text style={styles.guestLinkDot}>•</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('PlatformStats')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.guestLinkText}>Platform Stats</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -352,6 +370,37 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Platform & Community */}
+        <View style={styles.menuSection}>
+          <Text style={styles.menuSectionTitle}>Platform & Community</Text>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('AboutEvenTime')}
+          >
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuIconBg, { backgroundColor: '#EEF0FF' }]}>
+                <Info size={18} color="#6C47FF" />
+              </View>
+              <Text style={styles.menuItemText}>About EvenTime</Text>
+            </View>
+            <ChevronRight size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('PlatformStats')}
+          >
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuIconBg, { backgroundColor: '#ECFDF5' }]}>
+                <BarChart2 size={18} color="#059669" />
+              </View>
+              <Text style={styles.menuItemText}>Platform Stats</Text>
+            </View>
+            <ChevronRight size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
         {/* Settings & Preferences */}
         <View style={styles.menuSection}>
           <Text style={styles.menuSectionTitle}>Account & Legal</Text>
@@ -468,6 +517,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Switzer-Bold',
     color: '#FFF',
     fontSize: 15,
+  },
+  guestLinksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 20,
+  },
+  guestLinkText: {
+    fontFamily: 'Switzer-Medium',
+    fontSize: 13,
+    color: '#6C47FF',
+  },
+  guestLinkDot: {
+    color: '#CBD5E1',
+    fontSize: 12,
   },
   profileCard: {
     backgroundColor: theme.colors.surface,

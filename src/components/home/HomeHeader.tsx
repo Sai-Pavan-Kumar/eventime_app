@@ -9,13 +9,6 @@ export interface HomeHeaderProps {
   onOpenCalendar: () => void;
   onOpenLeaderboard: () => void;
   greeting: string;
-  platformStats: {
-    event_count: number;
-    city_count: number;
-    category_count: number;
-    user_count: number;
-  };
-  eventsCount: number;
 }
 
 export const HomeHeader = React.memo<HomeHeaderProps>(({
@@ -23,8 +16,6 @@ export const HomeHeader = React.memo<HomeHeaderProps>(({
   onOpenCalendar,
   onOpenLeaderboard,
   greeting,
-  platformStats,
-  eventsCount,
 }) => {
   return (
     <View style={styles.headerContainer}>
@@ -70,32 +61,6 @@ export const HomeHeader = React.memo<HomeHeaderProps>(({
         <Text style={styles.greetingText} numberOfLines={1} ellipsizeMode="tail">
           {greeting}
         </Text>
-      </View>
-
-      {/* Live Stats Bar */}
-      <View style={styles.statsBar}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{platformStats.event_count || eventsCount || 0}</Text>
-          <Text style={styles.statLabel}>EVENTS</Text>
-        </View>
-        <View style={styles.statDivider} />
-
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{platformStats.city_count || 12}</Text>
-          <Text style={styles.statLabel}>CITIES</Text>
-        </View>
-        <View style={styles.statDivider} />
-
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{platformStats.category_count || 36}</Text>
-          <Text style={styles.statLabel}>CATEGORIES</Text>
-        </View>
-        <View style={styles.statDivider} />
-
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{platformStats.user_count || 50}</Text>
-          <Text style={styles.statLabel}>USERS</Text>
-        </View>
       </View>
     </View>
   );
@@ -167,44 +132,13 @@ const styles = StyleSheet.create({
   greetingContainer: {
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingTop: 10,
+    paddingBottom: 10,
   },
   greetingText: {
     fontFamily: 'Outfit-Bold',
     fontSize: 22,
     color: '#0F172A',
     letterSpacing: -0.4,
-  },
-  statsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statNumber: {
-    fontFamily: 'Outfit-Bold',
-    fontSize: 16,
-    color: '#0F172A',
-  },
-  statLabel: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 10,
-    color: '#94A3B8',
-    letterSpacing: 0.5,
-    marginTop: 1,
-  },
-  statDivider: {
-    width: 1,
-    height: 18,
-    backgroundColor: '#E2E8F0',
   },
 });

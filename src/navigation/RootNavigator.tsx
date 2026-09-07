@@ -27,6 +27,8 @@ import CityEventsScreen from '../screens/CityEventsScreen';
 import CuratorProfileScreen from '../screens/CuratorProfileScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsScreen from '../screens/TermsScreen';
+import AboutEvenTimeScreen from '../screens/AboutEvenTimeScreen';
+import PlatformStatsScreen from '../screens/PlatformStatsScreen';
 import { theme } from '../config/theme';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { getHasCompletedOnboarding } from '../lib/guest-preferences';
@@ -178,6 +180,8 @@ export function RootNavigator() {
         <Stack.Screen name="CuratorProfile" component={CuratorProfileScreen} />
         <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         <Stack.Screen name="Terms" component={TermsScreen} />
+        <Stack.Screen name="AboutEvenTime" component={AboutEvenTimeScreen} />
+        <Stack.Screen name="PlatformStats" component={PlatformStatsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

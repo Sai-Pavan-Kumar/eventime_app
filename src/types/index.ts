@@ -42,6 +42,8 @@ export type RootStackParamList = {
   CuratorProfile: { username?: string; userId?: string; name?: string };
   PrivacyPolicy: undefined;
   Terms: undefined;
+  AboutEvenTime: undefined;
+  PlatformStats: undefined;
 };
 
 export type MainTabParamList = {

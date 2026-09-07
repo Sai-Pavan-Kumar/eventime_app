@@ -48,8 +48,6 @@ import {
   saveCachedHomeEvents,
   loadCachedCampusEvents,
   saveCachedCampusEvents,
-  loadCachedPlatformStats,
-  saveCachedPlatformStats,
   loadCachedSavedEventIds,
   saveCachedSavedEventIds,
 } from '../lib/offline-cache';
@@ -179,19 +177,6 @@ export default function HomeScreen() {
 
   const PAGE_SIZE = 15;
 
-  // Platform stats for live ticker (Matching website parity)
-  const [platformStats, setPlatformStats] = useState<{
-    event_count: number;
-    city_count: number;
-    category_count: number;
-    user_count: number;
-  }>({
-    event_count: 0,
-    city_count: 12,
-    category_count: 36,
-    user_count: 0,
-  });
-
   // 1. Instant 0ms Cold-Start Hydration from Local Storage (Stale-While-Revalidate)
   useEffect(() => {
     loadCachedHomeEvents().then((cached) => {
@@ -207,12 +192,6 @@ export default function HomeScreen() {
       }
     });
 
-    loadCachedPlatformStats().then((cachedStats) => {
-      if (cachedStats) {
-        setPlatformStats(cachedStats);
-      }
-    });
-
     loadCachedSavedEventIds().then((cachedIds) => {
       if (cachedIds) {
         setSavedEventIds(cachedIds);
@@ -220,34 +199,8 @@ export default function HomeScreen() {
     });
   }, []);
 
-  const fetchPlatformStats = useCallback(async (forceRefresh: boolean = false) => {
-    try {
-      const { data: statsData, error } = await supabase.rpc('get_platform_stats').single();
-      let freshStats: any;
-      if (!error && statsData) {
-        freshStats = statsData;
-      } else {
-        const [{ count: eventCount }, { count: userCount }] = await Promise.all([
-          supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
-          supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        ]);
-        freshStats = {
-          event_count: eventCount || 0,
-          city_count: 12,
-          category_count: 36,
-          user_count: userCount || 0,
-        };
-      }
-      setPlatformStats(freshStats);
-      saveCachedPlatformStats(freshStats);
-    } catch (e) {
-      console.warn('[HomeScreen] Failed to load stats', e);
-    }
-  }, []);
-
   // Fetch all distinct event dates to show dot indicators in the calendar
   useEffect(() => {
-    fetchPlatformStats();
     supabase
       .from('events')
       .select('date_string')
@@ -268,7 +221,7 @@ export default function HomeScreen() {
           setEventDates(datesSet);
         }
       });
-  }, [fetchPlatformStats]);
+  }, []);
 
   const fetchSavedEventIds = useCallback(async () => {
     if (!user) {
@@ -455,7 +408,6 @@ export default function HomeScreen() {
     fetchEvents(0, true);
     fetchCampusEvents(0, true);
     fetchSavedEventIds();
-    fetchPlatformStats(true);
   };
 
   // 1. Base date-filtered pool
@@ -630,8 +582,6 @@ export default function HomeScreen() {
           onOpenCalendar={() => setShowDateModal(true)}
           onOpenLeaderboard={() => navigation.navigate('Leaderboard')}
           greeting={getTimeOfDayGreeting(profile?.username?.trim().slice(0, 12) || profile?.full_name?.split(' ')[0]?.trim().slice(0, 12) || (user ? undefined : 'explorer'))}
-          platformStats={platformStats}
-          eventsCount={events.length}
         />
 
         <HomeSegmentedTabs
