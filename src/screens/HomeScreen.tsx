@@ -202,28 +202,35 @@ export default function HomeScreen() {
     });
   }, []);
 
-  // Fetch all distinct event dates to show dot indicators in the calendar
+  // Fetch all distinct event dates to show dot indicators in the calendar (fallback if not loaded by buffet)
   useEffect(() => {
-    supabase
-      .from('events')
-      .select('date_string')
-      .eq('status', 'approved')
-      .or('college_only.is.null,college_only.eq.false')
-      .then(({ data }) => {
-        if (data) {
-          const datesSet = new Set<string>();
-          data.forEach((e) => {
-            const parsed = parseEventDateString(e.date_string || '');
-            if (parsed) {
-              const y = parsed.getFullYear();
-              const m = String(parsed.getMonth() + 1).padStart(2, '0');
-              const d = String(parsed.getDate()).padStart(2, '0');
-              datesSet.add(`${y}-${m}-${d}`);
+    const timer = setTimeout(() => {
+      setEventDates((current) => {
+        if (current.size > 0) return current;
+        supabase
+          .from('events')
+          .select('date_string')
+          .eq('status', 'approved')
+          .or('college_only.is.null,college_only.eq.false')
+          .then(({ data }) => {
+            if (data) {
+              const datesSet = new Set<string>();
+              data.forEach((e) => {
+                const parsed = parseEventDateString(e.date_string || '');
+                if (parsed) {
+                  const y = parsed.getFullYear();
+                  const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                  const d = String(parsed.getDate()).padStart(2, '0');
+                  datesSet.add(`${y}-${m}-${d}`);
+                }
+              });
+              setEventDates(datesSet);
             }
           });
-          setEventDates(datesSet);
-        }
+        return current;
       });
+    }, 2000);
+    return () => clearTimeout(timer);
   }, []);
 
   const fetchSavedEventIds = useCallback(async () => {
@@ -254,6 +261,46 @@ export default function HomeScreen() {
           if (prev.length === 0) setIsLoading(true);
           return prev;
         });
+      }
+
+      // Edge CDN Buffet Fast Path on Initial Cold-Start (0 Supabase DB load)
+      if (pageIndex === 0 && !selectedDate && !forceRefresh) {
+        try {
+          const buffetRes = await withTimeout(
+            fetch('https://eventime.thesurfboard.in/api/buffet', {
+              headers: { Accept: 'application/json' },
+            }),
+            5000
+          );
+          if (buffetRes.ok) {
+            const buffetData = await buffetRes.json();
+            if (buffetData?.allEvents && Array.isArray(buffetData.allEvents) && buffetData.allEvents.length > 0) {
+              const rawEvents = buffetData.allEvents as EventRow[];
+              setIsOffline(false);
+              setHasMore(rawEvents.length >= PAGE_SIZE);
+              saveCachedHomeEvents(rawEvents);
+              setEvents(rawEvents);
+
+              // Seamlessly populate eventDates for calendar dots without hitting DB
+              if (buffetData.allEventDates && Array.isArray(buffetData.allEventDates)) {
+                const datesSet = new Set<string>();
+                buffetData.allEventDates.forEach((dateStr: string) => {
+                  const parsed = parseEventDateString(dateStr);
+                  if (parsed) {
+                    const y = parsed.getFullYear();
+                    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                    const d = String(parsed.getDate()).padStart(2, '0');
+                    datesSet.add(`${y}-${m}-${d}`);
+                  }
+                });
+                setEventDates(datesSet);
+              }
+              return;
+            }
+          }
+        } catch {
+          // Gracefully fall through to direct Supabase query
+        }
       }
 
       const from = pageIndex * PAGE_SIZE;
