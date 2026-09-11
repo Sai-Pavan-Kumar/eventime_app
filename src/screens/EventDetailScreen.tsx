@@ -364,6 +364,7 @@ export default function EventDetailScreen() {
     const nextState = !isSaved;
     setIsSaved(nextState);
     setIsSaving(true);
+    appEventSync.emit({ eventId: event.id, type: 'save', isSaved: nextState });
 
     try {
       if (nextState) {
@@ -384,6 +385,7 @@ export default function EventDetailScreen() {
       }
     } catch (e) {
       setIsSaved(!nextState);
+      appEventSync.emit({ eventId: event.id, type: 'save', isSaved: !nextState });
       console.error('Bookmark error:', e);
     } finally {
       setIsSaving(false);
@@ -409,6 +411,7 @@ export default function EventDetailScreen() {
     setIsInterested(nextState);
     setInterestCount(newCount);
     setIsUpdatingInterest(true);
+    appEventSync.emit({ eventId: event.id, type: 'interest', isInterested: nextState, newInterestedCount: newCount });
 
     try {
       if (nextState) {

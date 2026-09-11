@@ -28,6 +28,7 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { triggerWebRevalidation } from '../lib/revalidate';
 import { theme } from '../config/theme';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { EmptyState } from '../components/EmptyState';
@@ -102,6 +103,7 @@ export default function MyPostedEventsScreen() {
           try {
             const { error } = await supabase.from('events').delete().eq('id', eventId);
             if (error) throw error;
+            triggerWebRevalidation(eventId);
             setEvents((prev) => prev.filter((e) => e.id !== eventId));
           } catch (e: any) {
             Alert.alert('Delete Error', e?.message || 'Could not delete event.');

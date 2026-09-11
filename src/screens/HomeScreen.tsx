@@ -56,6 +56,7 @@ import { HomeSegmentedTabs } from '../components/home/HomeSegmentedTabs';
 import { HomeActiveDateBanner } from '../components/home/HomeActiveDateBanner';
 import { CalendarPickerModal } from '../components/CalendarPickerModal';
 import type { EventRow, RootStackParamList } from '../types';
+import { appEventSync } from '../lib/eventSync';
 
 const { width } = Dimensions.get('window');
 
@@ -180,8 +181,39 @@ export default function HomeScreen() {
 
   const PAGE_SIZE = 15;
 
+  // Reactive client-side interaction sync across screens
+  useEffect(() => {
+    const unsubscribe = appEventSync.subscribe((payload) => {
+      if (payload.type === 'interest') {
+        setEvents((prev) =>
+          prev.map((ev) => {
+            if (ev.id === payload.eventId) {
+              return {
+                ...ev,
+                interested_count: payload.newInterestedCount,
+                interested_events: [{ count: payload.newInterestedCount ?? 0 }],
+              };
+            }
+            return ev;
+          })
+        );
+      } else if (payload.type === 'save' && typeof payload.isSaved === 'boolean') {
+        setSavedEventIds((prev) => {
+          const next = new Set(prev);
+          if (payload.isSaved) next.add(payload.eventId);
+          else next.delete(payload.eventId);
+          return next;
+        });
+      } else if (payload.type === 'delete') {
+        setEvents((prev) => prev.filter((ev) => ev.id !== payload.eventId));
+      }
+    });
+    return unsubscribe;
+  }, []);
+
   // 1. Instant 0ms Cold-Start Hydration from Local Storage (Stale-While-Revalidate)
   useEffect(() => {
+
     loadCachedHomeEvents().then((cached) => {
       if (cached && cached.length > 0) {
         setEvents(cached);

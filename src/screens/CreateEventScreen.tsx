@@ -59,6 +59,7 @@ import { INDIAN_COLLEGE_BRANCHES } from '../lib/constants/branches';
 import { CATEGORY_TEMPLATES, teamOptions } from '../lib/constants/event-options';
 import { uploadEventPoster } from '../lib/storage';
 import { sendRemotePushNotification } from '../lib/notifications';
+import { triggerWebRevalidation } from '../lib/revalidate';
 import { checkRateLimit, recordAction } from '../lib/rate-limiter';
 import { CuratorCelebrationModal, CelebrationEventData } from '../components/CuratorCelebrationModal';
 import { formatEventDateDetailed, parseEventDateString } from '../lib/utils/date';
@@ -1412,6 +1413,7 @@ export default function CreateEventScreen() {
             .eq('status', 'pending');
         } catch {}
 
+        triggerWebRevalidation(editId);
         Alert.alert('Success', 'Event updated successfully!', [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
@@ -1475,6 +1477,8 @@ export default function CreateEventScreen() {
         }
 
         const insertedId = insertedEvent?.id;
+
+        triggerWebRevalidation(uniqueSlug);
 
         // Trigger Apple-grade Curator Celebration Pop Modal
         setPublishedEventData({
