@@ -780,7 +780,7 @@ export default function HomeScreen() {
               }
               ListEmptyComponent={
                 <EmptyState
-                  illustration={APP_ASSETS.illustrations.empty}
+                  illustration={APP_ASSETS.illustrations.forYou}
                   title={
                     selectedDate
                       ? 'No Events Scheduled'
@@ -858,7 +858,7 @@ export default function HomeScreen() {
               }
               ListEmptyComponent={
                 <EmptyState
-                  illustration={APP_ASSETS.illustrations.empty}
+                  illustration={APP_ASSETS.illustrations.aroundYou}
                   title={
                     selectedDate
                       ? 'No Events Scheduled'
@@ -985,7 +985,7 @@ export default function HomeScreen() {
                 ListEmptyComponent={
                   campusFilterMode === 'eligible' && campusFeedEvents.length > 0 ? (
                     <EmptyState
-                      illustration={APP_ASSETS.illustrations.empty}
+                      illustration={APP_ASSETS.illustrations.eligibleForMe}
                       title="No Specific Batch Events"
                       message="No events are currently restricted to your branch or graduation year. Switch to All Events to explore everything happening on campus!"
                       buttonText="Show All Campus Events"
@@ -996,7 +996,7 @@ export default function HomeScreen() {
                     />
                   ) : (
                     <EmptyState
-                      illustration={APP_ASSETS.illustrations.empty}
+                      illustration={APP_ASSETS.illustrations.noCollegeEvents}
                       title={selectedDate ? 'No Events Scheduled' : 'No Campus Events'}
                       message={
                         selectedDate

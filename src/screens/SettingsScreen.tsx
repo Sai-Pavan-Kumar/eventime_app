@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, CheckCircle2, Save, MapPin, User, Building, GraduationCap, Lock, Bell, Sparkles, Search, X, Flag } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Save, MapPin, User, Building, GraduationCap, Lock, Bell, Search, X, Flag } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
@@ -343,7 +343,10 @@ export default function SettingsScreen() {
         }
       }
 
-      const payload = {
+      const hasPreferences = preferredCities.length > 0 && goals.length > 0;
+      const needsProfileBonus = hasPreferences && ((profile?.et_score ?? 100) < 150 || !profile?.is_onboarded);
+
+      const payload: any = {
         full_name: fullName.trim() || null,
         username: cleanUsername,
         user_type: userType,
@@ -353,17 +356,33 @@ export default function SettingsScreen() {
         graduation_year: userType === 'student' ? graduationYear : null,
         preferred_cities: isAdmin ? preferredCities : preferredCities.slice(0, 3),
         goals: isAdmin ? goals : goals.slice(0, 6),
+        is_onboarded: hasPreferences ? true : (profile?.is_onboarded ?? false),
         updated_at: new Date().toISOString(),
       };
 
+      if (needsProfileBonus) {
+        payload.et_score = Math.max((profile?.et_score || 100) + 50, 150);
+      }
+
       const { error } = await supabase.from('profiles').update(payload).eq('id', user.id);
       if (error) throw error;
+
+      if (needsProfileBonus) {
+        try {
+          await supabase.rpc('increment_et_score', { user_id: user.id, delta: 50 });
+        } catch (rpcErr) {
+          console.warn('[Settings] increment_et_score error:', rpcErr);
+        }
+      }
 
       await saveNotificationPreferences(notifPrefs, user.id);
 
       await refreshProfile();
       haptic.success();
-      Alert.alert('Success', 'Profile settings updated successfully!', [
+      const successMessage = needsProfileBonus
+        ? 'Profile preferences saved! You earned +50 ET Score for completing your profile! 🎉'
+        : 'Profile settings updated successfully!';
+      Alert.alert('Success', successMessage, [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (err: any) {
@@ -873,25 +892,13 @@ export default function SettingsScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.legalRow}
+            style={[styles.legalRow, { borderBottomWidth: 0 }]}
             onPress={() => (navigation as any).navigate('Terms')}
             activeOpacity={0.7}
           >
             <View style={styles.legalLeft}>
               <Building size={16} color={theme.colors.brand} />
               <Text style={styles.legalText}>Terms of Service & Guidelines</Text>
-            </View>
-            <Text style={styles.legalArrow}>›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.legalRow, { borderBottomWidth: 0 }]}
-            onPress={() => (navigation as any).navigate('Onboarding')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.legalLeft}>
-              <Sparkles size={16} color={theme.colors.brand} />
-              <Text style={styles.legalText}>Replay Onboarding Tour</Text>
             </View>
             <Text style={styles.legalArrow}>›</Text>
           </TouchableOpacity>

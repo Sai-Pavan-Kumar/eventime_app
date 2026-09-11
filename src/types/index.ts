@@ -44,6 +44,7 @@ export type RootStackParamList = {
   Terms: undefined;
   AboutEvenTime: undefined;
   PlatformStats: undefined;
+  ProfileStats: undefined;
 };
 
 export type MainTabParamList = {

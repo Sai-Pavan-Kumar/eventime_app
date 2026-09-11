@@ -41,42 +41,23 @@ export default function ProfileScreen() {
   const { user, profile, isAdmin, signOut, refreshProfile } = useAuth();
 
   const [createdEventsCount, setCreatedEventsCount] = useState(0);
-  const [totalSavesCount, setTotalSavesCount] = useState(0);
-  const [savedCount, setSavedCount] = useState(0);
   const [liveEtScore, setLiveEtScore] = useState<number | null>(null);
-  const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
   const fetchStats = useCallback(async () => {
-    if (!user) {
-      setIsLoadingStats(false);
-      return;
-    }
+    if (!user) return;
     try {
-      // 1. Created events count & total saves
+      // 1. Created events count (used for Curator Tier)
       const { data: myEvents } = await supabase
         .from('events')
-        .select('id, saved_events(count)')
+        .select('id')
         .eq('creator_id', user.id);
 
       if (myEvents) {
         setCreatedEventsCount(myEvents.length);
-        let saves = 0;
-        myEvents.forEach((ev: any) => {
-          saves += ev.saved_events?.[0]?.count || 0;
-        });
-        setTotalSavesCount(saves);
       }
 
-      // 2. Saved events count
-      const { count: bookmarkCount } = await supabase
-        .from('saved_events')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-
-      setSavedCount(bookmarkCount || 0);
-
-      // 3. Live ET Score from leaderboard_view (matches website parity)
+      // 2. Live ET Score from leaderboard_view
       const { data: scoreRow } = await supabase
         .from('leaderboard_view')
         .select('et_score')
@@ -88,8 +69,6 @@ export default function ProfileScreen() {
       }
     } catch (err) {
       console.error('Fetch profile stats error:', err);
-    } finally {
-      setIsLoadingStats(false);
     }
   }, [user]);
 
@@ -258,27 +237,6 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Calendar size={18} color={theme.colors.brand} />
-            <Text style={styles.statNumber}>{createdEventsCount}</Text>
-            <Text style={styles.statLabel}>Events Posted</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Heart size={18} color="#EF4444" />
-            <Text style={styles.statNumber}>{totalSavesCount}</Text>
-            <Text style={styles.statLabel}>Total Saves</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Bookmark size={18} color="#F59E0B" />
-            <Text style={styles.statNumber}>{savedCount}</Text>
-            <Text style={styles.statLabel}>Bookmarks</Text>
-          </View>
-        </View>
-
         {/* Navigation Action Rows */}
         <View style={styles.menuSection}>
           <Text style={styles.menuSectionTitle}>My Activity</Text>
@@ -396,6 +354,19 @@ export default function ProfileScreen() {
                 <BarChart2 size={18} color="#059669" />
               </View>
               <Text style={styles.menuItemText}>Platform Stats</Text>
+            </View>
+            <ChevronRight size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('ProfileStats')}
+          >
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuIconBg, { backgroundColor: '#EDE9FE' }]}>
+                <BarChart2 size={18} color="#6C47FF" />
+              </View>
+              <Text style={styles.menuItemText}>Profile Stats & Impact</Text>
             </View>
             <ChevronRight size={18} color={theme.colors.textMuted} />
           </TouchableOpacity>
@@ -686,33 +657,6 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: theme.colors.brand,
     borderRadius: 2,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: theme.spacing.lg,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: theme.colors.surface,
-    padding: 14,
-    borderRadius: theme.borderRadius.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    gap: 4,
-    ...theme.shadows.sm,
-  },
-  statNumber: {
-    fontFamily: 'Outfit-Bold',
-    fontSize: 18,
-    color: theme.colors.textPrimary,
-  },
-  statLabel: {
-    fontFamily: 'Switzer-Bold',
-    fontSize: 10,
-    color: theme.colors.textMuted,
-    textTransform: 'uppercase',
   },
   menuSection: {
     marginBottom: theme.spacing.lg,

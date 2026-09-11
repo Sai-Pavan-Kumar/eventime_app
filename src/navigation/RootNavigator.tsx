@@ -29,6 +29,7 @@ import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsScreen from '../screens/TermsScreen';
 import AboutEvenTimeScreen from '../screens/AboutEvenTimeScreen';
 import PlatformStatsScreen from '../screens/PlatformStatsScreen';
+import ProfileStatsScreen from '../screens/ProfileStatsScreen';
 import { theme } from '../config/theme';
 import { APP_ASSETS } from '../lib/asset-registry';
 import { getHasCompletedOnboarding } from '../lib/guest-preferences';
@@ -180,6 +181,7 @@ export function RootNavigator() {
         <Stack.Screen name="Terms" component={TermsScreen} />
         <Stack.Screen name="AboutEvenTime" component={AboutEvenTimeScreen} />
         <Stack.Screen name="PlatformStats" component={PlatformStatsScreen} />
+        <Stack.Screen name="ProfileStats" component={ProfileStatsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

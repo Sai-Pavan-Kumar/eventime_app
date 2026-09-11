@@ -19,7 +19,7 @@ export function EmptyState({
   illustration = APP_ASSETS.illustrations.empty,
   buttonText,
   onButtonPress,
-  illustrationHeight = 180,
+  illustrationHeight = 200,
 }: EmptyStateProps) {
   return (
     <View style={styles.container}>

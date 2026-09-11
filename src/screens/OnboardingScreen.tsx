@@ -504,6 +504,7 @@ export default function OnboardingScreen() {
         preferred_cities: selectedCities,
         goals: selectedGoals.slice(0, isAdmin ? undefined : 6),
         is_onboarded: true,
+        et_score: Math.max((profile?.et_score || 100) + 50, 150),
       };
 
       const { error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id);
@@ -685,7 +686,7 @@ export default function OnboardingScreen() {
             <Image
               source={slide.image}
               style={styles.image1x1}
-              contentFit="cover"
+              contentFit="contain"
               cachePolicy="none"
               priority="high"
               transition={200}
@@ -770,7 +771,7 @@ export default function OnboardingScreen() {
                 <Image
                   source={APP_ASSETS.onboarding.screen6}
                   style={styles.image1x1}
-                  contentFit="cover"
+                  contentFit="contain"
                   cachePolicy="none"
                   priority="high"
                   transition={200}

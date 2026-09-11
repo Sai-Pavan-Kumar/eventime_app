@@ -54,6 +54,7 @@ import { EventCard } from '../components/EventCard';
 import { EmptyState } from '../components/EmptyState';
 import { EventReportModal } from '../components/EventReportModal';
 import { formatEventDateDetailed, parseEventDateString, formatEventTime } from '../lib/utils/date';
+import { appEventSync } from '../lib/eventSync';
 import type { EventRow, RootStackParamList } from '../types';
 
 const { width } = Dimensions.get('window');
@@ -138,37 +139,56 @@ export default function EventDetailScreen() {
       const SIMILAR_EVENT_FIELDS =
         'id, slug, title, category, date_string, start_time, end_time, location, city, poster_url, organizer_name, is_free, is_featured, is_virtual, colleges(name)';
 
+      const isVirtual = Boolean(currentEvent.is_virtual || currentEvent.city?.toLowerCase() === 'online');
+      const eventCity = currentEvent.city?.trim();
+
+      if (!isVirtual && !eventCity) {
+        setSimilarEvents([]);
+        return;
+      }
+
       let query = supabase
         .from('events')
         .select(SIMILAR_EVENT_FIELDS)
         .eq('status', 'approved')
-        .neq('id', currentEvent.id)
-        .limit(6);
+        .neq('id', currentEvent.id);
 
-      if (currentEvent.category) {
-        query = query.eq('category', currentEvent.category);
-      } else if (currentEvent.city && currentEvent.city !== 'Online') {
-        query = query.eq('city', currentEvent.city);
+      if (isVirtual) {
+        query = query.or('is_virtual.eq.true,city.eq.Online');
+      } else if (eventCity) {
+        query = query.eq('city', eventCity).eq('is_virtual', false);
       }
 
-      const { data } = await query;
-      if (data && data.length > 0) {
-        setSimilarEvents(data as unknown as EventRow[]);
-      } else {
-        // Fallback to latest approved events so the stream never reaches a dead end
-        const { data: fallback } = await supabase
-          .from('events')
-          .select(SIMILAR_EVENT_FIELDS)
-          .eq('status', 'approved')
-          .neq('id', currentEvent.id)
-          .order('created_at', { ascending: false })
-          .limit(6);
-        if (fallback) {
-          setSimilarEvents(fallback as unknown as EventRow[]);
-        }
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        setSimilarEvents([]);
+        return;
       }
+
+      // Filter: strictly today or future events (eliminate all past events)
+      const now = Date.now();
+      const upcoming = (data as unknown as EventRow[]).filter((ev) => {
+        if (!ev.date_string) return false;
+        const parsed = parseEventDateString(ev.date_string);
+        if (!parsed) return false;
+        const endOfDay = new Date(parsed);
+        endOfDay.setHours(23, 59, 59, 999);
+        return endOfDay.getTime() >= now;
+      });
+
+      // Sort chronologically: soonest upcoming event first
+      upcoming.sort((a, b) => {
+        const timeA = parseEventDateString(a.date_string)?.getTime() || 0;
+        const timeB = parseEventDateString(b.date_string)?.getTime() || 0;
+        return timeA - timeB;
+      });
+
+      setSimilarEvents(upcoming.slice(0, 6));
     } catch (e) {
-      console.warn('[EventDetail] Failed to load similar events', e);
+      console.warn('[EventDetail] Failed to load city events', e);
+      setSimilarEvents([]);
     }
   }, []);
 
@@ -934,15 +954,12 @@ export default function EventDetailScreen() {
             </View>
           )}
 
-          {/* Similar Events / More in this City Carousel */}
+          {/* More in this City Carousel */}
           {similarEvents.length > 0 && (
             <View style={styles.similarSection}>
               <View style={styles.similarHeader}>
                 <Text style={styles.similarTitle}>
-                  More Events in {event.category || event.city || 'EvenTime'}
-                </Text>
-                <Text style={styles.similarSubtitle}>
-                  Similar events happening near you
+                  More Events in {event.is_virtual || event.city?.toLowerCase() === 'online' ? 'Online' : event.city || 'Your City'}
                 </Text>
               </View>
               <ScrollView

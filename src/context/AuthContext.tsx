@@ -61,6 +61,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data) {
+        // Auto-heal: Award +50 ET Complete Profile bonus if user has set up preferences but score is stuck at 100
+        const hasCompletedPreferences = (data.preferred_cities?.length ?? 0) > 0 && (data.goals?.length ?? 0) > 0;
+        if (hasCompletedPreferences && (data.et_score == null || data.et_score <= 100)) {
+          try {
+            await supabase.rpc('increment_et_score', { user_id: userId, delta: 50 });
+            await supabase.from('profiles').update({ et_score: 150, is_onboarded: true }).eq('id', userId);
+            data.et_score = 150;
+            data.is_onboarded = true;
+          } catch (healErr) {
+            console.warn('[AuthContext] Auto-grant profile completion score error:', healErr);
+          }
+        }
         setProfile(data);
       } else if (currentUser) {
         // Initial profile creation if row is missing

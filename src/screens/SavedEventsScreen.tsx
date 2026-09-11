@@ -207,9 +207,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   emptyIllustration: {
-    width: 220,
-    height: 160,
-    marginBottom: 16,
+    width: 200,
+    height: 200,
+    marginBottom: 20,
   },
   emptyIconBg: {
     width: 68,
