@@ -54,7 +54,8 @@ export default function MyPostedEventsScreen() {
       const query = supabase
         .from('events')
         .select('*, saved_events(count), interested_events(count)')
-        .eq('creator_id', user.id);
+        .eq('creator_id', user.id)
+        .limit(50);
 
       const { data, error } = await withTimeout(query, 8000);
 

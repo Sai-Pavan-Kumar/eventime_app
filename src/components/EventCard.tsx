@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, Alert } from 'react-native';
 import { Image } from 'expo-image';
-import { Bookmark, Share2, MapPin, Clock, Users, IndianRupee, Check, Sparkles } from 'lucide-react-native';
+import { Bookmark, Share2, MapPin, Clock, Users, IndianRupee, Check } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '../config/theme';
 import { getCategoryConfig } from '../lib/category-config';
@@ -12,6 +12,7 @@ import { parseEventDateString, formatEventTime } from '../lib/utils/date';
 import { scheduleEventReminder, cancelEventReminder } from '../lib/notifications';
 import { haptic } from '../lib/haptics';
 import { saveCachedEventDetail, loadCachedSavedEventIds, saveCachedSavedEventIds } from '../lib/offline-cache';
+import { appEventSync } from '../lib/eventSync';
 import type { EventRow } from '../types';
 
 export interface EventCardProps {
@@ -243,6 +244,11 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
     setIsSaved(nextState);
     setIsSaving(true);
 
+    // Broadcast across screens via appEventSync so other views sync in 0ms without hitting DB
+    if (id) {
+      appEventSync.emit({ eventId: id, type: 'save', isSaved: nextState });
+    }
+
     // Optimistically update local cached saved IDs immediately
     if (id) {
       loadCachedSavedEventIds().then((cachedSet) => {
@@ -258,10 +264,10 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
 
     try {
       if (nextState) {
-        await supabase.from('saved_events').insert({
-          user_id: user.id,
-          event_id: id,
-        });
+        await supabase.from('saved_events').upsert(
+          { user_id: user.id, event_id: id },
+          { onConflict: 'user_id,event_id', ignoreDuplicates: true }
+        );
         scheduleEventReminder({
           id,
           title,

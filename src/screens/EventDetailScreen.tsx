@@ -159,6 +159,8 @@ export default function EventDetailScreen() {
         query = query.eq('city', eventCity).eq('is_virtual', false);
       }
 
+      query = query.limit(20);
+
       const { data, error } = await query;
       if (error) throw error;
 

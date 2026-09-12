@@ -37,7 +37,6 @@ import {
   GraduationCap,
   Building,
   Hourglass,
-  Sparkles,
   Plus,
   ChevronDown,
   ChevronUp,
@@ -1737,7 +1736,7 @@ export default function CreateEventScreen() {
                     </Text>
                     {autoFilledFields.title ? (
                       <View style={styles.autoFilledBadge}>
-                        <Sparkles size={10} color="#047857" />
+                        <Check size={10} color="#047857" />
                         <Text style={styles.autoFilledText}>Auto-filled</Text>
                       </View>
                     ) : null}
@@ -1923,7 +1922,7 @@ export default function CreateEventScreen() {
                     </Text>
                     {autoFilledFields.description ? (
                       <View style={styles.autoFilledBadge}>
-                        <Sparkles size={10} color="#047857" />
+                        <Check size={10} color="#047857" />
                         <Text style={styles.autoFilledText}>Auto-filled</Text>
                       </View>
                     ) : null}
@@ -1955,7 +1954,7 @@ export default function CreateEventScreen() {
                       </Text>
                       {autoFilledFields.date ? (
                         <View style={styles.autoFilledBadge}>
-                          <Sparkles size={10} color="#047857" />
+                          <Check size={10} color="#047857" />
                           <Text style={styles.autoFilledText}>Auto-filled</Text>
                         </View>
                       ) : null}
@@ -2266,7 +2265,7 @@ export default function CreateEventScreen() {
                   </Text>
                   {autoFilledFields.poster ? (
                     <View style={styles.autoFilledBadge}>
-                      <Sparkles size={10} color="#047857" />
+                      <Check size={10} color="#047857" />
                       <Text style={styles.autoFilledText}>Auto-filled from link</Text>
                     </View>
                   ) : null}

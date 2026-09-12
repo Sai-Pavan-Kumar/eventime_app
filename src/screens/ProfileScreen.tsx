@@ -26,7 +26,6 @@ import {
   Heart,
   CheckCircle,
   MessageSquare,
-  Sparkles,
   Info,
   BarChart2,
 } from 'lucide-react-native';

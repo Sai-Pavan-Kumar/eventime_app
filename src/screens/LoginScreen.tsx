@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
-import { CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react-native';
+import { CheckCircle2, ShieldCheck } from 'lucide-react-native';
 import { GoogleIcon, GithubIcon } from '../components/SocialIcons';
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../config/theme';
@@ -87,7 +87,7 @@ export default function LoginScreen() {
         {/* Card */}
         <View style={styles.card}>
           <View style={styles.badgeContainer}>
-            <Sparkles size={14} color={theme.colors.brand} />
+            <ShieldCheck size={14} color={theme.colors.brand} />
             <Text style={styles.badgeText}>Fast 1-Click Access</Text>
           </View>
           <Text style={styles.cardTitle}>Sign In to EvenTime</Text>

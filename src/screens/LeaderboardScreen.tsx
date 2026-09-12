@@ -26,7 +26,6 @@ import {
   X,
   Zap,
   ShieldCheck,
-  Sparkles,
   Compass,
   GraduationCap,
   MapPin,
@@ -43,6 +42,12 @@ import type { LeaderboardViewRow } from '../types';
 
 const DEFAULT_EXCLUDED_EMAILS = ['p.pavansiri@gmail.com', 'eventime.admin@gmail.com'];
 const DEFAULT_EXCLUDED_USERNAMES = ['eventime.admin', 'eventimeadmin', 'admin'];
+
+// In-memory cache for static metadata to eliminate 3 queries per tab click (75% query reduction at 2M scale)
+let cachedLeaderboardEnabled: boolean | null = null;
+let cachedExcludedIds: Set<string> | null = null;
+let leaderboardMetaCacheTime = 0;
+const META_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 export type CohortType = 'campus' | 'city' | 'all_time';
 
@@ -122,50 +127,69 @@ export default function LeaderboardScreen() {
       try {
         const cityTarget = cityOverride || selectedLeaderboardCity;
 
-        // 1. Check if leaderboard is enabled in app_settings (protected with 8s timeout)
-        const { data: settings } = await withTimeout(
-          supabase
-            .from('app_settings')
-            .select('leaderboard_enabled')
-            .eq('id', 1)
-            .maybeSingle(),
-          8000
-        );
+        // Check if cached metadata is fresh (eliminates 3 redundant DB hits per tab click)
+        const isMetaFresh =
+          Date.now() - leaderboardMetaCacheTime < META_CACHE_TTL && cachedExcludedIds !== null;
 
-        if (settings && settings.leaderboard_enabled === false) {
-          setIsLeaderboardEnabled(false);
+        let isEnabled = cachedLeaderboardEnabled;
+        let excludedIds = cachedExcludedIds || new Set<string>();
+
+        if (!isMetaFresh) {
+          // 1. Check if leaderboard is enabled in app_settings (protected with 8s timeout)
+          const { data: settings } = await withTimeout(
+            supabase
+              .from('app_settings')
+              .select('leaderboard_enabled')
+              .eq('id', 1)
+              .maybeSingle(),
+            8000
+          );
+
+          isEnabled = settings?.leaderboard_enabled !== false;
+          cachedLeaderboardEnabled = isEnabled;
+
+          if (!isEnabled) {
+            setIsLeaderboardEnabled(false);
+            return [];
+          }
+
+          // 2. Resolve excluded user IDs in parallel
+          const rawEnvEmails = process.env.EXPO_PUBLIC_LEADERBOARD_EXCLUDED_EMAILS || '';
+          const envEmailList = rawEnvEmails
+            .split(',')
+            .map((e: string) => e.trim().toLowerCase())
+            .filter(Boolean);
+
+          const allExcludedEmails = Array.from(new Set([...DEFAULT_EXCLUDED_EMAILS, ...envEmailList]));
+
+          const [{ data: excludedProfiles }, { data: excludedByUsername }] = await Promise.all([
+            withTimeout(
+              supabase
+                .from('profiles')
+                .select('id, username, email')
+                .in('email', allExcludedEmails),
+              8000
+            ),
+            withTimeout(
+              supabase
+                .from('profiles')
+                .select('id, username')
+                .in('username', DEFAULT_EXCLUDED_USERNAMES),
+              8000
+            ),
+          ]);
+
+          excludedIds = new Set<string>((excludedProfiles || []).map((p) => p.id));
+          (excludedByUsername || []).forEach((p) => excludedIds.add(p.id));
+
+          cachedExcludedIds = excludedIds;
+          leaderboardMetaCacheTime = Date.now();
+        }
+
+        setIsLeaderboardEnabled(isEnabled ?? true);
+        if (isEnabled === false) {
           return [];
         }
-        setIsLeaderboardEnabled(true);
-
-        // 2. Resolve excluded user IDs
-        const rawEnvEmails = process.env.EXPO_PUBLIC_LEADERBOARD_EXCLUDED_EMAILS || '';
-        const envEmailList = rawEnvEmails
-          .split(',')
-          .map((e: string) => e.trim().toLowerCase())
-          .filter(Boolean);
-
-        const allExcludedEmails = Array.from(new Set([...DEFAULT_EXCLUDED_EMAILS, ...envEmailList]));
-
-        const { data: excludedProfiles } = await withTimeout(
-          supabase
-            .from('profiles')
-            .select('id, username, email')
-            .in('email', allExcludedEmails),
-          8000
-        );
-
-        const excludedIds = new Set<string>((excludedProfiles || []).map((p) => p.id));
-
-        const { data: excludedByUsername } = await withTimeout(
-          supabase
-            .from('profiles')
-            .select('id, username')
-            .in('username', DEFAULT_EXCLUDED_USERNAMES),
-          8000
-        );
-
-        (excludedByUsername || []).forEach((p) => excludedIds.add(p.id));
 
         let cleanRows: LeaderboardViewRow[] = [];
 

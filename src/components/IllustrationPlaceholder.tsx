@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Image, ImageSource } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles } from 'lucide-react-native';
+import { Compass } from 'lucide-react-native';
 import { theme } from '../config/theme';
 
 interface IllustrationPlaceholderProps {
@@ -33,7 +33,7 @@ export function IllustrationPlaceholder({
         ) : (
           <View style={styles.placeholderCenter}>
             <View style={styles.iconCircle}>
-              {placeholderIcon || <Sparkles size={32} color="#A78BFA" />}
+              {placeholderIcon || <Compass size={32} color="#A78BFA" />}
             </View>
             <Text style={styles.placeholderLabel}>Vector Illustration Placeholder</Text>
           </View>

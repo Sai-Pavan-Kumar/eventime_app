@@ -40,6 +40,8 @@ import { SearchBar } from '../components/search/SearchBar';
 import { SearchFilterRow } from '../components/search/SearchFilterRow';
 import { HomeActiveDateBanner } from '../components/home/HomeActiveDateBanner';
 import { CalendarPickerModal } from '../components/CalendarPickerModal';
+import { loadCachedHomeEvents, loadCachedSavedEventIds, saveCachedSavedEventIds } from '../lib/offline-cache';
+import { appEventSync } from '../lib/eventSync';
 import type { EventRow, RootStackParamList } from '../types';
 
 export default function SearchScreen() {
@@ -81,8 +83,27 @@ export default function SearchScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch all approved events with relations
-  const fetchAllEvents = useCallback(async () => {
+  const fetchAllEvents = useCallback(async (isSilent = false) => {
     try {
+      // 1. Edge CDN Buffet Fast Path (0 Supabase DB load)
+      try {
+        const buffetRes = await withTimeout(
+          fetch('https://eventime.thesurfboard.in/api/buffet', {
+            headers: { Accept: 'application/json' },
+          }),
+          4000
+        );
+        if (buffetRes.ok) {
+          const buffetData = await buffetRes.json();
+          if (buffetData?.allEvents && Array.isArray(buffetData.allEvents) && buffetData.allEvents.length > 0) {
+            setAllEvents(buffetData.allEvents as any[]);
+            return;
+          }
+        }
+      } catch {
+        // Gracefully fall through to direct Supabase query
+      }
+
       const SEARCH_EVENT_FIELDS =
         'id, slug, title, category, date_string, start_time, end_time, location, city, poster_url, organizer_name, is_free, is_featured, is_virtual, college_only, college_id, goal_tags, branch_tags, target_audience, description, creator_id, created_at, colleges(name), profiles(username, full_name), interested_events(count)';
 
@@ -91,7 +112,8 @@ export default function SearchScreen() {
         .select(SEARCH_EVENT_FIELDS)
         .eq('status', 'approved')
         .or('college_only.is.null,college_only.eq.false')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       const { data, error } = await withTimeout(query, 8000);
 
@@ -113,14 +135,65 @@ export default function SearchScreen() {
         .select('event_id')
         .eq('user_id', user.id);
       if (data) {
-        setSavedEventIds(new Set(data.map((d) => d.event_id).filter(Boolean) as string[]));
+        const idSet = new Set(data.map((d) => d.event_id).filter(Boolean) as string[]);
+        setSavedEventIds(idSet);
+        saveCachedSavedEventIds(idSet);
       }
     } catch (e) {
       console.error('[SearchScreen] Saved events error:', e);
     }
   }, [user]);
 
+  // Reactive interaction sync: sync bookmarks and interest in 0ms without hitting Supabase
   useEffect(() => {
+    const unsubscribe = appEventSync.subscribe((payload) => {
+      if (payload.type === 'save' && typeof payload.isSaved === 'boolean') {
+        setSavedEventIds((prev) => {
+          const next = new Set(prev);
+          if (payload.isSaved) next.add(payload.eventId);
+          else next.delete(payload.eventId);
+          return next;
+        });
+      } else if (payload.type === 'interest') {
+        setAllEvents((prev) =>
+          prev.map((ev) => {
+            if (ev.id === payload.eventId) {
+              return {
+                ...ev,
+                interested_count: payload.newInterestedCount,
+                interested_events: [{ count: payload.newInterestedCount ?? 0 }],
+              };
+            }
+            return ev;
+          })
+        );
+      } else if (payload.type === 'create' && payload.event) {
+        setAllEvents((prev) => {
+          if (prev.some((e) => e.id === payload.event.id || (payload.event.slug && e.slug === payload.event.slug))) {
+            return prev;
+          }
+          return [payload.event, ...prev];
+        });
+      }
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    // Instant smooth load from local memory cache (0ms perceived latency)
+    loadCachedHomeEvents().then((cached) => {
+      if (cached && cached.length > 0) {
+        setAllEvents(cached);
+        setIsLoading(false);
+      }
+    });
+
+    loadCachedSavedEventIds().then((cachedIds) => {
+      if (cachedIds && cachedIds.size > 0) {
+        setSavedEventIds(cachedIds);
+      }
+    });
+
     fetchAllEvents();
     fetchSavedEventIds();
   }, [fetchAllEvents, fetchSavedEventIds]);

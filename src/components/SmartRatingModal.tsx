@@ -12,7 +12,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { Star, X, Sparkles, Send, CheckCircle2, MessageSquareHeart } from 'lucide-react-native';
+import { Star, X, Send, CheckCircle2, MessageSquareHeart } from 'lucide-react-native';
 import { theme } from '../config/theme';
 import { useAuth } from '../context/AuthContext';
 import { recordRatingAction, openStoreListing } from '../lib/rating-prompt';
@@ -124,7 +124,7 @@ export function SmartRatingModal({ visible, onClose }: SmartRatingModalProps) {
                 {/* Brand Badge */}
                 <View style={styles.badgeContainer}>
                   <View style={styles.brandIconBg}>
-                    <Sparkles size={20} color={theme.colors.brand} />
+                    <Star size={20} color={theme.colors.brand} fill={theme.colors.brand} />
                   </View>
                 </View>
 

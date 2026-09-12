@@ -159,7 +159,8 @@ export default function CuratorProfileScreen() {
           .eq('creator_id', curatorData.id)
           .eq('status', 'approved')
           .gte('date_string', sixMonthsAgoStr)
-          .order('date_string', { ascending: true }),
+          .order('date_string', { ascending: true })
+          .limit(50),
       ]);
 
       setTotalEventCount(countRes.count || 0);

@@ -26,7 +26,6 @@ import {
   ChevronRight,
   X,
   Clock,
-  Sparkles,
   WifiOff,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';

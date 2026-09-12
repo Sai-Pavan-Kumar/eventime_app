@@ -31,7 +31,6 @@ import {
   ArrowRight,
   ArrowLeft,
   Lock,
-  Sparkles,
   ShieldCheck,
   Compass,
 } from 'lucide-react-native';
