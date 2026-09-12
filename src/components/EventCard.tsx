@@ -102,35 +102,64 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
     return clean.toUpperCase();
   }, [dateString, parsedDate]);
 
+  // Helper to test if event's time has started or passed
+  const isEventTimePast = (date: Date, timeStr?: string): boolean => {
+    const now = new Date();
+    const evDateTime = new Date(date);
+    if (timeStr && timeStr.trim()) {
+      const match = timeStr.trim().match(/(\d+):(\d+)\s*(AM|PM)?/i);
+      if (match) {
+        let hours = parseInt(match[1], 10);
+        const minutes = parseInt(match[2], 10);
+        const ampm = match[3]?.toUpperCase();
+        if (ampm === 'PM' && hours !== 12) hours += 12;
+        if (ampm === 'AM' && hours === 12) hours = 0;
+        evDateTime.setHours(hours, minutes, 0, 0);
+        return now.getTime() >= evDateTime.getTime();
+      }
+    }
+    // If no start time given, it stays until the end of today (23:59:59)
+    evDateTime.setHours(23, 59, 59, 999);
+    return now.getTime() >= evDateTime.getTime();
+  };
+
   // Status calculation
   const statusInfo = (() => {
     if (!parsedDate || hidePastBadge) return null;
     const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const evDate = new Date(parsedDate);
-    evDate.setHours(0, 0, 0, 0);
+    const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const evZero = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
 
-    const diffDays = Math.ceil((evDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.round((evZero.getTime() - todayZero.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) {
-      return { label: 'Live Today', bg: '#DCFCE7', color: '#15803D' };
-    }
-    if (diffDays > 0 && diffDays <= 2) {
-      return { label: 'This Week', bg: '#FEF3C7', color: '#B45309' };
-    }
     if (diffDays < 0) {
       return { label: 'Past Event', bg: '#F1F5F9', color: '#64748B' };
     }
+
+    if (diffDays === 0) {
+      const hasStartedOrPassed = isEventTimePast(parsedDate, startTime);
+      if (hasStartedOrPassed) {
+        return { label: 'Past Event', bg: '#F1F5F9', color: '#64748B' };
+      }
+      return { label: 'Live Today', bg: '#DCFCE7', color: '#15803D' };
+    }
+
+    if (diffDays > 0 && diffDays <= 2) {
+      return { label: 'This Week', bg: '#FEF3C7', color: '#B45309' };
+    }
+
     return null;
   })();
 
   const isPast = (() => {
     if (!parsedDate) return false;
     const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const evDate = new Date(parsedDate);
-    evDate.setHours(0, 0, 0, 0);
-    return evDate.getTime() < now.getTime();
+    const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const evZero = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+    const diffDays = Math.round((evZero.getTime() - todayZero.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return true;
+    if (diffDays === 0) return isEventTimePast(parsedDate, startTime);
+    return false;
   })();
 
   const handlePress = () => {

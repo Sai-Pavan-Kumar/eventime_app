@@ -1,10 +1,11 @@
 export type AppEventSyncPayload = {
   eventId: string;
-  type: 'interest' | 'save' | 'delete';
+  type: 'interest' | 'save' | 'delete' | 'create';
   isInterested?: boolean;
   newInterestedCount?: number;
   interestedCountDelta?: number;
   isSaved?: boolean;
+  event?: any;
 };
 
 type AppEventSyncListener = (payload: AppEventSyncPayload) => void;

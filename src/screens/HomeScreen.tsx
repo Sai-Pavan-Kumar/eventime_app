@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Compass,
@@ -184,7 +184,33 @@ export default function HomeScreen() {
   // Reactive client-side interaction sync across screens
   useEffect(() => {
     const unsubscribe = appEventSync.subscribe((payload) => {
-      if (payload.type === 'interest') {
+      if (payload.type === 'create' && payload.event) {
+        setEvents((prev) => {
+          if (prev.some((e) => e.id === payload.event.id || (payload.event.slug && e.slug === payload.event.slug))) {
+            return prev;
+          }
+          const updated = [payload.event, ...prev];
+          saveCachedHomeEvents(updated);
+          return updated;
+        });
+        if (payload.event.college_id) {
+          setCampusEvents((prev) => {
+            if (prev.some((e) => e.id === payload.event.id)) return prev;
+            const updated = [payload.event, ...prev];
+            saveCachedCampusEvents(updated);
+            return updated;
+          });
+        }
+        if (payload.event.date_string) {
+          const parsed = parseEventDateString(payload.event.date_string);
+          if (parsed) {
+            const y = parsed.getFullYear();
+            const m = String(parsed.getMonth() + 1).padStart(2, '0');
+            const d = String(parsed.getDate()).padStart(2, '0');
+            setEventDates((prev) => new Set([...prev, `${y}-${m}-${d}`]));
+          }
+        }
+      } else if (payload.type === 'interest') {
         setEvents((prev) =>
           prev.map((ev) => {
             if (ev.id === payload.eventId) {
@@ -480,6 +506,19 @@ export default function HomeScreen() {
     fetchCampusEvents(0);
     fetchSavedEventIds();
   }, [fetchEvents, fetchCampusEvents, fetchSavedEventIds, selectedDate]);
+
+  // Gentle focus revalidation with 5-min cooldown to avoid wasteful DB calls on rapid tab switches
+  const lastFocusSyncRef = useRef<number>(Date.now());
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      if (now - lastFocusSyncRef.current > 5 * 60 * 1000) {
+        lastFocusSyncRef.current = now;
+        fetchEvents(0);
+        fetchCampusEvents(0);
+      }
+    }, [fetchEvents, fetchCampusEvents])
+  );
 
   const onRefresh = () => {
     setIsRefreshing(true);

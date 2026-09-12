@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.xl,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    ...theme.shadows.card,
+    ...theme.shadows.md,
   },
   badgeContainer: {
     flexDirection: 'row',
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
-    ...theme.shadows.card,
+    ...theme.shadows.sm,
   },
   googleContent: {
     flexDirection: 'row',

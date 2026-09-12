@@ -60,6 +60,7 @@ import { CATEGORY_TEMPLATES, teamOptions } from '../lib/constants/event-options'
 import { uploadEventPoster } from '../lib/storage';
 import { sendRemotePushNotification } from '../lib/notifications';
 import { triggerWebRevalidation } from '../lib/revalidate';
+import { appEventSync } from '../lib/eventSync';
 import { checkRateLimit, recordAction } from '../lib/rate-limiter';
 import { CuratorCelebrationModal, CelebrationEventData } from '../components/CuratorCelebrationModal';
 import { formatEventDateDetailed, parseEventDateString } from '../lib/utils/date';
@@ -659,6 +660,46 @@ export default function CreateEventScreen() {
       location.trim()
     )
   );
+
+  const resetForm = useCallback(() => {
+    if (draftTimerRef.current) {
+      clearTimeout(draftTimerRef.current);
+      draftTimerRef.current = null;
+    }
+    setTitle('');
+    setRegLink('');
+    setCategory('');
+    setDescription('');
+    setDateString('');
+    setHasEndDate(false);
+    setEndDateString('');
+    setStartTime('');
+    setHasEndTime(false);
+    setEndTime('');
+    setIsVirtual(false);
+    setCity('');
+    setLocation('');
+    setIsFree(true);
+    setPrice('');
+    setIsFeatured(false);
+    setCollegeOnly(false);
+    setCollegeName(profile?.college || '');
+    setCollegeId(profile?.college_id || null);
+    setCollegeBranch('All Branches');
+    setCollegeYear('All Years');
+    setPosterUri(null);
+    setOrganizerName(profile?.full_name || '');
+    setWebsite('');
+    setPrizes('');
+    setTeamSize('Solo');
+    setRegistrationDeadline('');
+    setIsTrusted(false);
+    setDuplicateError('');
+    setExtractionConfidence(0);
+    setAutoFilledFields({});
+    setStep(0);
+    AsyncStorage.removeItem(DRAFT_STORAGE_KEY).catch(() => {});
+  }, [profile]);
 
   // 1. Auto-restore draft on mount if not editing an existing event
   useEffect(() => {
@@ -1480,6 +1521,19 @@ export default function CreateEventScreen() {
 
         triggerWebRevalidation(uniqueSlug);
 
+        // Broadcast to appEventSync so feeds update in real-time with zero extra database hits
+        appEventSync.emit({
+          eventId: insertedId || uniqueSlug || '',
+          type: 'create',
+          event: {
+            ...payload,
+            id: insertedId,
+            slug: uniqueSlug,
+            created_at: new Date().toISOString(),
+            interested_events: [{ count: 0 }],
+          },
+        });
+
         // Trigger Apple-grade Curator Celebration Pop Modal
         setPublishedEventData({
           id: insertedId,
@@ -1494,8 +1548,8 @@ export default function CreateEventScreen() {
           isTrusted: isTrusted || isAdmin,
         });
         setShowCelebrationModal(true);
-        // Clear saved draft from local storage upon successful publish
-        AsyncStorage.removeItem(DRAFT_STORAGE_KEY).catch(() => {});
+        // Cleanly reset all form state and draft storage
+        resetForm();
       }
     } catch (err: any) {
       console.error('[CreateEvent] Error:', err);
