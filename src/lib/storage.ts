@@ -49,10 +49,11 @@ export async function uploadEventPoster(
 
     // 1. Get Presigned URL from Web API (with 20s timeout guard)
     const presignRes = await withTimeout(
-      fetch('https://eventime.thesurfboard.in/api/upload/presign', {
+      fetch(`${process.env.EXPO_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://eventime.thesurfboard.in'}/api/upload/presign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
           'Cookie': `${cookieName}=${cookieValue}`,
         },
         body: JSON.stringify({
