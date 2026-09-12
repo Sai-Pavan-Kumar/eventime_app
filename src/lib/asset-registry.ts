@@ -7,7 +7,7 @@ export const APP_ASSETS = {
   heroBanner: require('../../assets/hero-section-v2.webp'),
   illustrations: {
     empty: require('../../assets/illustrations/Empty_state.webp'),
-    search: require('../../assets/illustrations/Search_state.webp'),
+    search: require('../../assets/illustrations/search_state.webp'),
     error: require('../../assets/illustrations/Error_state.webp'),
     notFound: require('../../assets/illustrations/404_State.webp'),
     emptySaved: require('../../assets/Empty_saved.webp'),
