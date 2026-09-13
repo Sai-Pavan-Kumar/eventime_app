@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
-import { CheckCircle2, ShieldCheck } from 'lucide-react-native';
+import { CheckCircle2, ShieldCheck, ChevronRight } from 'lucide-react-native';
 import { GoogleIcon, GithubIcon } from '../components/SocialIcons';
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../config/theme';
@@ -110,7 +110,7 @@ export default function LoginScreen() {
                 style={styles.consentLink}
                 onPress={() => navigation.navigate('PrivacyPolicy')}
               >
-                Data Collection Policy
+                Privacy Policy (DPDP)
               </Text>{' '}
               and{' '}
               <Text
@@ -158,6 +158,24 @@ export default function LoginScreen() {
                 <Text style={styles.githubButtonText}>Continue with GitHub</Text>
               </View>
             )}
+          </TouchableOpacity>
+
+          {/* DPDP Privacy Policy Button (Matching Profile Screen) */}
+          <TouchableOpacity
+            style={styles.dpdpButton}
+            onPress={() => navigation.navigate('PrivacyPolicy')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.dpdpButtonLeft}>
+              <View style={styles.dpdpIconBg}>
+                <ShieldCheck size={18} color="#059669" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dpdpButtonTitle}>Privacy Policy (DPDP)</Text>
+                <Text style={styles.dpdpButtonSubtitle}>DPDP Act 2023 • Rights & Data Protection</Text>
+              </View>
+            </View>
+            <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
         </View>
 
@@ -324,6 +342,44 @@ const styles = StyleSheet.create({
     fontFamily: 'Switzer-Bold',
     fontSize: 15,
     color: '#FFFFFF',
+  },
+  dpdpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 12,
+  },
+  dpdpButtonLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  dpdpIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  dpdpButtonTitle: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 13.5,
+    color: '#166534',
+  },
+  dpdpButtonSubtitle: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 10.5,
+    color: '#15803D',
+    marginTop: 1,
   },
   trustFooter: {
     flexDirection: 'row',

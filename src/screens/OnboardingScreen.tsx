@@ -748,6 +748,33 @@ export default function OnboardingScreen() {
               </Text>
             </View>
 
+            {/* DPDP Compliance Consent Checkbox */}
+            <View style={styles.consentRow}>
+              <TouchableOpacity
+                style={[styles.checkbox, hasConsented && styles.checkboxChecked]}
+                onPress={() => setHasConsented(!hasConsented)}
+                activeOpacity={0.8}
+              >
+                {hasConsented && <Check size={14} color="#FFFFFF" />}
+              </TouchableOpacity>
+              <Text style={styles.consentText}>
+                I agree to the{' '}
+                <Text
+                  style={styles.consentLink}
+                  onPress={() => navigation.navigate('PrivacyPolicy')}
+                >
+                  Privacy Policy (DPDP)
+                </Text>{' '}
+                and{' '}
+                <Text
+                  style={styles.consentLink}
+                  onPress={() => navigation.navigate('Terms')}
+                >
+                  Terms of Service
+                </Text>.
+              </Text>
+            </View>
+
             {/* Auth Buttons Stack (Google & GitHub Pushed First) */}
             <View style={styles.authButtonsStack}>
               {/* 1. Google Sign In */}
@@ -788,6 +815,23 @@ export default function OnboardingScreen() {
                 )}
               </TouchableOpacity>
 
+              {/* 3. DPDP Privacy Policy Button (Matching Profile Screen) */}
+              <TouchableOpacity
+                style={styles.dpdpButton}
+                onPress={() => navigation.navigate('PrivacyPolicy')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.dpdpButtonLeft}>
+                  <View style={styles.dpdpIconBg}>
+                    <ShieldCheck size={18} color="#059669" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.dpdpButtonTitle}>Privacy Policy (DPDP)</Text>
+                    <Text style={styles.dpdpButtonSubtitle}>DPDP Act 2023 • Rights & Data Protection</Text>
+                  </View>
+                </View>
+                <ChevronRight size={18} color="#94A3B8" />
+              </TouchableOpacity>
 
               {/* 4. Continue as Guest (Exploration Entry) */}
               <TouchableOpacity
@@ -803,7 +847,20 @@ export default function OnboardingScreen() {
             {/* Legal & Consent Notice */}
             <View style={styles.legalNotice}>
               <Text style={styles.legalText}>
-                By continuing, you agree to EvenTime’s Terms of Service and Privacy Policy.
+                By continuing, you agree to EvenTime’s{' '}
+                <Text
+                  style={styles.legalLink}
+                  onPress={() => navigation.navigate('Terms')}
+                >
+                  Terms of Service
+                </Text>{' '}
+                and{' '}
+                <Text
+                  style={styles.legalLink}
+                  onPress={() => navigation.navigate('PrivacyPolicy')}
+                >
+                  Privacy Policy (DPDP)
+                </Text>.
               </Text>
             </View>
           </ScrollView>
@@ -1708,8 +1765,85 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6C47FF',
   },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    marginTop: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  checkboxChecked: {
+    backgroundColor: '#6C47FF',
+    borderColor: '#6C47FF',
+  },
+  consentText: {
+    fontFamily: 'Switzer-Regular',
+    flex: 1,
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 18,
+  },
+  consentLink: {
+    fontFamily: 'Switzer-Bold',
+    color: '#0F172A',
+    textDecorationLine: 'underline',
+  },
+  dpdpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  dpdpButtonLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  dpdpIconBg: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  dpdpButtonTitle: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 13.5,
+    color: '#166534',
+  },
+  dpdpButtonSubtitle: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 10.5,
+    color: '#15803D',
+    marginTop: 1,
+  },
   legalNotice: {
-    marginTop: 20,
+    marginTop: 18,
     paddingHorizontal: 20,
     alignItems: 'center',
   },
@@ -1719,6 +1853,11 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 16,
+  },
+  legalLink: {
+    fontFamily: 'Switzer-Bold',
+    color: '#64748B',
+    textDecorationLine: 'underline',
   },
 
   // ---------------------------------------------

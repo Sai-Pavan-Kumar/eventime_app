@@ -145,10 +145,17 @@ export default function ProfileScreen() {
             </TouchableOpacity>
             <Text style={styles.guestLinkDot}>•</Text>
             <TouchableOpacity
+              onPress={() => navigation.navigate('PrivacyPolicy')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.guestLinkText}>Privacy Policy (DPDP)</Text>
+            </TouchableOpacity>
+            <Text style={styles.guestLinkDot}>•</Text>
+            <TouchableOpacity
               onPress={() => navigation.navigate('PlatformStats')}
               activeOpacity={0.7}
             >
-              <Text style={styles.guestLinkText}>Platform Stats</Text>
+              <Text style={styles.guestLinkText}>Stats</Text>
             </TouchableOpacity>
           </View>
         </View>
