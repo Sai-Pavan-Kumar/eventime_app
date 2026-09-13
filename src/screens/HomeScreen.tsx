@@ -11,6 +11,7 @@ import {
   Dimensions,
   Platform,
   Animated,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -83,6 +84,7 @@ export default function HomeScreen() {
   const { user, profile } = useAuth();
 
   const [guestPrefs, setGuestPrefs] = useState<OnboardingData | null>(null);
+  const [guestForYouLimit, setGuestForYouLimit] = useState(4);
 
   useEffect(() => {
     if (!user) {
@@ -525,6 +527,7 @@ export default function HomeScreen() {
     setHasMore(true);
     setCampusPage(0);
     setHasMoreCampus(true);
+    setGuestForYouLimit(4);
     fetchEvents(0, true);
     fetchCampusEvents(0, true);
     fetchSavedEventIds();
@@ -578,6 +581,16 @@ export default function HomeScreen() {
 
   // Tab 0: For You Events
   const forYouEvents = useMemo(() => {
+    if (!user) {
+      if (basePool.length === 0) return [];
+      // Deterministic hash-based random shuffle for guests so order is stable across pagination steps
+      return [...basePool].sort((a, b) => {
+        const hashA = (a.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 17;
+        const hashB = (b.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 17;
+        return hashA - hashB;
+      });
+    }
+
     if (preferredCities.length === 0 || preferredGoals.length === 0) {
       return [];
     }
@@ -598,7 +611,28 @@ export default function HomeScreen() {
       const db = parseEventDateString(b.date_string)?.getTime() || 0;
       return da - db;
     });
-  }, [basePool, preferredCities, preferredGoals]);
+  }, [basePool, preferredCities, preferredGoals, user]);
+
+  const handleGuestLoadMore = useCallback(() => {
+    haptic.light();
+    if (guestForYouLimit < 8 && forYouEvents.length > guestForYouLimit) {
+      setGuestForYouLimit(8);
+    } else {
+      Alert.alert(
+        'Sign in to EvenTime',
+        'Sign in to explore more personalized events, save your favorites, and set reminders.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Sign In',
+            onPress: () => {
+              navigation.navigate('Login');
+            },
+          },
+        ]
+      );
+    }
+  }, [guestForYouLimit, forYouEvents.length, navigation]);
 
   // Tab 1: Around You Events
   const aroundYouEvents = useMemo(() => {
@@ -803,7 +837,7 @@ export default function HomeScreen() {
           {/* Page 0: For You Feed */}
           <View style={styles.pageContainer}>
             <FlatList
-              data={forYouEvents}
+              data={!user ? forYouEvents.slice(0, guestForYouLimit) : forYouEvents}
               keyExtractor={(item) => item.id}
               renderItem={renderEventItem}
               ListHeaderComponent={
@@ -813,7 +847,11 @@ export default function HomeScreen() {
                       ? `Events on ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
                       : 'For You'}
                   </Text>
-                  <Text style={styles.eventCountText}>{forYouEvents.length} events</Text>
+                  <Text style={styles.eventCountText}>
+                    {!user
+                      ? `${Math.min(forYouEvents.length, guestForYouLimit)} events`
+                      : `${forYouEvents.length} events`}
+                  </Text>
                 </View>
               }
               ListEmptyComponent={
@@ -864,10 +902,26 @@ export default function HomeScreen() {
               windowSize={5}
               removeClippedSubviews={Platform.OS === 'android'}
               updateCellsBatchingPeriod={50}
-              onEndReached={loadMoreEvents}
+              onEndReached={!user ? undefined : loadMoreEvents}
               onEndReachedThreshold={0.5}
               ListFooterComponent={
-                isFetchingMore ? (
+                !user ? (
+                  forYouEvents.length > 0 ? (
+                    <View style={styles.guestFooterContainer}>
+                      <TouchableOpacity
+                        style={styles.guestLoadMoreBtn}
+                        onPress={handleGuestLoadMore}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.guestLoadMoreBtnText}>
+                          {guestForYouLimit < 8 && forYouEvents.length > guestForYouLimit
+                            ? 'Load More Events'
+                            : 'Sign In to See More Events'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null
+                ) : isFetchingMore ? (
                   <View style={{ paddingVertical: 20 }}>
                     <ActivityIndicator size="small" color={theme.colors.brand} />
                   </View>
@@ -880,80 +934,104 @@ export default function HomeScreen() {
 
           {/* Page 1: Around You Feed */}
           <View style={styles.pageContainer}>
-            <FlatList
-              data={aroundYouEvents}
-              keyExtractor={(item) => item.id}
-              renderItem={renderEventItem}
-              ListHeaderComponent={
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>
-                    {selectedDate
-                      ? `Events on ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
-                      : 'Around You'}
-                  </Text>
-                  <Text style={styles.eventCountText}>{aroundYouEvents.length} events</Text>
-                </View>
-              }
-              ListEmptyComponent={
-                <EmptyState
-                  illustration={APP_ASSETS.illustrations.aroundYou}
-                  title={
-                    selectedDate
-                      ? 'No Events Scheduled'
-                      : forYouEvents.length > 0
-                      ? `All caught up in ${citiesLabel}!`
-                      : `No Events in ${citiesLabel}`
-                  }
-                  message={
-                    selectedDate
-                      ? `There are no events scheduled for ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}. Be the first to host one!`
-                      : forYouEvents.length > 0
-                      ? `All scheduled events in ${citiesLabel} currently match your selected interests and are waiting in 'For You'. Check back soon as new categories are added!`
-                      : `No upcoming events found in ${citiesLabel}. Add more cities in your Profile or host an event yourself to get the community started!`
-                  }
-                  buttonText={
-                    selectedDate
-                      ? 'Clear Date'
-                      : forYouEvents.length > 0
-                      ? 'View For You'
-                      : 'Update Cities'
-                  }
-                  onButtonPress={() => {
-                    if (selectedDate) {
-                      setSelectedDate(null);
-                    } else if (forYouEvents.length > 0) {
-                      handleSelectTab(0);
-                    } else {
-                      (navigation as any).navigate('ProfileTab');
-                    }
-                  }}
-                />
-              }
-              refreshControl={
-                <RefreshControl
-                  refreshing={isRefreshing}
-                  onRefresh={onRefresh}
-                  colors={[theme.colors.brand]}
-                  tintColor={theme.colors.brand}
-                />
-              }
-              initialNumToRender={6}
-              maxToRenderPerBatch={8}
-              windowSize={5}
-              removeClippedSubviews={Platform.OS === 'android'}
-              updateCellsBatchingPeriod={50}
-              onEndReached={loadMoreEvents}
-              onEndReachedThreshold={0.5}
-              ListFooterComponent={
-                isFetchingMore ? (
-                  <View style={{ paddingVertical: 20 }}>
-                    <ActivityIndicator size="small" color={theme.colors.brand} />
+            {!user ? (
+              <View style={styles.guestLockedContainer}>
+                <View style={styles.guestLockedCard}>
+                  <View style={styles.guestLockBadge}>
+                    <Compass size={32} color={theme.colors.brand} />
                   </View>
-                ) : null
-              }
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-            />
+                  <Text style={styles.guestLockTitle}>Sign In to See Events Around You</Text>
+                  <Text style={styles.guestLockSubtitle}>
+                    Unlock local tech gatherings, college fests, workshops, and hackathons happening right in your city.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.guestSignInBtn}
+                    onPress={() => {
+                      haptic.medium();
+                      navigation.navigate('Login');
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.guestSignInBtnText}>Sign In to Unlock</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <FlatList
+                data={aroundYouEvents}
+                keyExtractor={(item) => item.id}
+                renderItem={renderEventItem}
+                ListHeaderComponent={
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>
+                      {selectedDate
+                        ? `Events on ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
+                        : 'Around You'}
+                    </Text>
+                    <Text style={styles.eventCountText}>{aroundYouEvents.length} events</Text>
+                  </View>
+                }
+                ListEmptyComponent={
+                  <EmptyState
+                    illustration={APP_ASSETS.illustrations.aroundYou}
+                    title={
+                      selectedDate
+                        ? 'No Events Scheduled'
+                        : forYouEvents.length > 0
+                        ? `All caught up in ${citiesLabel}!`
+                        : `No Events in ${citiesLabel}`
+                    }
+                    message={
+                      selectedDate
+                        ? `There are no events scheduled for ${new Date(selectedDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}. Be the first to host one!`
+                        : forYouEvents.length > 0
+                        ? `All scheduled events in ${citiesLabel} currently match your selected interests and are waiting in 'For You'. Check back soon as new categories are added!`
+                        : `No upcoming events found in ${citiesLabel}. Add more cities in your Profile or host an event yourself to get the community started!`
+                    }
+                    buttonText={
+                      selectedDate
+                        ? 'Clear Date'
+                        : forYouEvents.length > 0
+                        ? 'View For You'
+                        : 'Update Cities'
+                    }
+                    onButtonPress={() => {
+                      if (selectedDate) {
+                        setSelectedDate(null);
+                      } else if (forYouEvents.length > 0) {
+                        handleSelectTab(0);
+                      } else {
+                        (navigation as any).navigate('ProfileTab');
+                      }
+                    }}
+                  />
+                }
+                refreshControl={
+                  <RefreshControl
+                    refreshing={isRefreshing}
+                    onRefresh={onRefresh}
+                    colors={[theme.colors.brand]}
+                    tintColor={theme.colors.brand}
+                  />
+                }
+                initialNumToRender={6}
+                maxToRenderPerBatch={8}
+                windowSize={5}
+                removeClippedSubviews={Platform.OS === 'android'}
+                updateCellsBatchingPeriod={50}
+                onEndReached={loadMoreEvents}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                  isFetchingMore ? (
+                    <View style={{ paddingVertical: 20 }}>
+                      <ActivityIndicator size="small" color={theme.colors.brand} />
+                    </View>
+                  ) : null
+                }
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
           </View>
 
           {/* Page 2: Your Campus Feed (Students only) */}
@@ -1405,5 +1483,83 @@ const styles = StyleSheet.create({
     fontFamily: 'Switzer-Medium',
     fontSize: 11,
     color: '#92400E',
+  },
+  guestFooterContainer: {
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    alignItems: 'center',
+    marginBottom: theme.spacing.xl,
+  },
+  guestLoadMoreBtn: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.brand,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: theme.borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...theme.shadows.sm,
+  },
+  guestLoadMoreBtnText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 14,
+    color: theme.colors.brand,
+  },
+  guestLockedContainer: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.xxl,
+    alignItems: 'center',
+  },
+  guestLockedCard: {
+    width: '100%',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.md,
+  },
+  guestLockBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(108, 71, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  guestLockTitle: {
+    fontFamily: 'Outfit-Bold',
+    fontSize: 19,
+    color: theme.colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.sm,
+    letterSpacing: -0.3,
+  },
+  guestLockSubtitle: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: theme.spacing.xl,
+  },
+  guestSignInBtn: {
+    backgroundColor: theme.colors.brand,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: theme.borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    ...theme.shadows.sm,
+  },
+  guestSignInBtnText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 15,
+    color: '#FFFFFF',
   },
 });

@@ -23,6 +23,8 @@
 # Google Sign In
 -dontwarn com.google.android.gms.**
 -keep class com.google.android.gms.** { *; }
+-dontwarn com.reactnativegooglesignin.**
+-keep class com.reactnativegooglesignin.** { *; }
 
 # Async Storage
 -dontwarn com.reactnativecommunity.asyncstorage.**

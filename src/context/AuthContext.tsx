@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import type { Session } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '../lib/supabase';
 import type { AuthUser, ProfileRow } from '../types';
@@ -239,6 +240,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error(
               '[AuthContext] DEVELOPER_ERROR (code 10): Ensure SHA-1 fingerprint (6E:34:E2:A3:1A:45:83:A7:2C:83:FF:D4:A5:8B:39:0E:E3:1B:B2:EE) and package com.eventime.app are registered in Firebase / Google Cloud Console, and Web Client ID matches.'
             );
+          }
+          if (Platform.OS === 'android') {
+            // On Android, do not silently fallback to WebBrowser. Return the exact native error message.
+            const errMsg =
+              nativeErr?.code === '10' || nativeErr?.code === 10
+                ? 'Google Play Services configuration mismatch (Code 10). Please ensure your Release SHA-1 is registered in Firebase.'
+                : (nativeErr?.message || `Google Sign-In failed (Code: ${nativeErr?.code || 'UNKNOWN'})`);
+            return { error: new Error(errMsg) };
           }
         }
       }
