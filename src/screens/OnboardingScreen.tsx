@@ -140,7 +140,7 @@ export default function OnboardingScreen() {
   const [currentSlide, setCurrentSlide] = useState(0);
 
   // Auth state for Slide 5
-  const [hasConsented, setHasConsented] = useState(true);
+  const [hasConsented, setHasConsented] = useState(false);
   const [authLoading, setAuthLoading] = useState<string | null>(null);
 
   // Profile Setup states (Step 6)
