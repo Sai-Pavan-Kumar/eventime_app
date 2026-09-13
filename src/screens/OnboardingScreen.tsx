@@ -25,9 +25,6 @@ import {
   ChevronRight,
   ChevronLeft,
   X,
-  Eye,
-  EyeOff,
-  Mail,
   ArrowRight,
   ArrowLeft,
   Lock,
@@ -134,8 +131,6 @@ export default function OnboardingScreen() {
     refreshProfile,
     signInWithGoogle,
     signInWithGithub,
-    signInWithEmail,
-    signUpWithEmail,
   } = useAuth();
 
   // Screen State:
@@ -144,12 +139,7 @@ export default function OnboardingScreen() {
   // 6: Smart Profile Setup (Only for new users where !profile?.is_onboarded)
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  // Auth form states for Slide 5
-  const [showEmailForm, setShowEmailForm] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  // Auth state for Slide 5
   const [hasConsented, setHasConsented] = useState(true);
   const [authLoading, setAuthLoading] = useState<string | null>(null);
 
@@ -348,34 +338,6 @@ export default function OnboardingScreen() {
     }
   };
 
-  const handleEmailAuth = async () => {
-    if (!hasConsented) {
-      Alert.alert('Consent Required', 'Please accept the Terms and Privacy Policy to continue.');
-      return;
-    }
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !password) {
-      Alert.alert('Missing Fields', 'Please enter both your email and password.');
-      return;
-    }
-
-    setAuthLoading('email');
-    if (isSignUp) {
-      const { error } = await signUpWithEmail(cleanEmail, password);
-      setAuthLoading(null);
-      if (error) {
-        Alert.alert('Sign-Up Error', error.message);
-      } else {
-        Alert.alert('Account Created', 'Please check your email to verify your account before logging in.');
-      }
-    } else {
-      const { error } = await signInWithEmail(cleanEmail, password);
-      setAuthLoading(null);
-      if (error) {
-        Alert.alert('Sign-In Error', error.message);
-      }
-    }
-  };
 
   // Profile Setup Validation & Handlers (Step 6)
   const USERNAME_REGEX = /^[a-z0-9_.-]{3,12}$/;
@@ -826,78 +788,6 @@ export default function OnboardingScreen() {
                 )}
               </TouchableOpacity>
 
-              {/* 3. Email Toggle / Form */}
-              {!showEmailForm ? (
-                <TouchableOpacity
-                  style={styles.emailToggleBtn}
-                  onPress={() => setShowEmailForm(true)}
-                  activeOpacity={0.8}
-                >
-                  <Mail size={16} color="#475569" style={{ marginRight: 8 }} />
-                  <Text style={styles.emailToggleText}>Continue with Email</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.emailFormBox}>
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Email Address</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="you@example.com"
-                      placeholderTextColor="#94A3B8"
-                      value={email}
-                      onChangeText={setEmail}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      maxLength={100}
-                    />
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Password</Text>
-                    <View style={styles.passwordRow}>
-                      <TextInput
-                        style={styles.passwordInput}
-                        placeholder="••••••••"
-                        placeholderTextColor="#94A3B8"
-                        secureTextEntry={!showPassword}
-                        value={password}
-                        onChangeText={setPassword}
-                        maxLength={100}
-                      />
-                      <TouchableOpacity
-                        style={styles.eyeBtn}
-                        onPress={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff size={18} color="#94A3B8" /> : <Eye size={18} color="#94A3B8" />}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  <TouchableOpacity
-                    style={styles.emailSubmitBtn}
-                    onPress={handleEmailAuth}
-                    activeOpacity={0.85}
-                    disabled={authLoading !== null}
-                  >
-                    {authLoading === 'email' ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.emailSubmitBtnText}>
-                        {isSignUp ? 'Create Account' : 'Sign In with Email'}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.switchAuthModeBtn}
-                    onPress={() => setIsSignUp(!isSignUp)}
-                  >
-                    <Text style={styles.switchAuthModeText}>
-                      {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
 
               {/* 4. Continue as Guest (Exploration Entry) */}
               <TouchableOpacity

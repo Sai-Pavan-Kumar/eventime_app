@@ -237,7 +237,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.warn('[AuthContext] Native Google sign-in failed (Code: ' + nativeErr?.code + '):', nativeErr?.message);
           if (nativeErr?.code === '10' || nativeErr?.code === 10) {
             console.error(
-              '[AuthContext] DEVELOPER_ERROR (code 10): Ensure SHA-1 fingerprint (5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25) and package com.eventime.app are registered in Firebase / Google Cloud Console, and Web Client ID matches.'
+              '[AuthContext] DEVELOPER_ERROR (code 10): Ensure SHA-1 fingerprint (6E:34:E2:A3:1A:45:83:A7:2C:83:FF:D4:A5:8B:39:0E:E3:1B:B2:EE) and package com.eventime.app are registered in Firebase / Google Cloud Console, and Web Client ID matches.'
             );
           }
         }

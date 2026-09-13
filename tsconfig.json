@@ -17,6 +17,7 @@
     "node_modules",
     "dist",
     "supabase/functions/**/*",
-    "cloudflare-waf-worker/**/*"
+    "cloudflare-waf-worker/**/*",
+    "tools/**/*"
   ]
 }
