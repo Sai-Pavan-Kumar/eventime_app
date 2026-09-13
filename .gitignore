@@ -41,6 +41,17 @@ release-builds/
 *.aab
 android/app/build/
 android/.gradle/
+!.env.example
+
+# typescript
+*.tsbuildinfo
+
+# Release build binaries and Android build caches
+release-builds/
+*.apk
+*.aab
+android/app/build/
+android/.gradle/
 android/.kotlin/
 android/build/
 *.jks
@@ -50,6 +61,7 @@ android/build/
 # Google Services & Firebase
 google-services.json
 android/app/google-services.json
+testers.csv
 
 # Internal launch & strategy documentation (Local laptop only)
 PLAY_STORE_*.md
