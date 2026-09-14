@@ -212,6 +212,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 1. Try native Google Sign-In SDK (in-app bottom sheet) if available
       if (GoogleSigninModule && typeof GoogleSigninModule.signIn === 'function') {
         try {
+          // REQUIRED: Must configure the SDK with webClientId before every sign-in.
+          // Without this, Google Play Services has no OAuth client context → Error Code 10.
+          GoogleSigninModule.configure({
+            webClientId: GOOGLE_WEB_CLIENT_ID,
+            scopes: ['profile', 'email'],
+          });
           await GoogleSigninModule.hasPlayServices({ showPlayServicesUpdateDialog: true });
           const response = await GoogleSigninModule.signIn();
           const idToken = (response as any)?.data?.idToken || (response as any)?.idToken;
