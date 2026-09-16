@@ -88,8 +88,11 @@ export default function SearchScreen() {
       // 1. Edge CDN Buffet Fast Path (0 Supabase DB load)
       try {
         const buffetRes = await withTimeout(
-          fetch('https://eventime.thesurfboard.in/api/buffet', {
-            headers: { Accept: 'application/json' },
+          fetch(`https://eventime.thesurfboard.in/api/buffet?_t=${Date.now()}`, {
+            headers: {
+              Accept: 'application/json',
+              'Cache-Control': 'no-cache, no-store',
+            },
           }),
           4000
         );

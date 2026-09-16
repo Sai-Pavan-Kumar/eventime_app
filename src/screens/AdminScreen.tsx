@@ -38,6 +38,8 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
 import { sendRemotePushNotification } from '../lib/notifications';
+import { triggerWebRevalidation } from '../lib/revalidate';
+import { appEventSync } from '../lib/eventSync';
 import type { EventRow, ReportRow, CollegeRow, FeedbackRow, ProfileRow } from '../types';
 
 export default function AdminScreen() {
@@ -203,6 +205,16 @@ export default function AdminScreen() {
 
       if (error) throw error;
 
+      // 1. Instantly revalidate Next.js and purge Cloudflare Edge CDN cache (0ms)
+      triggerWebRevalidation(eventItem.slug || eventItem.id);
+
+      // 2. Broadcast across screens so all open feeds update in 0ms
+      appEventSync.emit({
+        eventId: eventItem.id,
+        type: 'create',
+        event: { ...eventItem, status: 'approved' },
+      });
+
       // Award +100 ET points to creator (using idempotent award_event_approval_score RPC)
       if (eventItem.creator_id) {
         try {
@@ -309,6 +321,7 @@ export default function AdminScreen() {
         .eq('id', eventId);
 
       if (error) throw error;
+      triggerWebRevalidation(eventId);
       loadData();
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Could not toggle featured.');
@@ -328,6 +341,8 @@ export default function AdminScreen() {
               .update({ status: 'deleted' })
               .eq('id', eventId);
             if (error) throw error;
+            triggerWebRevalidation(eventId);
+            appEventSync.emit({ type: 'delete', eventId });
             Alert.alert('Deleted', 'Event has been removed.');
             loadData();
           } catch (e: any) {

@@ -12,6 +12,7 @@ import {
   Platform,
   Animated,
   Alert,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -326,8 +327,11 @@ export default function HomeScreen() {
       if (pageIndex === 0 && !selectedDate && !forceRefresh) {
         try {
           const buffetRes = await withTimeout(
-            fetch('https://eventime.thesurfboard.in/api/buffet', {
-              headers: { Accept: 'application/json' },
+            fetch(`https://eventime.thesurfboard.in/api/buffet?_t=${Date.now()}`, {
+              headers: {
+                Accept: 'application/json',
+                'Cache-Control': 'no-cache, no-store',
+              },
             }),
             5000
           );
@@ -508,18 +512,34 @@ export default function HomeScreen() {
     fetchSavedEventIds();
   }, [fetchEvents, fetchCampusEvents, fetchSavedEventIds, selectedDate]);
 
-  // Gentle focus revalidation with 5-min cooldown to avoid wasteful DB calls on rapid tab switches
+  // Instant focus revalidation: when returning to Home tab, sync latest events and preserve tab position
   const lastFocusSyncRef = useRef<number>(Date.now());
   useFocusEffect(
     useCallback(() => {
       const now = Date.now();
-      if (now - lastFocusSyncRef.current > 5 * 60 * 1000) {
+      if (now - lastFocusSyncRef.current > 4000) {
         lastFocusSyncRef.current = now;
         fetchEvents(0);
         fetchCampusEvents(0);
       }
-    }, [fetchEvents, fetchCampusEvents])
+      if (activeTabIdx > 0 && pagerRef.current) {
+        requestAnimationFrame(() => {
+          pagerRef.current?.scrollTo({ x: activeTabIdx * width, animated: false });
+        });
+      }
+    }, [fetchEvents, fetchCampusEvents, activeTabIdx])
   );
+
+  // AppState resume listener: when user unlocks phone or switches back to app, instantly sync
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        fetchEvents(0);
+        fetchCampusEvents(0);
+      }
+    });
+    return () => subscription.remove();
+  }, [fetchEvents, fetchCampusEvents]);
 
   const onRefresh = () => {
     setIsRefreshing(true);

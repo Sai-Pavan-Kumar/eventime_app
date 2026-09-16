@@ -1119,10 +1119,6 @@ export default function CreateEventScreen() {
                 newAutoFilled.date = true;
               }
             }
-            if (extracted.image && !posterUri) {
-              setPosterUri(extracted.image);
-              newAutoFilled.poster = true;
-            }
             if (extracted.finalUrl && extracted.finalUrl !== normalizedUrl) {
               setRegLink(extracted.finalUrl);
             }
