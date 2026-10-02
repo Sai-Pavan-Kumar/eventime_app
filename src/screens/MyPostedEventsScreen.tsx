@@ -25,6 +25,8 @@ import {
   Clock,
   XCircle,
   Plus,
+  Users,
+  Check,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -41,7 +43,7 @@ export default function MyPostedEventsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuth();
 
-  const [events, setEvents] = useState<(EventRow & { saved_count?: number })[]>([]);
+  const [events, setEvents] = useState<(EventRow & { saved_count?: number; interested_count?: number; reg_count?: number })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -53,7 +55,7 @@ export default function MyPostedEventsScreen() {
     try {
       const query = supabase
         .from('events')
-        .select('*, saved_events(count), interested_events(count)')
+        .select('*, saved_events(count), interested_events(count), registered_events(count)')
         .eq('creator_id', user.id)
         .limit(50);
 
@@ -64,6 +66,8 @@ export default function MyPostedEventsScreen() {
       const formatted = (data || []).map((ev: any) => ({
         ...ev,
         saved_count: ev.saved_events?.[0]?.count || 0,
+        interested_count: ev.interested_events?.[0]?.count || 0,
+        reg_count: ev.registered_events?.[0]?.count || 0,
       }));
 
       // Sort strictly in chronological order (soonest/earliest event date to latest)
@@ -198,9 +202,19 @@ export default function MyPostedEventsScreen() {
 
               {/* Stats & Actions Bar */}
               <View style={styles.cardFooter}>
-                <View style={styles.savesIndicator}>
-                  <Bookmark size={13} color={theme.colors.textSecondary} />
-                  <Text style={styles.savesText}>{item.saved_count || 0} Saves</Text>
+                <View style={styles.statsIndicatorRow}>
+                  <View style={styles.regBadge}>
+                    <Check size={10} color="#065F46" strokeWidth={2.5} />
+                    <Text style={styles.regBadgeText}>{item.reg_count || 0} Reg</Text>
+                  </View>
+                  <View style={styles.statChip}>
+                    <Users size={11} color="#64748B" />
+                    <Text style={styles.statChipText}>{item.interested_count || 0}</Text>
+                  </View>
+                  <View style={styles.statChip}>
+                    <Bookmark size={11} color="#64748B" />
+                    <Text style={styles.statChipText}>{item.saved_count || 0}</Text>
+                  </View>
                 </View>
 
                 <View style={styles.actionButtons}>
@@ -363,6 +377,46 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: theme.colors.borderLight,
+  },
+  statsIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+    flex: 1,
+    marginRight: 8,
+  },
+  regBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  regBadgeText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 10,
+    color: '#065F46',
+  },
+  statChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  statChipText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 10,
+    color: '#475569',
   },
   savesIndicator: {
     flexDirection: 'row',

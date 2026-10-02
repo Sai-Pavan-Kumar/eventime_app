@@ -11,7 +11,7 @@ import { supabase } from '../lib/supabase';
 import { parseEventDateString, formatEventTime } from '../lib/utils/date';
 import { scheduleEventReminder, cancelEventReminder } from '../lib/notifications';
 import { haptic } from '../lib/haptics';
-import { saveCachedEventDetail, loadCachedSavedEventIds, saveCachedSavedEventIds } from '../lib/offline-cache';
+import { saveCachedEventDetail, loadCachedSavedEventIds, saveCachedSavedEventIds, loadCachedRegisteredEventIds } from '../lib/offline-cache';
 import { appEventSync } from '../lib/eventSync';
 import type { EventRow } from '../types';
 
@@ -35,6 +35,7 @@ export interface EventCardProps {
   hideOrganizer?: boolean;
   hidePastBadge?: boolean;
   isSaved?: boolean;
+  isRegistered?: boolean;
   onPress?: () => void;
   onSaveToggle?: (eventId: string, isSaved: boolean) => void;
   onOrganizerPress?: () => void;
@@ -67,6 +68,7 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
   const hidePastBadge = props.hidePastBadge ?? false;
 
   const [isSaved, setIsSaved] = useState(props.isSaved ?? false);
+  const [isRegisteredState, setIsRegisteredState] = useState(props.isRegistered ?? false);
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -75,13 +77,37 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
   const [ownerNotice, setOwnerNotice] = useState(false);
   const ownerNoticeTimer = React.useRef<NodeJS.Timeout | null>(null);
 
+  // Sync registered status from offline cache
   useEffect(() => {
+    if (id) {
+      loadCachedRegisteredEventIds().then((cachedSet) => {
+        if (cachedSet && (cachedSet.has(id) || (slug && cachedSet.has(slug)))) {
+          setIsRegisteredState(true);
+        }
+      });
+    }
+  }, [id, slug]);
+
+  // Reactive subscription across screens
+  useEffect(() => {
+    const unsubscribe = appEventSync.subscribe((payload) => {
+      if (payload.eventId === id || (slug && payload.eventId === slug)) {
+        if (payload.type === 'save' && typeof payload.isSaved === 'boolean') {
+          setIsSaved(payload.isSaved);
+        }
+        if (payload.type === 'register' && typeof payload.isRegistered === 'boolean') {
+          setIsRegisteredState(payload.isRegistered);
+        }
+      }
+    });
+
     return () => {
+      unsubscribe();
       if (ownerNoticeTimer.current) {
         clearTimeout(ownerNoticeTimer.current);
       }
     };
-  }, []);
+  }, [id, slug]);
 
   const categoryConfig = getCategoryConfig(category);
   const isCustomPoster = Boolean(isFeatured && posterUrl && posterUrl.startsWith('http'));
@@ -359,6 +385,13 @@ export const EventCard: React.FC<EventCardProps> = React.memo((props) => {
 
         {/* Bottom Left Status & Featured Badges */}
         <View style={styles.bottomOverlayCol}>
+          {isRegisteredState && (
+            <View style={styles.registeredBadge}>
+              <Check size={9} color="#FFFFFF" strokeWidth={3} />
+              <Text style={styles.registeredBadgeText}>REGISTERED</Text>
+            </View>
+          )}
+
           {isFeatured && (
             <View style={styles.featuredBadge}>
               <Text style={styles.featuredText}>Featured</Text>
@@ -728,6 +761,26 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 10,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  registeredBadge: {
+    backgroundColor: '#059669',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  registeredBadgeText: {
+    fontFamily: 'Switzer-Bold',
+    color: '#FFFFFF',
+    fontSize: 9,
     letterSpacing: 0.5,
   },
 });

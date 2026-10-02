@@ -90,7 +90,7 @@ export default function PrivacyPolicyScreen() {
             </Text>
             <View style={styles.contactBox}>
               <Mail size={16} color={theme.colors.brand} />
-              <Text style={styles.contactEmail}>eventime.admin@gmail.com</Text>
+              <Text style={styles.contactEmail}>eventime@thesurfboard.in</Text>
             </View>
           </View>
         </View>

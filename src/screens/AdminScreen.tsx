@@ -215,7 +215,7 @@ export default function AdminScreen() {
         event: { ...eventItem, status: 'approved' },
       });
 
-      // Award +100 ET points to creator (using idempotent award_event_approval_score RPC)
+      // Award +20 ET points to creator (using idempotent award_event_approval_score RPC)
       if (eventItem.creator_id) {
         try {
           const { error: rpcError } = await supabase.rpc('award_event_approval_score', {
@@ -227,7 +227,7 @@ export default function AdminScreen() {
             // Fallback for environments with standard increment_et_score RPC
             await supabase.rpc('increment_et_score', {
               user_id: eventItem.creator_id,
-              delta: 100,
+              delta: 20,
             } as any);
           }
         } catch (scoreErr) {
@@ -240,7 +240,7 @@ export default function AdminScreen() {
         sendRemotePushNotification({
           userIds: [eventItem.creator_id],
           title: 'Event Published',
-          body: `"${eventItem.title}" is now live on EvenTime (+100 ET score).`,
+          body: `"${eventItem.title}" is now live on EvenTime (+20 ET score).`,
           data: { eventId: eventItem.id, id: eventItem.id },
           channelId: 'events-reminders',
         });
@@ -732,7 +732,7 @@ export default function AdminScreen() {
                         onPress={() => handleApproveEvent(item)}
                       >
                         <CheckCircle2 size={16} color="#FFF" />
-                        <Text style={styles.approveBtnText}>Approve (+100 ET)</Text>
+                        <Text style={styles.approveBtnText}>Approve (+20 ET)</Text>
                       </TouchableOpacity>
                     </View>
                   </View>

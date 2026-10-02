@@ -40,6 +40,8 @@ import {
   Tag,
   Info,
   WifiOff,
+  Compass,
+  Check,
 } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { theme } from '../config/theme';
@@ -47,7 +49,7 @@ import { getCategoryConfig } from '../lib/category-config';
 import { APP_ASSETS, getCategoryPoster } from '../lib/asset-registry';
 import { scheduleEventReminder, cancelEventReminder, sendRemotePushNotification } from '../lib/notifications';
 import { withTimeout } from '../lib/api-resilience';
-import { loadCachedEventDetail, saveCachedEventDetail, loadCachedSavedEventIds } from '../lib/offline-cache';
+import { loadCachedEventDetail, saveCachedEventDetail, loadCachedSavedEventIds, loadCachedRegisteredEventIds, saveCachedRegisteredEventIds } from '../lib/offline-cache';
 import { useAuth } from '../context/AuthContext';
 import { haptic } from '../lib/haptics';
 import { EventCard } from '../components/EventCard';
@@ -72,6 +74,8 @@ export default function EventDetailScreen() {
   const [similarEvents, setSimilarEvents] = useState<EventRow[]>([]);
   const [isSaved, setIsSaved] = useState(false);
   const [isInterested, setIsInterested] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [interestCount, setInterestCount] = useState<number>(
     (initialEvent as any)?.interested_events?.[0]?.count ?? (initialEvent as any)?.interested_count ?? 0
   );
@@ -100,7 +104,7 @@ export default function EventDetailScreen() {
     }
   }, [eventId, id, slug, initialEvent]);
 
-  // Check saved state from local cache (works offline)
+  // Check saved & registered state from local cache (works offline)
   useEffect(() => {
     const targetId = event?.id || id || eventId;
     if (targetId && user) {
@@ -109,8 +113,35 @@ export default function EventDetailScreen() {
           setIsSaved(true);
         }
       });
+      loadCachedRegisteredEventIds().then((regIds) => {
+        if (regIds && regIds.has(targetId)) {
+          setIsRegistered(true);
+        }
+      });
     }
   }, [event?.id, id, eventId, user]);
+
+  // Reactive subscription across screens
+  useEffect(() => {
+    const targetId = event?.id || id || eventId;
+    const unsubscribe = appEventSync.subscribe((payload) => {
+      if (payload.eventId === targetId) {
+        if (payload.type === 'save' && typeof payload.isSaved === 'boolean') {
+          setIsSaved(payload.isSaved);
+        }
+        if (payload.type === 'interest' && typeof payload.isInterested === 'boolean') {
+          setIsInterested(payload.isInterested);
+          if (typeof payload.newInterestedCount === 'number') {
+            setInterestCount(payload.newInterestedCount);
+          }
+        }
+        if (payload.type === 'register' && typeof payload.isRegistered === 'boolean') {
+          setIsRegistered(payload.isRegistered);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [event?.id, id, eventId]);
 
   const isStudent = profile?.user_type === 'student';
   const userCollege = profile?.college || event?.colleges?.name || '';
@@ -187,7 +218,7 @@ export default function EventDetailScreen() {
         return timeA - timeB;
       });
 
-      setSimilarEvents(upcoming.slice(0, 6));
+      setSimilarEvents(upcoming.slice(0, 20));
     } catch (e) {
       console.warn('[EventDetail] Failed to load city events', e);
       setSimilarEvents([]);
@@ -213,6 +244,19 @@ export default function EventDetailScreen() {
       if (error) throw error;
 
       if (data) {
+        // Security Gate: Non-approved events must only be accessible to their creator or admin
+        const isAdmin = profile?.role === 'admin' || profile?.user_type === 'admin';
+        const isCreator = Boolean(user && user.id === data.creator_id);
+        if (data.status !== 'approved' && !isCreator && !isAdmin) {
+          Alert.alert(
+            'Event Unavailable',
+            'This event is currently pending review or has been archived.',
+            [{ text: 'Go Back', onPress: () => navigation.goBack() }]
+          );
+          setIsLoading(false);
+          return;
+        }
+
         setEvent(data as any);
         saveCachedEventDetail(data as any);
         setIsOfflineMode(false);
@@ -224,7 +268,7 @@ export default function EventDetailScreen() {
         fetchSimilarEvents(data as EventRow);
 
         if (user) {
-          const [{ data: savedRow }, { data: interestRow }, { data: reportRow }] = await Promise.all([
+          const [{ data: savedRow }, { data: interestRow }, { data: reportRow }, { data: regRow }] = await Promise.all([
             supabase
               .from('saved_events')
               .select('id')
@@ -244,11 +288,18 @@ export default function EventDetailScreen() {
               .eq('reporter_id', user.id)
               .eq('status', 'pending')
               .maybeSingle(),
+            supabase
+              .from('registered_events')
+              .select('id')
+              .eq('event_id', data.id)
+              .eq('user_id', user.id)
+              .maybeSingle(),
           ]);
 
           setIsSaved(!!savedRow);
           setIsInterested(!!interestRow);
           setIsReportedByMe(!!reportRow);
+          setIsRegistered(!!regRow);
         }
       }
     } catch (err) {
@@ -505,6 +556,74 @@ export default function EventDetailScreen() {
     } catch (err) {
       console.error('[EventDetail] Add to calendar error:', err);
       Alert.alert('Error', 'Could not open calendar.');
+    }
+  };
+
+  const handleToggleRegistration = async () => {
+    if (isRegistering) return;
+    if (!user) {
+      Alert.alert(
+        'Sign In Required',
+        'Please sign in to mark and track your event registrations.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+        ]
+      );
+      return;
+    }
+    if (!event) return;
+
+    const nextState = !isRegistered;
+    if (nextState) {
+      haptic.success();
+    } else {
+      haptic.light();
+    }
+
+    setIsRegistered(nextState);
+    setIsRegistering(true);
+
+    // Sync across event bus and offline cache
+    appEventSync.emit({ eventId: event.id, type: 'register', isRegistered: nextState });
+    loadCachedRegisteredEventIds().then((cachedSet) => {
+      const idSet = cachedSet ? new Set(cachedSet) : new Set<string>();
+      if (nextState) {
+        idSet.add(event.id);
+      } else {
+        idSet.delete(event.id);
+      }
+      saveCachedRegisteredEventIds(idSet);
+    });
+
+    try {
+      if (nextState) {
+        await supabase
+          .from('registered_events')
+          .delete()
+          .eq('event_id', event.id)
+          .eq('user_id', user.id);
+        const { error } = await supabase.from('registered_events').insert({
+          event_id: event.id,
+          user_id: user.id,
+          status: 'confirmed',
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('registered_events')
+          .delete()
+          .eq('event_id', event.id)
+          .eq('user_id', user.id);
+        if (error) throw error;
+      }
+    } catch (err: any) {
+      console.error('Registration toggle error:', err);
+      setIsRegistered(!nextState);
+      appEventSync.emit({ eventId: event.id, type: 'register', isRegistered: !nextState });
+      Alert.alert('Error', 'Could not update registration status. Please try again.');
+    } finally {
+      setIsRegistering(false);
     }
   };
 
@@ -875,6 +994,25 @@ export default function EventDetailScreen() {
               </TouchableOpacity>
             )}
 
+            {/* Category */}
+            {Boolean(event.category) && (
+              <TouchableOpacity
+                style={styles.detailRow}
+                onPress={() => navigation.navigate('CategoryEvents', { category: event.category })}
+                activeOpacity={0.7}
+              >
+                <View style={styles.detailIconWrapper}>
+                  <Compass size={18} color={theme.colors.brand} />
+                </View>
+                <View style={styles.detailTextWrapper}>
+                  <Text style={styles.detailLabel}>Category</Text>
+                  <Text style={[styles.detailValue, { color: theme.colors.brand, fontFamily: 'Switzer-Bold' }]}>
+                    {event.category}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
             {/* 5. Registration Price (if it is a paid event) */}
             {(event.is_free === false || Boolean(event.price)) && (
               <View style={styles.detailRow}>
@@ -1018,31 +1156,57 @@ export default function EventDetailScreen() {
 
       {/* Fixed Bottom Register Bar */}
       <View style={[styles.bottomBar, { paddingBottom: bottomPadding + 6 }]}>
-        <TouchableOpacity
-          style={[
-            styles.registerBtn,
-            isPast && styles.registerBtnDisabled,
-            !isPast && !hasRegistrationLink && styles.registerBtnWalkIn,
-          ]}
-          onPress={isPast || !hasRegistrationLink ? undefined : handleRegister}
-          activeOpacity={isPast || !hasRegistrationLink ? 1 : 0.85}
-          disabled={isPast || !hasRegistrationLink}
-        >
-          <Text
+        <View style={styles.bottomBarRow}>
+          <TouchableOpacity
             style={[
-              styles.registerBtnText,
-              isPast && styles.registerBtnTextDisabled,
-              !isPast && !hasRegistrationLink && styles.registerBtnTextWalkIn,
+              styles.registerBtn,
+              hasRegistrationLink && !isPast && { flex: 1 },
+              isPast && styles.registerBtnDisabled,
+              !isPast && !hasRegistrationLink && styles.registerBtnWalkIn,
             ]}
+            onPress={isPast || !hasRegistrationLink ? undefined : handleRegister}
+            activeOpacity={isPast || !hasRegistrationLink ? 1 : 0.85}
+            disabled={isPast || !hasRegistrationLink}
           >
-            {isPast
-              ? 'Event Concluded'
-              : hasRegistrationLink
-              ? 'Register for Event'
-              : 'Walk-in Event'}
-          </Text>
-          {!isPast && hasRegistrationLink && <ExternalLink size={18} color="#FFF" />}
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.registerBtnText,
+                isPast && styles.registerBtnTextDisabled,
+                !isPast && !hasRegistrationLink && styles.registerBtnTextWalkIn,
+              ]}
+            >
+              {isPast
+                ? 'Event Concluded'
+                : hasRegistrationLink
+                ? 'Register for Event'
+                : 'Walk-in Event'}
+            </Text>
+            {!isPast && hasRegistrationLink && <ExternalLink size={18} color="#FFF" />}
+          </TouchableOpacity>
+
+          {!isPast && hasRegistrationLink && (
+            <TouchableOpacity
+              style={[
+                styles.markRegisteredBtn,
+                isRegistered && styles.markRegisteredBtnActive,
+              ]}
+              onPress={handleToggleRegistration}
+              disabled={isRegistering}
+              activeOpacity={0.8}
+            >
+              {isRegistering ? (
+                <ActivityIndicator size="small" color={isRegistered ? '#059669' : '#475569'} />
+              ) : isRegistered ? (
+                <>
+                  <Check size={16} color="#059669" strokeWidth={2.5} />
+                  <Text style={styles.markRegisteredTextActive}>Registered</Text>
+                </>
+              ) : (
+                <Text style={styles.markRegisteredText}>Mark Registered</Text>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Event Report Modal matching website */}
@@ -1599,6 +1763,37 @@ const styles = StyleSheet.create({
   },
   registerBtnTextWalkIn: {
     color: '#334155',
+  },
+  bottomBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  markRegisteredBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 6,
+  },
+  markRegisteredBtnActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  markRegisteredText: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 13,
+    color: '#475569',
+  },
+  markRegisteredTextActive: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 13,
+    color: '#065F46',
   },
   modalOverlay: {
     flex: 1,

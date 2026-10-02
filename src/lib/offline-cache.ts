@@ -13,6 +13,7 @@ const CACHE_KEYS = {
   CAMPUS_EVENTS: '@eventime_cache_campus_events_v2',
   PLATFORM_STATS: '@eventime_cache_stats_v2',
   SAVED_EVENT_IDS: '@eventime_cache_saved_ids_v2',
+  REGISTERED_EVENT_IDS: '@eventime_cache_registered_ids_v1',
   LEADERBOARD_CAMPUS: '@eventime_cache_leaderboard_campus_v1',
   LEADERBOARD_CITY: '@eventime_cache_leaderboard_city_v1',
   LEADERBOARD_ALL_TIME: '@eventime_cache_leaderboard_all_time_v1',
@@ -38,6 +39,7 @@ const memoryCache = {
   campusEvents: null as CacheEnvelope<EventRow[]> | null,
   stats: null as CacheEnvelope<CachedStatsData> | null,
   savedIds: null as CacheEnvelope<string[]> | null,
+  registeredIds: null as CacheEnvelope<string[]> | null,
   leaderboard: {
     campus: null as CacheEnvelope<LeaderboardViewRow[]> | null,
     city: null as CacheEnvelope<LeaderboardViewRow[]> | null,
@@ -228,6 +230,48 @@ export async function saveCachedSavedEventIds(ids: Set<string> | string[]): Prom
     await AsyncStorage.setItem(CACHE_KEYS.SAVED_EVENT_IDS, JSON.stringify(envelope));
   } catch (err) {
     console.warn('[OfflineCache] Failed to persist saved event IDs:', err);
+  }
+}
+
+// ==========================================
+// 4b. REGISTERED EVENT IDS CACHE
+// ==========================================
+
+export function getMemoryRegisteredEventIds(): Set<string> | null {
+  if (!memoryCache.registeredIds?.data) return null;
+  return new Set(memoryCache.registeredIds.data);
+}
+
+export async function loadCachedRegisteredEventIds(): Promise<Set<string> | null> {
+  if (memoryCache.registeredIds?.data) {
+    return new Set(memoryCache.registeredIds.data);
+  }
+  try {
+    const raw = await AsyncStorage.getItem(CACHE_KEYS.REGISTERED_EVENT_IDS);
+    if (!raw) return null;
+    const parsed: CacheEnvelope<string[]> = JSON.parse(raw);
+    if (Array.isArray(parsed?.data)) {
+      memoryCache.registeredIds = parsed;
+      return new Set(parsed.data);
+    }
+  } catch (err) {
+    console.warn('[OfflineCache] Failed to load cached registered event IDs:', err);
+  }
+  return null;
+}
+
+export async function saveCachedRegisteredEventIds(ids: Set<string> | string[]): Promise<void> {
+  const array = Array.isArray(ids) ? ids : Array.from(ids);
+  const envelope: CacheEnvelope<string[]> = {
+    data: array,
+    timestamp: Date.now(),
+    version: 1,
+  };
+  memoryCache.registeredIds = envelope;
+  try {
+    await AsyncStorage.setItem(CACHE_KEYS.REGISTERED_EVENT_IDS, JSON.stringify(envelope));
+  } catch (err) {
+    console.warn('[OfflineCache] Failed to persist registered event IDs:', err);
   }
 }
 

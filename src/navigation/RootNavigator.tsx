@@ -19,11 +19,13 @@ import OnboardingScreen from '../screens/OnboardingScreen';
 import EventDetailScreen from '../screens/EventDetailScreen';
 import CreateEventScreen from '../screens/CreateEventScreen';
 import SavedEventsScreen from '../screens/SavedEventsScreen';
+import RegisteredEventsScreen from '../screens/RegisteredEventsScreen';
 import MyPostedEventsScreen from '../screens/MyPostedEventsScreen';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
 import AdminScreen from '../screens/AdminScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import CityEventsScreen from '../screens/CityEventsScreen';
+import CategoryEventsScreen from '../screens/CategoryEventsScreen';
 import CuratorProfileScreen from '../screens/CuratorProfileScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsScreen from '../screens/TermsScreen';
@@ -52,6 +54,7 @@ const linking = {
       Login: 'auth',
       EventDetail: 'events/:slug',
       CityEvents: 'cities/:city',
+      CategoryEvents: 'categories/:category',
       CuratorProfile: 'curator/:username',
       Leaderboard: 'leaderboard',
       CreateEvent: 'create',
@@ -171,11 +174,13 @@ export function RootNavigator() {
           options={{ animation: 'slide_from_bottom' }}
         />
         <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />
+        <Stack.Screen name="RegisteredEvents" component={RegisteredEventsScreen} />
         <Stack.Screen name="MyPostedEvents" component={MyPostedEventsScreen} />
         <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
         <Stack.Screen name="Admin" component={AdminScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="CityEvents" component={CityEventsScreen} />
+        <Stack.Screen name="CategoryEvents" component={CategoryEventsScreen} />
         <Stack.Screen name="CuratorProfile" component={CuratorProfileScreen} />
         <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         <Stack.Screen name="Terms" component={TermsScreen} />

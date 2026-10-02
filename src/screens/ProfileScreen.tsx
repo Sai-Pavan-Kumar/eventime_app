@@ -275,6 +275,19 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
+            onPress={() => navigation.navigate('RegisteredEvents')}
+          >
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuIconBg, { backgroundColor: '#ECFDF5' }]}>
+                <CheckCircle size={18} color="#059669" />
+              </View>
+              <Text style={styles.menuItemText}>My Registered Events</Text>
+            </View>
+            <ChevronRight size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
             onPress={() => navigation.navigate('Leaderboard')}
           >
             <View style={styles.menuItemLeft}>

@@ -7,10 +7,12 @@ export type EventRow = Database['public']['Tables']['events']['Row'] & {
   interested_count?: number | null;
   interested_events?: { count: number }[];
   saved_events?: { count: number }[];
+  registered_events?: { count: number }[];
 };
 export type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 export type ReportRow = Database['public']['Tables']['event_reports']['Row'];
 export type SavedEventRow = Database['public']['Tables']['saved_events']['Row'];
+export type RegisteredEventRow = Database['public']['Tables']['registered_events']['Row'];
 export type InterestedEventRow = Database['public']['Tables']['interested_events']['Row'];
 export type CollegeRow = Database['public']['Tables']['colleges']['Row'];
 export type VerifiedDomainRow = Database['public']['Tables']['verified_domains']['Row'];
@@ -33,6 +35,7 @@ export type RootStackParamList = {
   EventDetail: { slug?: string; id?: string; eventId?: string; initialEvent?: Partial<EventRow> };
   CreateEvent: { editId?: string; event?: any };
   SavedEvents: undefined;
+  RegisteredEvents: undefined;
   MyPostedEvents: undefined;
   Leaderboard: undefined;
   Admin: undefined;

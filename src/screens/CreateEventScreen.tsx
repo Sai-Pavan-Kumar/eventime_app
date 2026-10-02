@@ -63,6 +63,7 @@ import { appEventSync } from '../lib/eventSync';
 import { checkRateLimit, recordAction } from '../lib/rate-limiter';
 import { CuratorCelebrationModal, CelebrationEventData } from '../components/CuratorCelebrationModal';
 import { formatEventDateDetailed, parseEventDateString } from '../lib/utils/date';
+import { searchColleges } from '../lib/college-search';
 import type { RootStackParamList } from '../types';
 
 const DRAFT_STORAGE_KEY = '@eventime_create_event_draft_v1';
@@ -571,7 +572,16 @@ export default function CreateEventScreen() {
   // Admin Feature Toggle
   const [isFeatured, setIsFeatured] = useState<boolean>(Boolean(initialEvent?.is_featured));
 
-  // College & Campus Section (Only visible for 'College Event' or 'College Fest')
+  // College & Campus Section - Decoupled toggle (Campus Event)
+  const [isCollegeEvent, setIsCollegeEvent] = useState<boolean>(
+    Boolean(
+      initialEvent?.college_id ||
+      (initialEvent as any)?.colleges?.name ||
+      initialEvent?.college_only ||
+      initialEvent?.category === 'College Event' ||
+      initialEvent?.category === 'College Fest'
+    )
+  );
   const [collegeOnly, setCollegeOnly] = useState(initialEvent?.college_only || false);
   const [collegeName, setCollegeName] = useState(initialEvent?.colleges?.name || profile?.college || '');
   const [collegeId, setCollegeId] = useState<string | null>(initialEvent?.college_id || profile?.college_id || null);
@@ -681,6 +691,7 @@ export default function CreateEventScreen() {
     setIsFree(true);
     setPrice('');
     setIsFeatured(false);
+    setIsCollegeEvent(false);
     setCollegeOnly(false);
     setCollegeName(profile?.college || '');
     setCollegeId(profile?.college_id || null);
@@ -729,6 +740,7 @@ export default function CreateEventScreen() {
               if (draft.prizes) setPrizes(draft.prizes);
               if (draft.teamSize) setTeamSize(draft.teamSize);
               if (draft.registrationDeadline) setRegistrationDeadline(draft.registrationDeadline);
+              if (draft.isCollegeEvent !== undefined) setIsCollegeEvent(draft.isCollegeEvent);
               if (draft.collegeOnly !== undefined) setCollegeOnly(draft.collegeOnly);
               if (draft.collegeName) setCollegeName(draft.collegeName);
               if (draft.collegeId) setCollegeId(draft.collegeId);
@@ -773,6 +785,7 @@ export default function CreateEventScreen() {
           prizes,
           teamSize,
           registrationDeadline,
+          isCollegeEvent,
           collegeOnly,
           collegeName,
           collegeId,
@@ -855,12 +868,9 @@ export default function CreateEventScreen() {
     return () => backSubscription.remove();
   }, [handleExitPress]);
 
-  // Determine if selected category is a college category
-  const isCollegeCategory = category === 'College Event' || category === 'College Fest';
-
-  // Auto-prefill student's registered college if creating a college event or fest
+  // Auto-prefill student's registered college if campus event is toggled
   useEffect(() => {
-    if (!editId && !initialEvent && isCollegeCategory && profile?.college) {
+    if (!editId && !initialEvent && isCollegeEvent && profile?.college) {
       if (!collegeName.trim()) {
         setCollegeName(profile.college);
         if (profile.college_id) {
@@ -868,7 +878,7 @@ export default function CreateEventScreen() {
         }
       }
     }
-  }, [editId, initialEvent, isCollegeCategory, profile?.college, profile?.college_id, collegeName]);
+  }, [editId, initialEvent, isCollegeEvent, profile?.college, profile?.college_id, collegeName]);
 
   // Admin feature controls
   const isAdminFeatureEnabled = Boolean(isAdmin && isFeaturedEnabledGlobally);
@@ -887,7 +897,7 @@ export default function CreateEventScreen() {
       });
   }, []);
 
-  // Search colleges when query changes
+  // Search colleges with dictionary normalization and alias matching
   useEffect(() => {
     const q = collegeSearchQuery.trim();
     if (q.length < 2) {
@@ -897,18 +907,14 @@ export default function CreateEventScreen() {
     setIsSearchingColleges(true);
     const timer = setTimeout(async () => {
       try {
-        const { data } = await supabase
-          .from('colleges')
-          .select('id, name')
-          .ilike('name', `%${q}%`)
-          .limit(6);
-        setCollegesList(data || []);
+        const results = await searchColleges(q);
+        setCollegesList(results || []);
       } catch (err) {
         console.error('Colleges search error:', err);
       } finally {
         setIsSearchingColleges(false);
       }
-    }, 300);
+    }, 250);
     return () => clearTimeout(timer);
   }, [collegeSearchQuery]);
 
@@ -953,6 +959,7 @@ export default function CreateEventScreen() {
           setRegistrationDeadline(data.registration_deadline || '');
           setPosterUri(data.poster_url || null);
           setIsFeatured(Boolean(data.is_featured));
+          setIsCollegeEvent(Boolean(data.college_id || (data as any).colleges?.name || data.college_only));
           setCollegeOnly(Boolean(data.college_only));
           setCollegeName((data as any).colleges?.name || '');
           setCollegeId(data.college_id || null);
@@ -1317,7 +1324,7 @@ export default function CreateEventScreen() {
       return;
     }
 
-    if (isCollegeCategory && collegeOnly && !collegeId && !collegeName.trim()) {
+    if (isCollegeEvent && collegeOnly && !collegeId && !collegeName.trim()) {
       Alert.alert('College Required', "Please select your college before restricting this event to it, or turn off 'Restrict to my college only'.");
       return;
     }
@@ -1419,12 +1426,12 @@ export default function CreateEventScreen() {
         team_size: teamSize || 'Solo',
         poster_url: finalPosterUrl || null,
         is_featured: isAdmin && isFeatured,
-        college_only: isCollegeCategory ? collegeOnly : false,
-        college_id: isCollegeCategory ? collegeId : null,
-        college_branch: isCollegeCategory && collegeBranch !== 'All Branches' ? collegeBranch : null,
-        branch_tags: isCollegeCategory && collegeBranch && collegeBranch !== 'All Branches' ? [collegeBranch] : null,
-        college_year: isCollegeCategory && collegeYear !== 'All Years' ? collegeYear : null,
-        target_audience: isCollegeCategory && collegeOnly ? ['College Students'] : ['Everyone'],
+        college_only: isCollegeEvent ? collegeOnly : false,
+        college_id: isCollegeEvent ? collegeId : null,
+        college_branch: isCollegeEvent && collegeBranch !== 'All Branches' ? collegeBranch : null,
+        branch_tags: isCollegeEvent && collegeBranch && collegeBranch !== 'All Branches' ? [collegeBranch] : null,
+        college_year: isCollegeEvent && collegeYear !== 'All Years' ? collegeYear : null,
+        target_audience: isCollegeEvent && collegeOnly ? ['College Students'] : ['Everyone'],
       };
 
       if (editId) {
@@ -1469,12 +1476,12 @@ export default function CreateEventScreen() {
         // Record action to enforce cooldown policy
         recordAction('CREATE_EVENT');
 
-        // Award +100 ET points if approved live
+        // Award +20 ET points if approved live (balanced score policy)
         if (status === 'approved') {
           try {
             await supabase.rpc('increment_et_score', {
               user_id: user.id,
-              delta: 100,
+              delta: 20,
             } as any);
           } catch {}
 
@@ -1484,13 +1491,13 @@ export default function CreateEventScreen() {
           sendRemotePushNotification({
             userIds: [user.id],
             title: 'Event Published',
-            body: `"${payload.title}" is now live on EvenTime (+100 ET score).`,
+            body: `"${payload.title}" is now live on EvenTime (+20 ET score).`,
             data: { eventId: insertedId, id: insertedId },
             channelId: 'events-reminders',
           });
 
           // Broadcast to target audience
-          if (collegeName && isCollegeCategory && collegeOnly) {
+          if (collegeName && isCollegeEvent && collegeOnly) {
             sendRemotePushNotification({
               college: collegeName,
               notificationType: 'campus_alerts',
@@ -1770,8 +1777,29 @@ export default function CreateEventScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* 4. College / Campus Section (STRICTLY ONLY SHOWN FOR College Event & College Fest) */}
-              {isCollegeCategory && (
+              {/* 3b. Campus Event Decoupled Toggle */}
+              <View style={styles.campusToggleRow}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={styles.campusToggleTitle}>Campus Event</Text>
+                  <Text style={styles.campusToggleSubtitle}>
+                    Is this event organized by or held at a specific college/campus?
+                  </Text>
+                </View>
+                <Switch
+                  value={isCollegeEvent}
+                  onValueChange={(val) => {
+                    setIsCollegeEvent(val);
+                    if (val && profile?.college && !collegeName.trim()) {
+                      setCollegeName(profile.college);
+                      if (profile.college_id) setCollegeId(profile.college_id);
+                    }
+                  }}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.brand }}
+                />
+              </View>
+
+              {/* 4. College / Campus Section (Visible whenever Campus Event is toggled) */}
+              {isCollegeEvent && (
                 <View style={styles.collegeCard}>
                   <View style={styles.collegeHeaderRow}>
                     <View style={styles.collegeIconCircle}>
@@ -1843,9 +1871,8 @@ export default function CreateEventScreen() {
                             </TouchableOpacity>
                           ))}
                         {!isSearchingColleges &&
-                          !collegesList.some(
-                            (c) => c.name.toLowerCase() === collegeSearchQuery.trim().toLowerCase()
-                          ) && (
+                          collegesList.length === 0 &&
+                          collegeSearchQuery.trim().length >= 3 && (
                             <TouchableOpacity
                               style={[styles.collegeDropdownItem, styles.addNewCollegeItem]}
                               onPress={handleAddCustomCollege}
@@ -2427,10 +2454,13 @@ export default function CreateEventScreen() {
           if (!description || Object.values(CATEGORY_TEMPLATES).includes(description)) {
             setDescription(CATEGORY_TEMPLATES[cat] || '');
           }
-          if ((cat === 'College Event' || cat === 'College Fest') && !collegeName.trim() && profile?.college) {
-            setCollegeName(profile.college);
-            if (profile.college_id) {
-              setCollegeId(profile.college_id);
+          if (cat === 'College Event' || cat === 'College Fest') {
+            setIsCollegeEvent(true);
+            if (!collegeName.trim() && profile?.college) {
+              setCollegeName(profile.college);
+              if (profile.college_id) {
+                setCollegeId(profile.college_id);
+              }
             }
           }
         }}
@@ -3076,6 +3106,28 @@ const styles = StyleSheet.create({
   },
   pricingTextActive: {
     color: theme.colors.brand,
+  },
+  campusToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+  },
+  campusToggleTitle: {
+    fontFamily: 'Switzer-Bold',
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  campusToggleSubtitle: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   },
   collegeCard: {
     backgroundColor: '#EFF6FF',

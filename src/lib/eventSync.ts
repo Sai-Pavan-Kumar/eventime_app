@@ -1,10 +1,13 @@
 export type AppEventSyncPayload = {
   eventId: string;
-  type: 'interest' | 'save' | 'delete' | 'create';
+  type: 'interest' | 'save' | 'delete' | 'create' | 'register';
   isInterested?: boolean;
   newInterestedCount?: number;
   interestedCountDelta?: number;
   isSaved?: boolean;
+  isRegistered?: boolean;
+  registeredCountDelta?: number;
+  newRegisteredCount?: number;
   event?: any;
 };
 

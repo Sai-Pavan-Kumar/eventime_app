@@ -935,7 +935,7 @@ export default function LeaderboardScreen() {
                 </Text>
               ) : userScore <= 150 ? (
                 <Text style={styles.rivalSubtitle}>
-                  Share an event (+100 ET) to earn points and claim your spot on the leaderboard.
+                  Share an event (+20 ET) to earn points and claim your spot on the leaderboard.
                 </Text>
               ) : (
                 <Text style={styles.rivalSubtitle}>
